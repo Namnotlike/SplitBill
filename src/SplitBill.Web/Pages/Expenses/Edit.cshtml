@@ -1,0 +1,110 @@
+@page "{expenseId:guid}"
+@model SplitBill.Web.Pages.Expenses.EditModel
+@{
+    ViewData["Title"] = "Sửa khoản chi";
+}
+
+<h1>Sửa khoản chi — @Model.Group.Name</h1>
+
+@if (Model.ErrorMessage is not null)
+{
+    <div class="alert alert-danger">@Model.ErrorMessage</div>
+}
+
+<form method="post">
+    <input type="hidden" asp-for="Input.RowVersion" />
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <label asp-for="Input.Title" class="form-label">Tiêu đề</label>
+            <input asp-for="Input.Title" class="form-control" />
+        </div>
+        <div class="col-md-3 mb-3">
+            <label asp-for="Input.TotalAmount" class="form-label">Tổng tiền (đ)</label>
+            <input asp-for="Input.TotalAmount" class="form-control" type="number" min="1" />
+        </div>
+        <div class="col-md-2 mb-3">
+            <label asp-for="Input.ExtraFeeAmount" class="form-label">Phụ phí (đ)</label>
+            <input asp-for="Input.ExtraFeeAmount" class="form-control" type="number" min="0" />
+        </div>
+        <div class="col-md-3 mb-3">
+            <label asp-for="Input.OccurredAt" class="form-label">Thời gian</label>
+            <input asp-for="Input.OccurredAt" class="form-control" type="datetime-local" />
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label asp-for="Input.Note" class="form-label">Ghi chú</label>
+        <input asp-for="Input.Note" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label d-block">Cách chia</label>
+        @{
+            var modes = new[] { ("Equal", "Chia đều"), ("Shares", "Theo phần"), ("Percentage", "Theo %"), ("ExactAmount", "Nhập tay") };
+        }
+        @foreach (var (value, label) in modes)
+        {
+            <div class="form-check form-check-inline">
+                <input class="form-check-input split-mode-radio" type="radio" name="Input.SplitMode" id="mode-@value" value="@value"
+                       checked="@(Model.Input.SplitMode == value)" />
+                <label class="form-check-label" for="mode-@value">@label</label>
+            </div>
+        }
+    </div>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Thành viên</th>
+                <th>Đã ứng (đ)</th>
+                <th class="split-col" data-mode="Equal">Tham gia?</th>
+                <th class="split-col" data-mode="Shares">Trọng số</th>
+                <th class="split-col" data-mode="Percentage">%</th>
+                <th class="split-col" data-mode="ExactAmount">Số tiền (đ)</th>
+            </tr>
+        </thead>
+        <tbody>
+            @for (var i = 0; i < Model.Input.Rows.Count; i++)
+            {
+                var member = Model.Group.Members.First(m => m.Id == Model.Input.Rows[i].MemberId);
+                <tr>
+                    <td>
+                        @member.DisplayName
+                        <input type="hidden" asp-for="Input.Rows[i].MemberId" />
+                    </td>
+                    <td><input asp-for="Input.Rows[i].PayerAmount" class="form-control form-control-sm" type="number" min="0" /></td>
+                    <td class="split-col" data-mode="Equal">
+                        <input asp-for="Input.Rows[i].EqualParticipant" class="form-check-input" type="checkbox" />
+                    </td>
+                    <td class="split-col" data-mode="Shares">
+                        <input asp-for="Input.Rows[i].ShareWeight" class="form-control form-control-sm" type="number" min="0" step="0.1" />
+                    </td>
+                    <td class="split-col" data-mode="Percentage">
+                        <input asp-for="Input.Rows[i].Percentage" class="form-control form-control-sm" type="number" min="0" max="100" step="0.1" />
+                    </td>
+                    <td class="split-col" data-mode="ExactAmount">
+                        <input asp-for="Input.Rows[i].ExactAmount" class="form-control form-control-sm" type="number" min="0" />
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+    <a asp-page="/Expenses/Index" asp-route-groupId="@Model.Group.Id" class="btn btn-outline-secondary">Hủy</a>
+</form>
+
+@section Scripts {
+    <script>
+        function updateSplitColumns() {
+            var mode = document.querySelector('.split-mode-radio:checked').value;
+            document.querySelectorAll('.split-col').forEach(function (el) {
+                el.style.display = el.dataset.mode === mode ? '' : 'none';
+            });
+        }
+        document.querySelectorAll('.split-mode-radio').forEach(function (el) {
+            el.addEventListener('change', updateSplitColumns);
+        });
+        updateSplitColumns();
+    </script>
+}

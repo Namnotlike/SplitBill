@@ -1,0 +1,179 @@
+using FluentAssertions;
+using SplitBill.Application.Groups;
+using SplitBill.Domain.Exceptions;
+using Xunit;
+
+namespace SplitBill.IntegrationTests;
+
+public sealed class GroupServiceTests
+{
+    [Fact]
+    public async Task CreateAsync_AssignsOwnerRole_WithCreatorsRealDisplayName()
+    {
+        using var harness = TestHarness.Create();
+        var userId = await harness.RegisterUserAsync("a@example.com", "Nam");
+
+        var group = await harness.GroupService.CreateAsync(userId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+
+        group.Members.Should().ContainSingle();
+        group.Members[0].Role.Should().Be("Owner");
+        // Bug đã sửa ở M4: DisplayName phải là tên user thật, KHÔNG phải tên nhóm.
+        group.Members[0].DisplayName.Should().Be("Nam");
+    }
+
+    [Fact]
+    public async Task AddMember_Guest_DefaultsToMemberRole()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+
+        var member = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(null, "Binh"), CancellationToken.None);
+
+        member.Role.Should().Be("Member");
+        member.UserId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ByNonOwner_ThrowsInsufficientRole()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var memberUserId = await harness.RegisterUserAsync("b@example.com", "Binh");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(memberUserId, "Binh"), CancellationToken.None);
+
+        var act = () => harness.GroupService.UpdateAsync(memberUserId, group.Id, new UpdateGroupRequest("Ten moi", null, null, null), CancellationToken.None);
+
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.InsufficientRole);
+    }
+
+    [Fact]
+    public async Task UpdateMemberAsync_SelfRename_AllowedForAnyRole()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var memberUserId = await harness.RegisterUserAsync("b@example.com", "Binh");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var member = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(memberUserId, "Binh"), CancellationToken.None);
+
+        var updated = await harness.GroupService.UpdateMemberAsync(memberUserId, group.Id, member.Id, new UpdateMemberRequest("Binh moi"), CancellationToken.None);
+
+        updated.DisplayName.Should().Be("Binh moi");
+    }
+
+    [Fact]
+    public async Task UpdateMemberAsync_RenameOtherByNonOwner_ThrowsInsufficientRole()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var memberUserId = await harness.RegisterUserAsync("b@example.com", "Binh");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var member = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(memberUserId, "Binh"), CancellationToken.None);
+
+        // Binh (Member) cố đổi tên của Owner (Nam) -> phải bị chặn.
+        var ownerMemberId = group.Members[0].Id;
+        var act = () => harness.GroupService.UpdateMemberAsync(memberUserId, group.Id, ownerMemberId, new UpdateMemberRequest("Hacked"), CancellationToken.None);
+
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.InsufficientRole);
+    }
+
+    [Fact]
+    public async Task RemoveMemberAsync_WithOutstandingBalance_ThrowsMemberHasOutstandingBalance()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var guest = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(null, "Binh"), CancellationToken.None);
+        var ownerMemberId = group.Members[0].Id;
+
+        var expenseBody = new Application.Expenses.CreateExpenseRequest(
+            "An toi", 100_000, 0, DateTimeOffset.UtcNow,
+            [new Application.Expenses.ExpensePayerInput(ownerMemberId, 100_000)],
+            "Equal",
+            new Application.Expenses.SplitConfigInput(MemberIds: [ownerMemberId, guest.Id]));
+        await harness.ExpenseService.CreateAsync(ownerId, group.Id, expenseBody, CancellationToken.None);
+
+        var act = () => harness.GroupService.RemoveMemberAsync(ownerId, group.Id, guest.Id, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.MemberHasOutstandingBalance);
+    }
+
+    [Fact]
+    public async Task RemoveMemberAsync_ZeroBalance_Succeeds()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var guest = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(null, "Binh"), CancellationToken.None);
+
+        await harness.GroupService.RemoveMemberAsync(ownerId, group.Id, guest.Id, CancellationToken.None);
+
+        var refreshed = await harness.GroupService.GetByIdAsync(ownerId, group.Id, CancellationToken.None);
+        refreshed.Members.Should().ContainSingle(m => m.Id == group.Members[0].Id);
+    }
+
+    [Fact]
+    public async Task RemoveMemberAsync_LastOwner_ThrowsLastOwnerCannotBeRemoved()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var ownerMemberId = group.Members[0].Id;
+
+        var act = () => harness.GroupService.RemoveMemberAsync(ownerId, group.Id, ownerMemberId, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.LastOwnerCannotBeRemoved);
+    }
+
+    [Fact]
+    public async Task GetBySharedTokenAsync_NoAuth_ReturnsGroup()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+
+        var shared = await harness.GroupService.GetBySharedTokenAsync(group.ShareToken, CancellationToken.None);
+
+        shared.Id.Should().Be(group.Id);
+    }
+
+    [Fact]
+    public async Task RotateShareTokenAsync_ByNonOwner_ThrowsInsufficientRole()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var memberUserId = await harness.RegisterUserAsync("b@example.com", "Binh");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(memberUserId, "Binh"), CancellationToken.None);
+
+        var act = () => harness.GroupService.RotateShareTokenAsync(memberUserId, group.Id, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.InsufficientRole);
+    }
+
+    [Fact]
+    public async Task RotateShareTokenAsync_ByOwner_ChangesToken()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+
+        var newToken = await harness.GroupService.RotateShareTokenAsync(ownerId, group.Id, CancellationToken.None);
+
+        newToken.Should().NotBe(group.ShareToken);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_NonMember_ThrowsMemberNotInGroup()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var strangerId = await harness.RegisterUserAsync("c@example.com", "Nguoi la");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+
+        var act = () => harness.GroupService.GetByIdAsync(strangerId, group.Id, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.MemberNotInGroup);
+    }
+}

@@ -1,0 +1,34 @@
+@page "{shareToken}"
+@model SplitBill.Web.Pages.Public.GroupModel
+@{
+    ViewData["Title"] = "Xem nhóm (chia sẻ)";
+    Layout = "_Layout";
+}
+
+@if (Model.ErrorMessage is not null)
+{
+    <div class="alert alert-danger">@Model.ErrorMessage</div>
+}
+else if (Model.Group is not null)
+{
+    <div class="alert alert-info">Bạn đang xem nhóm qua link chia sẻ (chỉ xem, không cần đăng nhập).</div>
+    <h1>@Model.Group.Name</h1>
+    @if (!string.IsNullOrEmpty(Model.Group.Description))
+    {
+        <p class="text-muted">@Model.Group.Description</p>
+    }
+
+    <h5>Thành viên</h5>
+    <ul class="list-group" style="max-width: 400px;">
+        @foreach (var member in Model.Group.Members)
+        {
+            <li class="list-group-item d-flex justify-content-between">
+                <span>@member.DisplayName</span>
+                @if (member.Role == "Owner")
+                {
+                    <span class="badge bg-warning text-dark">Owner</span>
+                }
+            </li>
+        }
+    </ul>
+}

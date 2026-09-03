@@ -1,0 +1,42 @@
+@page
+@model SplitBill.Web.Pages.Account.ProfileModel
+@{
+    ViewData["Title"] = "Hồ sơ";
+}
+
+<h1>Hồ sơ của tôi</h1>
+
+@if (Model.SuccessMessage is not null)
+{
+    <div class="alert alert-success">@Model.SuccessMessage</div>
+}
+@if (Model.ErrorMessage is not null)
+{
+    <div class="alert alert-danger">@Model.ErrorMessage</div>
+}
+
+<div class="row">
+    <div class="col-md-6">
+        <form method="post">
+            <div class="mb-3">
+                <label asp-for="Input.DisplayName" class="form-label">Tên hiển thị</label>
+                <input asp-for="Input.DisplayName" class="form-control" />
+            </div>
+            <div class="mb-3">
+                <label asp-for="Input.BankBin" class="form-label">Mã BIN ngân hàng (6 số)</label>
+                <input asp-for="Input.BankBin" class="form-control" placeholder="VD: 970436 (Vietcombank)" />
+                <span asp-validation-for="Input.BankBin" class="text-danger"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Input.BankAccountNumber" class="form-label">Số tài khoản</label>
+                <input asp-for="Input.BankAccountNumber" class="form-control" />
+            </div>
+            <p class="text-muted small">Dùng để sinh mã VietQR khi người khác cần chuyển tiền cho bạn.</p>
+            <button type="submit" class="btn btn-primary">Lưu</button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

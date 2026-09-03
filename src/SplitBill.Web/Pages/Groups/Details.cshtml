@@ -1,0 +1,105 @@
+@page "{id:guid}"
+@model SplitBill.Web.Pages.Groups.DetailsModel
+@{
+    ViewData["Title"] = Model.Group.Name;
+    var successMessage = TempData["SuccessMessage"] as string;
+    var errorMessage = TempData["ErrorMessage"] as string ?? Model.ErrorMessage;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1>@Model.Group.Name</h1>
+        @if (!string.IsNullOrEmpty(Model.Group.Description))
+        {
+            <p class="text-muted mb-0">@Model.Group.Description</p>
+        }
+    </div>
+    <span class="badge bg-light text-dark">@Model.Group.Type · @Model.Group.Currency</span>
+</div>
+
+@if (successMessage is not null)
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+@if (errorMessage is not null)
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+<div class="mb-3">
+    <a asp-page="/Expenses/Index" asp-route-groupId="@Model.Group.Id" class="btn btn-primary">Khoản chi</a>
+    <a asp-page="/Groups/Balances" asp-route-id="@Model.Group.Id" class="btn btn-outline-primary">Số dư</a>
+    <a asp-page="/Groups/SettlementPlan" asp-route-id="@Model.Group.Id" class="btn btn-outline-primary">Kế hoạch thanh toán</a>
+</div>
+
+<div class="row">
+    <div class="col-md-7">
+        <h5>Thành viên</h5>
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr><th>Tên</th><th>Vai trò</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var member in Model.Group.Members)
+                {
+                    <tr>
+                        <td>@member.DisplayName @(member.UserId is null ? " (khách)" : "")</td>
+                        <td>
+                            @if (member.Role == "Owner")
+                            {
+                                <span class="badge bg-warning text-dark">Owner</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Member</span>
+                            }
+                        </td>
+                        <td>
+                            <form method="post" asp-page-handler="RemoveMember" asp-route-id="@Model.Group.Id" asp-route-memberId="@member.Id" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Rời/Xóa</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <form method="post" asp-page-handler="AddMember" asp-route-id="@Model.Group.Id" class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label asp-for="NewMember.DisplayName" class="form-label">Thêm thành viên (khách vãng lai)</label>
+                <input asp-for="NewMember.DisplayName" class="form-control" placeholder="Tên hiển thị" />
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-secondary">Thêm</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="col-md-5">
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Link chia sẻ</h5>
+                <p class="text-muted small">Ai có link này đều xem được nhóm (không cần đăng nhập).</p>
+                <input type="text" class="form-control mb-2" readonly value="@Url.Page("/Public/Group", null, new { shareToken = Model.Group.ShareToken }, Request.Scheme)" />
+                <form method="post" asp-page-handler="RotateShareToken" asp-route-id="@Model.Group.Id">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">Đổi link mới</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Cài đặt</h5>
+                <form method="post" asp-page-handler="ToggleSimplify" asp-route-id="@Model.Group.Id" asp-route-simplifyDebts="@Model.Group.SimplifyDebts">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" checked="@Model.Group.SimplifyDebts" disabled />
+                        <label class="form-check-label">Gộp nợ tối ưu (SimplifyDebts)</label>
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-outline-secondary mt-2">
+                        @(Model.Group.SimplifyDebts ? "Tắt gộp nợ" : "Bật gộp nợ")
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,71 @@
+@page
+@model SplitBill.Web.Pages.Groups.IndexModel
+@{
+    ViewData["Title"] = "Nhóm của tôi";
+}
+
+<h1>Nhóm của tôi</h1>
+
+@if (Model.ErrorMessage is not null)
+{
+    <div class="alert alert-danger">@Model.ErrorMessage</div>
+}
+
+<div class="row">
+    <div class="col-md-7">
+        @if (Model.MyGroups.Count == 0)
+        {
+            <p class="text-muted">Chưa có nhóm nào. Tạo nhóm đầu tiên ở bên phải 👉</p>
+        }
+        else
+        {
+            <div class="list-group">
+                @foreach (var group in Model.MyGroups)
+                {
+                    <a asp-page="/Groups/Details" asp-route-id="@group.Id"
+                       class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <span>
+                            @group.Name
+                            @if (group.IsArchived)
+                            {
+                                <span class="badge bg-secondary ms-2">Đã lưu trữ</span>
+                            }
+                        </span>
+                        <span class="badge bg-light text-dark">@group.Type</span>
+                    </a>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Tạo nhóm mới</h5>
+                <form method="post" asp-page-handler="Create">
+                    <div class="mb-3">
+                        <label asp-for="NewGroup.Name" class="form-label">Tên nhóm</label>
+                        <input asp-for="NewGroup.Name" class="form-control" placeholder="VD: Du lịch Đà Lạt" />
+                        <span asp-validation-for="NewGroup.Name" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="NewGroup.Description" class="form-label">Mô tả (tùy chọn)</label>
+                        <input asp-for="NewGroup.Description" class="form-control" />
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="NewGroup.Type" class="form-label">Loại nhóm</label>
+                        <select asp-for="NewGroup.Type" class="form-select">
+                            <option value="OneTime">Một lần (cuộc chơi)</option>
+                            <option value="Recurring">Dùng lại nhiều lần</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Tạo nhóm</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

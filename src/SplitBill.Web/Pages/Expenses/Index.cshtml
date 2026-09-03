@@ -1,0 +1,58 @@
+@page "{groupId:guid}"
+@model SplitBill.Web.Pages.Expenses.IndexModel
+@{
+    ViewData["Title"] = "Khoản chi";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Khoản chi — @Model.Group.Name</h1>
+    <div>
+        <a asp-page="/Expenses/Create" asp-route-groupId="@Model.GroupId" class="btn btn-primary">+ Thêm khoản chi</a>
+        <a asp-page="/Groups/Details" asp-route-id="@Model.GroupId" class="btn btn-outline-secondary">← Về nhóm</a>
+    </div>
+</div>
+
+@if (TempData["ErrorMessage"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+@if (Model.Expenses.Items.Count == 0)
+{
+    <p class="text-muted">Chưa có khoản chi nào.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Ngày</th>
+                <th>Tiêu đề</th>
+                <th>Tổng tiền</th>
+                <th>Ai ứng</th>
+                <th>Chia theo</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var expense in Model.Expenses.Items)
+            {
+                <tr>
+                    <td>@expense.OccurredAt.ToString("dd/MM/yyyy")</td>
+                    <td>@expense.Title</td>
+                    <td>@expense.TotalAmount.ToString("N0")đ</td>
+                    <td>@string.Join(", ", expense.Payers.Select(p => Model.MemberName(p.MemberId)))</td>
+                    <td>@expense.SplitMode</td>
+                    <td>
+                        <a asp-page="/Expenses/Edit" asp-route-expenseId="@expense.Id" class="btn btn-sm btn-outline-secondary">Sửa</a>
+                        <form method="post" asp-page-handler="Delete" asp-route-expenseId="@expense.Id" asp-route-groupId="@Model.GroupId" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Xóa</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <p class="text-muted">Trang @Model.Expenses.Page — tổng @Model.Expenses.TotalCount khoản chi.</p>
+}

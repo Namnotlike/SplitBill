@@ -1,0 +1,185 @@
+using System.Net.Http.Json;
+using System.Text.Json;
+using SplitBill.Application.Auth;
+using SplitBill.Application.Expenses;
+using SplitBill.Application.Groups;
+using SplitBill.Application.Settlements;
+using SplitBill.Application.Users;
+
+namespace SplitBill.Web.Services;
+
+/// <summary>
+/// Client HTTP gọi SplitBill.Api. Tái dùng thẳng DTO từ SplitBill.Application để không phải khai
+/// báo lại request/response shape (Web tham chiếu Application chỉ để lấy DTO, không gọi service
+/// trong-process — mọi nghiệp vụ vẫn đi qua API thật, đúng ranh giới CLAUDE.md mục 3).
+/// </summary>
+public sealed class SplitBillApiClient
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    private readonly HttpClient _httpClient;
+
+    public SplitBillApiClient(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
+    }
+
+    // ===== Auth =====
+    public Task<AuthTokens> RegisterAsync(RegisterRequest request, CancellationToken ct) =>
+        PostAsync<RegisterRequest, AuthTokens>("auth/register", request, ct);
+
+    public Task<AuthTokens> LoginAsync(LoginRequest request, CancellationToken ct) =>
+        PostAsync<LoginRequest, AuthTokens>("auth/login", request, ct);
+
+    public Task LogoutAsync(string refreshToken, CancellationToken ct) =>
+        PostNoContentAsync("auth/logout", new { refreshToken }, ct);
+
+    // ===== Users =====
+    public Task<UserProfileDto> GetMeAsync(CancellationToken ct) => GetAsync<UserProfileDto>("users/me", ct);
+
+    public Task<UserProfileDto> UpdateMeAsync(UpdateProfileRequest request, CancellationToken ct) =>
+        PatchAsync<UpdateProfileRequest, UserProfileDto>("users/me", request, ct);
+
+    // ===== Groups =====
+    public Task<IReadOnlyList<GroupSummaryDto>> GetMyGroupsAsync(CancellationToken ct) =>
+        GetAsync<IReadOnlyList<GroupSummaryDto>>("groups", ct);
+
+    public Task<GroupDto> GetGroupAsync(Guid id, CancellationToken ct) => GetAsync<GroupDto>($"groups/{id}", ct);
+
+    public Task<GroupDto> CreateGroupAsync(CreateGroupRequest request, CancellationToken ct) =>
+        PostAsync<CreateGroupRequest, GroupDto>("groups", request, ct);
+
+    public Task<GroupDto> UpdateGroupAsync(Guid id, UpdateGroupRequest request, CancellationToken ct) =>
+        PatchAsync<UpdateGroupRequest, GroupDto>($"groups/{id}", request, ct);
+
+    public Task DeleteGroupAsync(Guid id, CancellationToken ct) => DeleteAsync($"groups/{id}", ct);
+
+    public Task<GroupDto> GetSharedGroupAsync(string shareToken, CancellationToken ct) =>
+        GetAsync<GroupDto>($"groups/shared/{shareToken}", ct);
+
+    public async Task<string> RotateShareTokenAsync(Guid id, CancellationToken ct)
+    {
+        var result = await PostAsync<object?, Dictionary<string, string>>($"groups/{id}/share-token/rotate", null, ct);
+        return result["shareToken"];
+    }
+
+    public Task<GroupMemberDto> AddMemberAsync(Guid groupId, AddMemberRequest request, CancellationToken ct) =>
+        PostAsync<AddMemberRequest, GroupMemberDto>($"groups/{groupId}/members", request, ct);
+
+    public Task<GroupMemberDto> UpdateMemberAsync(Guid groupId, Guid memberId, UpdateMemberRequest request, CancellationToken ct) =>
+        PatchAsync<UpdateMemberRequest, GroupMemberDto>($"groups/{groupId}/members/{memberId}", request, ct);
+
+    public Task RemoveMemberAsync(Guid groupId, Guid memberId, CancellationToken ct) =>
+        DeleteAsync($"groups/{groupId}/members/{memberId}", ct);
+
+    // ===== Expenses =====
+    public Task<PagedResult<ExpenseDto>> GetExpensesAsync(Guid groupId, int page, int pageSize, CancellationToken ct) =>
+        GetAsync<PagedResult<ExpenseDto>>($"groups/{groupId}/expenses?page={page}&pageSize={pageSize}", ct);
+
+    public Task<ExpenseDto> GetExpenseAsync(Guid expenseId, CancellationToken ct) => GetAsync<ExpenseDto>($"expenses/{expenseId}", ct);
+
+    public Task<ExpenseResult> CreateExpenseAsync(Guid groupId, CreateExpenseRequest request, CancellationToken ct) =>
+        PostAsync<CreateExpenseRequest, ExpenseResult>($"groups/{groupId}/expenses", request, ct);
+
+    public Task<ExpenseResult> UpdateExpenseAsync(Guid expenseId, UpdateExpenseRequest request, CancellationToken ct) =>
+        PutAsync<UpdateExpenseRequest, ExpenseResult>($"expenses/{expenseId}", request, ct);
+
+    public Task DeleteExpenseAsync(Guid expenseId, CancellationToken ct) => DeleteAsync($"expenses/{expenseId}", ct);
+
+    public Task<PreviewSplitResult> PreviewSplitAsync(PreviewSplitRequest request, CancellationToken ct) =>
+        PostAsync<PreviewSplitRequest, PreviewSplitResult>("expenses/preview-split", request, ct);
+
+    // ===== Balances / Settlement =====
+    public Task<IReadOnlyList<MemberBalanceDto>> GetBalancesAsync(Guid groupId, CancellationToken ct) =>
+        GetAsync<IReadOnlyList<MemberBalanceDto>>($"groups/{groupId}/balances", ct);
+
+    public Task<SettlementPlanDto> GetSettlementPlanAsync(Guid groupId, CancellationToken ct) =>
+        GetAsync<SettlementPlanDto>($"groups/{groupId}/settlement-plan", ct);
+
+    public Task<IReadOnlyList<SettlementDto>> GetSettlementsAsync(Guid groupId, CancellationToken ct) =>
+        GetAsync<IReadOnlyList<SettlementDto>>($"groups/{groupId}/settlements", ct);
+
+    public Task<SettlementDto> CreateSettlementAsync(Guid groupId, CreateSettlementRequest request, CancellationToken ct) =>
+        PostAsync<CreateSettlementRequest, SettlementDto>($"groups/{groupId}/settlements", request, ct);
+
+    public Task<SettlementDto> ConfirmSettlementAsync(Guid settlementId, CancellationToken ct) =>
+        PostAsync<object?, SettlementDto>($"settlements/{settlementId}/confirm", null, ct);
+
+    public Task<SettlementDto> RejectSettlementAsync(Guid settlementId, CancellationToken ct) =>
+        PostAsync<object?, SettlementDto>($"settlements/{settlementId}/reject", null, ct);
+
+    public Task DeleteSettlementAsync(Guid settlementId, CancellationToken ct) => DeleteAsync($"settlements/{settlementId}", ct);
+
+    // ===== Helpers =====
+    private async Task<TResponse> GetAsync<TResponse>(string path, CancellationToken ct)
+    {
+        var response = await _httpClient.GetAsync(path, ct);
+        return await ReadOrThrowAsync<TResponse>(response, ct);
+    }
+
+    private async Task<TResponse> PostAsync<TRequest, TResponse>(string path, TRequest? body, CancellationToken ct)
+    {
+        var response = await _httpClient.PostAsJsonAsync(path, body, JsonOptions, ct);
+        return await ReadOrThrowAsync<TResponse>(response, ct);
+    }
+
+    private async Task PostNoContentAsync<TRequest>(string path, TRequest body, CancellationToken ct)
+    {
+        var response = await _httpClient.PostAsJsonAsync(path, body, JsonOptions, ct);
+        await EnsureSuccessAsync(response, ct);
+    }
+
+    private async Task<TResponse> PatchAsync<TRequest, TResponse>(string path, TRequest body, CancellationToken ct)
+    {
+        var response = await _httpClient.PatchAsJsonAsync(path, body, JsonOptions, ct);
+        return await ReadOrThrowAsync<TResponse>(response, ct);
+    }
+
+    private async Task<TResponse> PutAsync<TRequest, TResponse>(string path, TRequest body, CancellationToken ct)
+    {
+        var response = await _httpClient.PutAsJsonAsync(path, body, JsonOptions, ct);
+        return await ReadOrThrowAsync<TResponse>(response, ct);
+    }
+
+    private async Task DeleteAsync(string path, CancellationToken ct)
+    {
+        var response = await _httpClient.DeleteAsync(path, ct);
+        await EnsureSuccessAsync(response, ct);
+    }
+
+    private static async Task<TResponse> ReadOrThrowAsync<TResponse>(HttpResponseMessage response, CancellationToken ct)
+    {
+        await EnsureSuccessAsync(response, ct);
+        var result = await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions, ct);
+        return result ?? throw new ApiException((int)response.StatusCode, "EMPTY_RESPONSE", "Server trả về nội dung rỗng.");
+    }
+
+    private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        var errorCode = "UNKNOWN_ERROR";
+        var message = $"Lỗi không xác định (HTTP {(int)response.StatusCode}).";
+
+        try
+        {
+            var problem = await response.Content.ReadFromJsonAsync<ProblemDetailsBody>(JsonOptions, ct);
+            if (problem is not null)
+            {
+                errorCode = problem.ErrorCode ?? errorCode;
+                message = problem.Title ?? message;
+            }
+        }
+        catch
+        {
+            // body không phải JSON hợp lệ — giữ message mặc định.
+        }
+
+        throw new ApiException((int)response.StatusCode, errorCode, message);
+    }
+
+    private sealed record ProblemDetailsBody(string? Title, string? ErrorCode);
+}
