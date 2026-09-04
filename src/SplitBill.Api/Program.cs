@@ -75,15 +75,23 @@ try
     }));
 
     // ===== Rate limiting cho /auth (chống brute-force) =====
+    // ⚠️ Sửa lỗi phát hiện khi rà soát 2026-09-04: AddFixedWindowLimiter (không có partition key)
+    // tạo ĐÚNG 1 hạn ngạch dùng chung cho MỌI client, không phải "10 request/phút/IP" như tài liệu
+    // ban đầu mô tả. Hậu quả: vài user đăng nhập cùng lúc có thể vô tình khóa đăng nhập của TẤT CẢ
+    // user khác trong 1 phút (tự gây DoS), và không hề chống được brute-force phân tán nhiều IP.
+    // Phải dùng AddPolicy + RateLimitPartition.GetFixedWindowLimiter với partition key = IP để mỗi
+    // client có hạn ngạch riêng.
     builder.Services.AddRateLimiter(options =>
     {
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-        options.AddFixedWindowLimiter("auth", limiterOptions =>
-        {
-            limiterOptions.PermitLimit = 10;
-            limiterOptions.Window = TimeSpan.FromMinutes(1);
-            limiterOptions.QueueLimit = 0;
-        });
+        options.AddPolicy("auth", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
     });
 
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -155,6 +163,13 @@ try
 catch (Exception ex) when (ex is not HostAbortedException)
 {
     Log.Fatal(ex, "SplitBill.Api dừng đột ngột khi khởi động");
+    // ⚠️ Sửa lỗi phát hiện khi rà soát 2026-09-04: thiếu dòng này khiến process thoát với exit code 0
+    // dù thực chất là crash lúc khởi động (từng thấy trực tiếp: "[exited with code 0]" khi thiếu
+    // Jwt:SigningKey). Exit code 0 = "tắt bình thường" đối với Docker/K8s/systemd — orchestrator sẽ
+    // KHÔNG tự restart hay báo lỗi, rất nguy hiểm nếu deploy production thiếu biến môi trường bắt
+    // buộc. Dùng Environment.ExitCode (không dùng Environment.Exit) để vẫn chạy xong khối finally
+    // bên dưới (flush log) trước khi process thật sự thoát với exit code khác 0.
+    Environment.ExitCode = 1;
 }
 finally
 {

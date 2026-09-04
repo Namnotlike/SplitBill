@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SplitBill.Api.Auth;
 using SplitBill.Application.Common;
+using SplitBill.Application.Expenses; // PagedResult<T>
 using SplitBill.Application.Groups;
 
 namespace SplitBill.Api.Controllers;
@@ -12,21 +13,26 @@ namespace SplitBill.Api.Controllers;
 [Authorize]
 public sealed class GroupsController : ControllerBase
 {
+    private const int DefaultAuditLogPageSize = 20;
+
     private readonly IGroupService _groupService;
     private readonly IValidator<CreateGroupRequest> _createGroupValidator;
     private readonly IValidator<AddMemberRequest> _addMemberValidator;
     private readonly IValidator<UpdateMemberRequest> _updateMemberValidator;
+    private readonly IValidator<UpdateMemberRoleRequest> _updateMemberRoleValidator;
 
     public GroupsController(
         IGroupService groupService,
         IValidator<CreateGroupRequest> createGroupValidator,
         IValidator<AddMemberRequest> addMemberValidator,
-        IValidator<UpdateMemberRequest> updateMemberValidator)
+        IValidator<UpdateMemberRequest> updateMemberValidator,
+        IValidator<UpdateMemberRoleRequest> updateMemberRoleValidator)
     {
         _groupService = groupService;
         _createGroupValidator = createGroupValidator;
         _addMemberValidator = addMemberValidator;
         _updateMemberValidator = updateMemberValidator;
+        _updateMemberRoleValidator = updateMemberRoleValidator;
     }
 
     [HttpPost]
@@ -103,5 +109,24 @@ public sealed class GroupsController : ControllerBase
     {
         await _groupService.RemoveMemberAsync(User.GetUserId(), id, memberId, cancellationToken);
         return NoContent();
+    }
+
+    [HttpPost("{id:guid}/members/{memberId:guid}/role")]
+    public async Task<ActionResult<GroupMemberDto>> UpdateMemberRoleAsync(Guid id, Guid memberId, UpdateMemberRoleRequest request, CancellationToken cancellationToken)
+    {
+        _updateMemberRoleValidator.ValidateOrThrowDomainException(request);
+        var member = await _groupService.UpdateMemberRoleAsync(User.GetUserId(), id, memberId, request, cancellationToken);
+        return Ok(member);
+    }
+
+    [HttpGet("{id:guid}/audit-logs")]
+    public async Task<ActionResult<PagedResult<AuditLogDto>>> GetAuditLogsAsync(
+        Guid id, [FromQuery] int page = 1, [FromQuery] int pageSize = DefaultAuditLogPageSize, CancellationToken cancellationToken = default)
+    {
+        page = Math.Max(1, page);
+        pageSize = pageSize <= 0 ? DefaultAuditLogPageSize : Math.Min(pageSize, 100);
+
+        var result = await _groupService.GetAuditLogsAsync(User.GetUserId(), id, page, pageSize, cancellationToken);
+        return Ok(result);
     }
 }

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using SplitBill.Application.Abstractions;
+using SplitBill.Application.Expenses; // PagedResult<T>
 using SplitBill.Application.Settlement;
 using SplitBill.Application.Splitting;
 using SplitBill.Domain.Entities;
@@ -260,6 +261,60 @@ public sealed class GroupService : IGroupService
 
         await WriteAuditLogAsync(group.Id, "GroupMember", target.Id, "Deleted", caller.Id, null, null, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<GroupMemberDto> UpdateMemberRoleAsync(Guid callerUserId, Guid groupId, Guid memberId, UpdateMemberRoleRequest request, CancellationToken cancellationToken)
+    {
+        if (!Enum.TryParse<GroupMemberRole>(request.Role, ignoreCase: true, out var newRole))
+        {
+            throw new DomainException(ErrorCodes.ValidationFailed, $"Role '{request.Role}' không hợp lệ.");
+        }
+
+        var group = await LoadGroupAsync(groupId, cancellationToken);
+        var caller = ResolveCallerMember(group, callerUserId);
+        RequireOwner(caller); // chỉ Owner mới được gán/thu hồi quyền Owner (CLAUDE.md mục 4.4)
+
+        var target = FindMember(group, memberId);
+
+        if (target.Role == GroupMemberRole.Owner && newRole == GroupMemberRole.Member)
+        {
+            var otherOwners = group.Members.Any(m => m.Id != target.Id && m.IsActive && m.Role == GroupMemberRole.Owner);
+            if (!otherOwners)
+            {
+                throw new DomainException(ErrorCodes.LastOwnerCannotBeRemoved, "Nhóm phải có ít nhất 1 Owner.");
+            }
+        }
+
+        var before = ToMemberDto(target);
+        target.Role = newRole;
+
+        await WriteAuditLogAsync(group.Id, "GroupMember", target.Id, "Updated", caller.Id, before, ToMemberDto(target), cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return ToMemberDto(target);
+    }
+
+    public async Task<PagedResult<AuditLogDto>> GetAuditLogsAsync(Guid callerUserId, Guid groupId, int page, int pageSize, CancellationToken cancellationToken)
+    {
+        var group = await LoadGroupAsync(groupId, cancellationToken);
+        ResolveCallerMember(group, callerUserId); // mọi thành viên đều xem được lịch sử, không riêng Owner
+
+        // Lấy theo cả thành viên đã rời nhóm (IsActive = false) để tên trong log cũ vẫn hiển thị đúng.
+        var memberNames = group.Members.ToDictionary(m => m.Id, m => m.DisplayName);
+
+        var (items, total) = await _auditLogRepository.GetPagedByGroupIdAsync(groupId, page, pageSize, cancellationToken);
+        var dtos = items.Select(log => new AuditLogDto(
+            log.Id,
+            log.EntityType,
+            log.EntityId,
+            log.Action,
+            log.ActorMemberId,
+            memberNames.GetValueOrDefault(log.ActorMemberId, "(đã rời nhóm)"),
+            log.BeforeJson,
+            log.AfterJson,
+            log.CreatedAt)).ToList();
+
+        return new PagedResult<AuditLogDto>(dtos, page, pageSize, total);
     }
 
     private async Task<long> GetMemberNetBalanceAsync(Guid groupId, Guid memberId, CancellationToken cancellationToken)

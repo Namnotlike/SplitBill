@@ -23,3 +23,18 @@ public sealed record UpdateGroupRequest(string? Name, string? Description, bool?
 public sealed record AddMemberRequest(Guid? UserId, string? DisplayName);
 
 public sealed record UpdateMemberRequest(string DisplayName);
+
+/// <summary>Gán/thu hồi quyền Owner cho 1 thành viên — chỉ Owner gọi được (CLAUDE.md mục 4.4).</summary>
+public sealed record UpdateMemberRoleRequest(string Role);
+
+/// <summary>1 dòng lịch sử thay đổi, trả qua GET /groups/{id}/audit-logs (CLAUDE.md mục 8).</summary>
+public sealed record AuditLogDto(
+    Guid Id,
+    string EntityType,
+    Guid EntityId,
+    string Action,
+    Guid ActorMemberId,
+    string ActorMemberName,
+    string? BeforeJson,
+    string? AfterJson,
+    DateTimeOffset CreatedAt);

@@ -74,6 +74,15 @@ public sealed class ExpensesController : ControllerBase
     }
 
     private static readonly HashSet<string> AllowedReceiptExtensions = new(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".webp" };
+    // ⚠️ Bổ sung khi rà soát 2026-09-04: trước đây chỉ kiểm tra ĐUÔI file, không kiểm tra Content-Type
+    // client gửi lên. Vì ContentType này được lưu thẳng và trả lại nguyên văn ở GET bên dưới, một
+    // thành viên nhóm có thể up file đuôi ".jpg" nhưng Content-Type "text/html" chứa mã độc — rủi ro
+    // stored-XSS phạm vi trong nhóm nếu sau này có UI hiển thị ảnh inline. Phải chặn ngay từ whitelist
+    // Content-Type thật, không chỉ dựa vào đuôi file (đuôi file người dùng đặt tùy ý).
+    private static readonly HashSet<string> AllowedReceiptContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image/jpeg", "image/png", "image/webp",
+    };
     private const long MaxReceiptImageBytes = 10 * 1024 * 1024; // 10MB
 
     [HttpPost("/api/v1/expenses/{expenseId:guid}/receipt-image")]
@@ -96,6 +105,11 @@ public sealed class ExpensesController : ControllerBase
             throw new DomainException(ErrorCodes.ValidationFailed, "Chỉ chấp nhận ảnh .jpg, .jpeg, .png, .webp.");
         }
 
+        if (!AllowedReceiptContentTypes.Contains(file.ContentType))
+        {
+            throw new DomainException(ErrorCodes.ValidationFailed, "Content-Type ảnh không hợp lệ. Chỉ chấp nhận image/jpeg, image/png, image/webp.");
+        }
+
         await using var stream = file.OpenReadStream();
         var expense = await _expenseService.UploadReceiptImageAsync(
             User.GetUserId(), expenseId, stream, file.FileName, file.ContentType, cancellationToken);
@@ -106,6 +120,9 @@ public sealed class ExpensesController : ControllerBase
     public async Task<IActionResult> GetReceiptImageAsync(Guid expenseId, CancellationToken cancellationToken)
     {
         var image = await _expenseService.GetReceiptImageAsync(User.GetUserId(), expenseId, cancellationToken);
+        // Phòng vệ thêm (defense in depth): dù ContentType đã được whitelist lúc upload, vẫn ép trình
+        // duyệt không tự "đoán" (MIME-sniff) loại nội dung khác với Content-Type khai báo.
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
         return File(image.Content, image.ContentType, image.FileName);
     }
 

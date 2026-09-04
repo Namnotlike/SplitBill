@@ -28,3 +28,11 @@ public sealed class UpdateMemberRequestValidator : AbstractValidator<UpdateMembe
         RuleFor(x => x.DisplayName).NotEmpty().MaximumLength(100);
     }
 }
+
+public sealed class UpdateMemberRoleRequestValidator : AbstractValidator<UpdateMemberRoleRequest>
+{
+    public UpdateMemberRoleRequestValidator()
+    {
+        RuleFor(x => x.Role).NotEmpty().Must(r => r is "Owner" or "Member").WithMessage("Role phải là 'Owner' hoặc 'Member'.");
+    }
+}
