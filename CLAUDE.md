@@ -807,8 +807,9 @@ Trình duyệt **không bao giờ thấy JWT thật**. Luồng:
 
 ### Giới hạn đã biết (chưa làm, để tránh phình phạm vi)
 
-- Form tạo/sửa khoản chi chỉ hỗ trợ `Equal`, `Shares`, `Percentage`, `ExactAmount` — **chưa có UI
-  cho `Itemized`** (API vẫn hỗ trợ đầy đủ, chỉ là chưa có form nhập món ăn động trên giao diện).
+- ~~Form tạo/sửa khoản chi chỉ hỗ trợ Equal/Shares/Percentage/ExactAmount, chưa có UI Itemized~~ —
+  đã bổ sung UI `Itemized` (bảng món ăn động, thêm/xóa dòng qua JS, xem `Create.cshtml`/`Edit.cshtml`)
+  cùng đợt thiết kế lại giao diện 2026-09-04; cả 5 `SplitMode` đều có form trên Web.
 - Form Edit không thể khôi phục chính xác trọng số/% gốc đã nhập lúc tạo (API chỉ lưu
   `ExpenseSplit.Amount` cuối cùng, không lưu `SplitConfigJson` có cấu trúc đọc lại được) — dùng
   Amount hiện tại làm giá trị khởi tạo cho Shares/Percentage, xem chi tiết trong docstring
@@ -851,6 +852,26 @@ Trình duyệt **không bao giờ thấy JWT thật**. Luồng:
   `.sb-balance-card` (+ `.positive`/`.negative`) cho lưới số dư, `.sb-auth-card` cho trang đăng nhập/đăng ký,
   `.fw-600`/`.fw-700` (Bootstrap không có sẵn 2 class này, phải tự định nghĩa). Mọi trang Razor Pages mới
   nên tái dùng các class/biến này thay vì viết style rời rạc, để giữ giao diện nhất quán.
+- Bổ sung `README.md` (hướng dẫn chạy nhanh, không lặp lại nội dung đặc tả ở đây) và đóng gói Docker
+  (2026-09-04): `src/SplitBill.Api/Dockerfile`, `src/SplitBill.Web/Dockerfile`, `docker-compose.yml`
+  ở gốc repo (SQL Server + Api + Web, `docker compose up --build`).
+  > ⚠️ Bug thật phát hiện lúc viết README: `src/SplitBill.Api/Properties/launchSettings.json` trước đó
+  > có `applicationUrl` mặc định là cổng **5036**, trong khi `SplitBill.Web/appsettings.json`
+  > (`Api:BaseUrl`) và CORS mặc định lại giả định Api chạy ở cổng **5199** — 2 giá trị này không hề
+  > khớp nhau. Suốt phiên làm việc trước đó phải tự set `$env:ASPNETCORE_URLS="http://localhost:5199"`
+  > thủ công mỗi lần chạy Api mới hoạt động đúng; nếu chạy đúng theo hướng dẫn mặc định (`dotnet run`,
+  > không override) thì Web sẽ không gọi được Api (connection refused vì Api thực ra lắng nghe ở 5036).
+  > Đã sửa `launchSettings.json` đổi cổng về 5199 để khớp với phần còn lại của hệ thống — từ nay
+  > `dotnet run` không cần override gì cũng chạy đúng theo README.
+  > Đồng thời thêm cờ `Database:AutoMigrateOnStartup` (mặc định `false`, chỉ bật qua env
+  > `Database__AutoMigrateOnStartup=true` trong `docker-compose.yml`) để container tự áp migration lúc
+  > khởi động mà không đổi hành vi mặc định của luồng dev local (vẫn `dotnet ef database update` thủ
+  > công như README mô tả), và bật `EnableRetryOnFailure()` cho `UseSqlServer` để chịu được lỗi kết nối
+  > tạm thời (giúp container Api không crash nếu khởi động trước khi SQL Server sẵn sàng nhận login).
+  > **Lưu ý:** môi trường làm việc hiện tại không có sẵn Docker CLI nên chưa tự chạy được
+  > `docker compose up --build` để verify end-to-end — cấu hình đã rà soát kỹ bằng mắt (đường dẫn COPY,
+  > tên service, biến môi trường khớp với `Program.cs`/`appsettings.json`) nhưng nếu Docker sẵn có ở máy
+  > khác, nên tự `docker compose up --build` 1 lần trước khi tin tưởng hoàn toàn.
 
 ---
 

@@ -1,0 +1,47 @@
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "SplitBill_DevOnly!23"
+    ports:
+      - "1433:1433" # tùy chọn — chỉ để mở SSMS/Azure Data Studio từ máy host nếu cần debug
+    volumes:
+      - splitbill-db-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/1433'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  api:
+    build:
+      context: .
+      dockerfile: src/SplitBill.Api/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: "Server=db;Database=SplitBill;User Id=sa;Password=SplitBill_DevOnly!23;TrustServerCertificate=True"
+      # ⚠️ Chỉ để chạy thử nhanh — ĐỔI giá trị này trước khi dùng ngoài máy cá nhân (xem README.md).
+      Jwt__SigningKey: "docker-compose-dev-only-signing-key-change-me-32bytes+"
+      Database__AutoMigrateOnStartup: "true" # chỉ bật ở đây — dev local vẫn dùng `dotnet ef database update` thủ công
+    ports:
+      - "5199:8080"
+
+  web:
+    build:
+      context: .
+      dockerfile: src/SplitBill.Web/Dockerfile
+    depends_on:
+      - api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Api__BaseUrl: "http://api:8080/api/v1/"
+    ports:
+      - "5103:8080"
+
+volumes:
+  splitbill-db-data:

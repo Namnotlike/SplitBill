@@ -46,7 +46,12 @@ try
     builder.Services.AddSwaggerGen();
 
     builder.Services.AddDbContext<SplitBillDbContext>(options =>
-        options.UseSqlServer(builder.Configuration.GetConnectionString("Default")));
+        options.UseSqlServer(
+            builder.Configuration.GetConnectionString("Default"),
+            // Tự retry khi mất kết nối tạm thời (transient) — theo khuyến nghị chuẩn của EF Core cho
+            // SQL Server, đồng thời giúp container Api khởi động ổn định hơn khi SQL Server trong
+            // docker-compose vẫn đang khởi tạo (nhận TCP connection trước khi sẵn sàng nhận login).
+            sqlOptions => sqlOptions.EnableRetryOnFailure()));
 
     // ===== JWT =====
     builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
@@ -142,6 +147,18 @@ try
     builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();
 
     var app = builder.Build();
+
+    // ===== Tự động áp migration lúc khởi động (TẮT mặc định) =====
+    // Chỉ dùng cho môi trường container hóa (xem docker-compose.yml, biến env
+    // Database__AutoMigrateOnStartup=true) để "docker compose up" chạy được ngay không cần thao tác
+    // thủ công. Luồng dev local bình thường (mục "Chạy nhanh" trong README.md) vẫn dùng
+    // `dotnet ef database update` thủ công như trước — KHÔNG đổi hành vi mặc định.
+    if (builder.Configuration.GetValue<bool>("Database:AutoMigrateOnStartup"))
+    {
+        using var migrationScope = app.Services.CreateScope();
+        var dbContext = migrationScope.ServiceProvider.GetRequiredService<SplitBillDbContext>();
+        dbContext.Database.Migrate();
+    }
 
     app.UseMiddleware<ExceptionHandlingMiddleware>();
 
