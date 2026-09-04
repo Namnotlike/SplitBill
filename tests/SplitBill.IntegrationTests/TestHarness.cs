@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using SplitBill.Application.Auth;
 using SplitBill.Application.Expenses;
+using SplitBill.Application.Export;
 using SplitBill.Application.Groups;
 using SplitBill.Application.Settlement;
 using SplitBill.Application.Settlements;
@@ -29,6 +30,7 @@ public sealed class TestHarness : IDisposable
     public IExpenseService ExpenseService { get; }
     public IBalanceService BalanceService { get; }
     public ISettlementRecordService SettlementRecordService { get; }
+    public IExportService ExportService { get; }
 
     private TestHarness(SplitBillDbContext dbContext)
     {
@@ -66,6 +68,7 @@ public sealed class TestHarness : IDisposable
             expenseRepository, groupRepository, auditLogRepository, unitOfWork, splitCalculator, receiptImageRepository);
         BalanceService = new BalanceService(groupRepository, expenseRepository, settlementRepository, balanceCalculator, vietQrGenerator);
         SettlementRecordService = new SettlementRecordService(groupRepository, settlementRepository, auditLogRepository, unitOfWork);
+        ExportService = new ExportService(ExpenseService, GroupService, BalanceService);
     }
 
     public static TestHarness Create()

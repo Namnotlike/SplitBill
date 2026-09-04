@@ -30,6 +30,8 @@
     <a asp-page="/Expenses/Index" asp-route-groupId="@Model.Group.Id" class="btn btn-primary">Khoản chi</a>
     <a asp-page="/Groups/Balances" asp-route-id="@Model.Group.Id" class="btn btn-outline-primary">Số dư</a>
     <a asp-page="/Groups/SettlementPlan" asp-route-id="@Model.Group.Id" class="btn btn-outline-primary">Kế hoạch thanh toán</a>
+    <a asp-page="/Groups/Details" asp-page-handler="ExportExpenses" asp-route-id="@Model.Group.Id" class="btn btn-outline-secondary">⬇ CSV khoản chi</a>
+    <a asp-page="/Groups/Details" asp-page-handler="ExportBalances" asp-route-id="@Model.Group.Id" class="btn btn-outline-secondary">⬇ CSV số dư</a>
 </div>
 
 <div class="row">

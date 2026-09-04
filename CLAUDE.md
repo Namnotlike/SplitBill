@@ -568,6 +568,8 @@ DELETE /expenses/{expenseId}            Soft delete
 POST   /expenses/preview-split          Tính thử splits mà không lưu — dùng cho UI realtime
 POST   /expenses/{expenseId}/receipt-image   Upload ảnh hóa đơn (multipart/form-data), trả về ReceiptImageUrl
 GET    /expenses/{expenseId}/receipt-image   Tải ảnh hóa đơn — yêu cầu JWT + phải là thành viên nhóm
+GET    /groups/{id}/export/expenses.csv      Xuất CSV danh sách khoản chi (bổ sung 2026-09-04)
+GET    /groups/{id}/export/balances.csv      Xuất CSV số dư từng người (bổ sung 2026-09-04)
 ```
 
 Ảnh lưu trong bảng `ReceiptImage` (SQL Server, `varbinary(max)`) — không dùng local disk hay cloud storage. `GET` bắt buộc `[Authorize]` + kiểm tra thành viên nhóm (khác với việc phục vụ file tĩnh qua static files, vốn không kiểm tra quyền — đã cân nhắc và chọn cách này để tránh lộ ảnh hóa đơn tài chính cho người ngoài group).
@@ -705,7 +707,8 @@ Auth JWT (`/auth/*`, `PasswordHasher<User>`), `/users/me`, API nhóm, thành vi�
 `/balances`, `/settlement-plan`, ghi nhận và xác nhận thanh toán, audit log.
 
 **M5 — Hoàn thiện**
-Link chia sẻ, VietQR, upload ảnh hóa đơn, chế độ `SimplifyDebts = false`, xuất dữ liệu.
+Link chia sẻ, VietQR, upload ảnh hóa đơn, chế độ `SimplifyDebts = false`, xuất dữ liệu (quyết định
+người dùng 2026-09-04: CSV khoản chi + số dư, xem mục 8 `/export/expenses.csv` và `/export/balances.csv`).
 
 **M6 — Về sau**
 Ràng buộc mềm (6.4), itemized split, đa tiền tệ, thông báo.
@@ -758,6 +761,22 @@ Trình duyệt **không bao giờ thấy JWT thật**. Luồng:
 /Groups/SettlementPlan/{id}    Kế hoạch thanh toán + VietQR + ghi nhận/xác nhận thanh toán
 ```
 
+### Production-hardening (bổ sung 2026-09-04)
+
+- **JWT SigningKey**: KHÔNG còn giá trị thật trong `appsettings.json` (để rỗng). Dev dùng
+  `dotnet user-secrets set "Jwt:SigningKey" "<chuỗi random >= 32 byte>"` trong `src/SplitBill.Api`;
+  Production đặt qua biến môi trường `Jwt__SigningKey` hoặc Key Vault. API **fail-fast khi khởi
+  động** (ném `InvalidOperationException` rõ ràng) nếu key rỗng hoặc < 32 byte — tránh chạy nhầm với
+  key yếu/rỗng do lỗi thao tác (từng gặp: `RandomNumberGenerator.Fill` không tồn tại trên .NET
+  Framework của Windows PowerShell 5.1, khiến key bị lưu toàn số 0 — đã phát hiện và sửa ngay).
+- **CORS**: bật theo whitelist từ config `Cors:AllowedOrigins` (mặc định chỉ
+  `http://localhost:5103` — origin của `SplitBill.Web`). Đã verify: origin trong whitelist nhận
+  header `Access-Control-Allow-Origin`, origin lạ thì không.
+- **Rate limiting**: `AuthController` giới hạn 10 request/phút/IP (`FixedWindowLimiter`, dùng
+  `Microsoft.AspNetCore.RateLimiting` có sẵn trong framework, không cần NuGet thêm), trả `429` khi
+  vượt. Đã verify bằng cách gọi `/auth/login` liên tiếp 13 lần: 10 lần đầu 401 (sai mật khẩu), 3 lần
+  sau 429.
+
 ### Giới hạn đã biết (chưa làm, để tránh phình phạm vi)
 
 - Form tạo/sửa khoản chi chỉ hỗ trợ `Equal`, `Shares`, `Percentage`, `ExactAmount` — **chưa có UI
@@ -772,9 +791,16 @@ Trình duyệt **không bao giờ thấy JWT thật**. Luồng:
 - Trang Web khi chạy dev phải set `ASPNETCORE_ENVIRONMENT=Development` tường minh nếu khởi động qua
   `dotnet run --no-launch-profile` (bỏ qua `launchSettings.json`), nếu không sẽ chạy ở chế độ
   Production và ẩn traceback lỗi thật.
-- Chưa có bộ test tự động (unit/integration) cho `SplitBill.Web` — mới kiểm chứng bằng chạy tay qua
-  trình duyệt thật (đăng ký → tạo nhóm → thêm thành viên → tạo khoản chi → xem số dư → xem kế hoạch
-  thanh toán kèm VietQR → ghi nhận và xác nhận thanh toán — toàn bộ đã chạy đúng).
+- ~~Chưa có bộ test tự động cho `SplitBill.Web`~~ — đã bổ sung `tests/SplitBill.Web.Tests` (2026-09-04):
+  17 test cho `SplitBillApiClient` (parse response, escape lỗi thành `ApiException` đúng errorCode),
+  `ExpenseFormHelpers.BuildSplitConfig` (đủ 5 mode kể cả Itemized), và `LoginModel` (có dựng
+  `HttpContext`/cookie auth thật để test `SignInAsync`, không cần thư viện mocking).
+  > ⚠️ Bug thật phát hiện khi viết test: nếu `GET /users/me` trả 200 nhưng body thiếu field (hoặc
+  > `DisplayName` null vì `System.Text.Json` KHÔNG enforce non-nullable reference type lúc runtime),
+  > `SignInHelper.SignInAsync` sập với `ArgumentNullException` không được bắt (catch cũ chỉ bắt
+  > `ApiException`), làm hỏng toàn bộ luồng đăng nhập dù bước đăng nhập cookie fallback đã thành
+  > công. Đã sửa: catch rộng hơn (mọi exception, miễn cookie fallback đã đăng nhập) + tự phòng vệ
+  > `DisplayName` rỗng/null bằng tên fallback thay vì tin tưởng type signature của DTO.
 
 ---
 

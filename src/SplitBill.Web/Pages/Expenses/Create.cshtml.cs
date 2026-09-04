@@ -46,6 +46,8 @@ public class CreateModel : PageModel
         public string SplitMode { get; set; } = "Equal";
 
         public List<MemberRowInput> Rows { get; set; } = new();
+
+        public List<ItemInput> Items { get; set; } = new();
     }
 
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
@@ -83,7 +85,7 @@ public class CreateModel : PageModel
             return Page();
         }
 
-        var splitConfig = ExpenseFormHelpers.BuildSplitConfig(Input.SplitMode, Input.Rows, out var configError);
+        var splitConfig = ExpenseFormHelpers.BuildSplitConfig(Input.SplitMode, Input.Rows, Input.Items, out var configError);
         if (configError is not null)
         {
             ErrorMessage = configError;

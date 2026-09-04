@@ -3,6 +3,9 @@ namespace SplitBill.Application.Expenses;
 public interface IExpenseService
 {
     Task<PagedResult<ExpenseDto>> GetPagedAsync(Guid callerUserId, Guid groupId, int page, int pageSize, CancellationToken cancellationToken);
+
+    /// <summary>Toàn bộ expense chưa xóa của nhóm (không phân trang) — dùng cho xuất dữ liệu.</summary>
+    Task<IReadOnlyList<ExpenseDto>> GetAllForExportAsync(Guid callerUserId, Guid groupId, CancellationToken cancellationToken);
     Task<ExpenseDto> GetByIdAsync(Guid callerUserId, Guid expenseId, CancellationToken cancellationToken);
     Task<ExpenseResult> CreateAsync(Guid callerUserId, Guid groupId, CreateExpenseRequest request, CancellationToken cancellationToken);
     Task<ExpenseResult> UpdateAsync(Guid callerUserId, Guid expenseId, UpdateExpenseRequest request, CancellationToken cancellationToken);

@@ -13,9 +13,17 @@ public sealed class MemberRowInput
     public long? ExactAmount { get; set; }
 }
 
+/// <summary>Một món ăn trong form SplitMode.Itemized.</summary>
+public sealed class ItemInput
+{
+    public string Name { get; set; } = string.Empty;
+    public long Price { get; set; }
+    public List<Guid> ConsumerMemberIds { get; set; } = new();
+}
+
 public static class ExpenseFormHelpers
 {
-    public static SplitConfigInput? BuildSplitConfig(string mode, List<MemberRowInput> rows, out string? error)
+    public static SplitConfigInput? BuildSplitConfig(string mode, List<MemberRowInput> rows, List<ItemInput> items, out string? error)
     {
         error = null;
 
@@ -63,6 +71,19 @@ public static class ExpenseFormHelpers
                 }
 
                 return new SplitConfigInput(ExactAmounts: exact);
+
+            case "Itemized":
+                var validItems = items
+                    .Where(i => !string.IsNullOrWhiteSpace(i.Name) && i.Price > 0 && i.ConsumerMemberIds.Count > 0)
+                    .Select(i => new ItemizedInput(i.Name, i.Price, i.ConsumerMemberIds))
+                    .ToList();
+                if (validItems.Count == 0)
+                {
+                    error = "Cần ít nhất 1 món có tên, giá > 0 và ít nhất 1 người ăn.";
+                    return null;
+                }
+
+                return new SplitConfigInput(Items: validItems);
 
             default:
                 error = $"Chế độ chia '{mode}' chưa được hỗ trợ trên giao diện này.";

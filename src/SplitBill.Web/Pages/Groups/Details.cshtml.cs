@@ -92,6 +92,18 @@ public class DetailsModel : PageModel
         return RedirectToPage("/Groups/Details", new { id });
     }
 
+    public async Task<IActionResult> OnGetExportExpensesAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var bytes = await _apiClient.ExportExpensesCsvAsync(id, cancellationToken);
+        return File(bytes, "text/csv", $"khoan-chi-{id}.csv");
+    }
+
+    public async Task<IActionResult> OnGetExportBalancesAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var bytes = await _apiClient.ExportBalancesCsvAsync(id, cancellationToken);
+        return File(bytes, "text/csv", $"so-du-{id}.csv");
+    }
+
     public async Task<IActionResult> OnPostRotateShareTokenAsync(Guid id, CancellationToken cancellationToken)
     {
         try

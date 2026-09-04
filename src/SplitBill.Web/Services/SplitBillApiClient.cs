@@ -99,6 +99,13 @@ public sealed class SplitBillApiClient
     public Task<IReadOnlyList<SettlementDto>> GetSettlementsAsync(Guid groupId, CancellationToken ct) =>
         GetAsync<IReadOnlyList<SettlementDto>>($"groups/{groupId}/settlements", ct);
 
+    // ===== Export =====
+    public Task<byte[]> ExportExpensesCsvAsync(Guid groupId, CancellationToken ct) =>
+        GetBytesAsync($"groups/{groupId}/export/expenses.csv", ct);
+
+    public Task<byte[]> ExportBalancesCsvAsync(Guid groupId, CancellationToken ct) =>
+        GetBytesAsync($"groups/{groupId}/export/balances.csv", ct);
+
     public Task<SettlementDto> CreateSettlementAsync(Guid groupId, CreateSettlementRequest request, CancellationToken ct) =>
         PostAsync<CreateSettlementRequest, SettlementDto>($"groups/{groupId}/settlements", request, ct);
 
@@ -115,6 +122,13 @@ public sealed class SplitBillApiClient
     {
         var response = await _httpClient.GetAsync(path, ct);
         return await ReadOrThrowAsync<TResponse>(response, ct);
+    }
+
+    private async Task<byte[]> GetBytesAsync(string path, CancellationToken ct)
+    {
+        var response = await _httpClient.GetAsync(path, ct);
+        await EnsureSuccessAsync(response, ct);
+        return await response.Content.ReadAsByteArrayAsync(ct);
     }
 
     private async Task<TResponse> PostAsync<TRequest, TResponse>(string path, TRequest? body, CancellationToken ct)

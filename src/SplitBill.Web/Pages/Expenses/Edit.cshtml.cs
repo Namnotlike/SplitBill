@@ -49,6 +49,8 @@ public class EditModel : PageModel
         public string RowVersion { get; set; } = string.Empty;
 
         public List<MemberRowInput> Rows { get; set; } = new();
+
+        public List<ItemInput> Items { get; set; } = new();
     }
 
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
@@ -88,7 +90,7 @@ public class EditModel : PageModel
             return Page();
         }
 
-        var splitConfig = ExpenseFormHelpers.BuildSplitConfig(Input.SplitMode, Input.Rows, out var configError);
+        var splitConfig = ExpenseFormHelpers.BuildSplitConfig(Input.SplitMode, Input.Rows, Input.Items, out var configError);
         if (configError is not null)
         {
             ErrorMessage = configError;
@@ -125,6 +127,8 @@ public class EditModel : PageModel
     /// contract đọc lại có cấu trúc) — nên form Edit dùng chính Amount hiện tại làm trọng số/% khởi
     /// tạo. Nếu người dùng không đổi gì, kết quả tính lại sẽ giữ nguyên tỉ lệ cũ (vì Shares chỉ quan
     /// tâm tỉ lệ tương đối). Nếu đổi TotalAmount thì các giá trị này chỉ là điểm khởi đầu gần đúng.
+    /// Riêng SplitMode.Itemized: hoàn toàn KHÔNG khôi phục được (tên món, ai ăn món nào không được
+    /// lưu lại) — Items luôn bắt đầu rỗng, người dùng phải nhập lại từ đầu nếu muốn sửa.
     /// </summary>
     private static ExpenseInput MapToInput(ExpenseDto expense, GroupDto group)
     {

@@ -43,6 +43,15 @@ public sealed class ExpenseService : IExpenseService
         return new PagedResult<ExpenseDto>(items.Select(ToDto).ToList(), page, pageSize, total);
     }
 
+    public async Task<IReadOnlyList<ExpenseDto>> GetAllForExportAsync(Guid callerUserId, Guid groupId, CancellationToken cancellationToken)
+    {
+        var group = await LoadGroupAsync(groupId, cancellationToken);
+        ResolveCallerMember(group, callerUserId);
+
+        var expenses = await _expenseRepository.GetAllByGroupIdAsync(groupId, cancellationToken);
+        return expenses.OrderByDescending(e => e.OccurredAt).Select(ToDto).ToList();
+    }
+
     public async Task<ExpenseDto> GetByIdAsync(Guid callerUserId, Guid expenseId, CancellationToken cancellationToken)
     {
         var expense = await LoadExpenseAsync(expenseId, cancellationToken);

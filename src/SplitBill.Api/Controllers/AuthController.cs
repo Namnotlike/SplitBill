@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using SplitBill.Application.Auth;
 using SplitBill.Application.Common;
 
@@ -9,6 +10,7 @@ namespace SplitBill.Api.Controllers;
 [ApiController]
 [Route("api/v1/auth")]
 [AllowAnonymous]
+[EnableRateLimiting("auth")]
 public sealed class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;

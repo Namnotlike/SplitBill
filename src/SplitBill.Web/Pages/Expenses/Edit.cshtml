@@ -10,6 +10,10 @@
 {
     <div class="alert alert-danger">@Model.ErrorMessage</div>
 }
+@if (Model.Input.SplitMode == "Itemized")
+{
+    <div class="alert alert-warning">Khoản chi này chia theo món nhưng hệ thống không lưu lại chi tiết từng món — vui lòng nhập lại danh sách món ăn.</div>
+}
 
 <form method="post">
     <input type="hidden" asp-for="Input.RowVersion" />
@@ -40,7 +44,7 @@
     <div class="mb-3">
         <label class="form-label d-block">Cách chia</label>
         @{
-            var modes = new[] { ("Equal", "Chia đều"), ("Shares", "Theo phần"), ("Percentage", "Theo %"), ("ExactAmount", "Nhập tay") };
+            var modes = new[] { ("Equal", "Chia đều"), ("Shares", "Theo phần"), ("Percentage", "Theo %"), ("ExactAmount", "Nhập tay"), ("Itemized", "Theo món") };
         }
         @foreach (var (value, label) in modes)
         {
@@ -90,6 +94,44 @@
         </tbody>
     </table>
 
+    <div class="split-col mb-3" data-mode="Itemized">
+        <label class="form-label d-block">Món ăn</label>
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th style="width: 25%">Tên món</th>
+                    <th style="width: 15%">Giá (đ)</th>
+                    <th>Người ăn</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="items-tbody"></tbody>
+        </table>
+        <button type="button" id="add-item-btn" class="btn btn-sm btn-secondary">+ Thêm món</button>
+    </div>
+
+    <template id="item-row-template">
+        <tr class="item-row">
+            <td>
+                <input type="hidden" name="Input.Items.Index" value="__INDEX__" />
+                <input name="Input.Items[__INDEX__].Name" class="form-control form-control-sm" placeholder="VD: Lẩu" />
+            </td>
+            <td>
+                <input name="Input.Items[__INDEX__].Price" type="number" min="0" class="form-control form-control-sm" />
+            </td>
+            <td>
+                @foreach (var member in Model.Group.Members)
+                {
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" name="Input.Items[__INDEX__].ConsumerMemberIds" value="@member.Id" id="item__INDEX__-@member.Id" />
+                        <label class="form-check-label" for="item__INDEX__-@member.Id">@member.DisplayName</label>
+                    </div>
+                }
+            </td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger remove-item-row">Xóa</button></td>
+        </tr>
+    </template>
+
     <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
     <a asp-page="/Expenses/Index" asp-route-groupId="@Model.Group.Id" class="btn btn-outline-secondary">Hủy</a>
 </form>
@@ -106,5 +148,21 @@
             el.addEventListener('change', updateSplitColumns);
         });
         updateSplitColumns();
+
+        var itemIndexCounter = 0;
+        var itemTemplateHtml = document.getElementById('item-row-template').innerHTML;
+        function addItemRow() {
+            var idx = 'i' + (itemIndexCounter++);
+            var html = itemTemplateHtml.split('__INDEX__').join(idx);
+            document.getElementById('items-tbody').insertAdjacentHTML('beforeend', html);
+            attachRemoveHandlers();
+        }
+        function attachRemoveHandlers() {
+            document.querySelectorAll('.remove-item-row').forEach(function (btn) {
+                btn.onclick = function () { btn.closest('tr').remove(); };
+            });
+        }
+        document.getElementById('add-item-btn').addEventListener('click', addItemRow);
+        addItemRow();
     </script>
 }
