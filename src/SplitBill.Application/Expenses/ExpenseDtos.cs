@@ -16,7 +16,11 @@ public sealed record ExpenseDto(
     DateTimeOffset OccurredAt,
     IReadOnlyList<ExpenseMemberAmountDto> Payers,
     IReadOnlyList<ExpenseMemberAmountDto> Splits,
-    string RowVersion);
+    string RowVersion,
+    // Input gốc người dùng đã nhập lúc tạo/sửa (JSON của SplitConfigInput — CLAUDE.md mục 4.1), để
+    // client (form Edit) khôi phục đúng trọng số/%/danh sách món ăn thay vì suy ngược từ Amount cuối
+    // cùng. Bổ sung 2026-09-05 — trước đó DB đã lưu field này nhưng API chưa từng trả ra.
+    string? SplitConfigJson);
 
 public sealed record ExpenseResult(ExpenseDto Data, IReadOnlyList<Warning> Warnings);
 

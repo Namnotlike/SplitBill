@@ -844,10 +844,17 @@ Trình duyệt **không bao giờ thấy JWT thật**. Luồng:
 - ~~Form tạo/sửa khoản chi chỉ hỗ trợ Equal/Shares/Percentage/ExactAmount, chưa có UI Itemized~~ —
   đã bổ sung UI `Itemized` (bảng món ăn động, thêm/xóa dòng qua JS, xem `Create.cshtml`/`Edit.cshtml`)
   cùng đợt thiết kế lại giao diện 2026-09-04; cả 5 `SplitMode` đều có form trên Web.
-- Form Edit không thể khôi phục chính xác trọng số/% gốc đã nhập lúc tạo (API chỉ lưu
-  `ExpenseSplit.Amount` cuối cùng, không lưu `SplitConfigJson` có cấu trúc đọc lại được) — dùng
-  Amount hiện tại làm giá trị khởi tạo cho Shares/Percentage, xem chi tiết trong docstring
-  `EditModel.MapToInput`.
+- ~~Form Edit không thể khôi phục chính xác trọng số/% gốc đã nhập lúc tạo (API chỉ lưu
+  ExpenseSplit.Amount cuối cùng, không lưu SplitConfigJson có cấu trúc đọc lại được)~~ — **sai, đã sửa
+  2026-09-05**: `ExpenseService` vốn đã lưu `SplitConfigJson` từ trước (dòng ghi `SplitConfigJson =
+  JsonSerializer.Serialize(request.SplitConfig)` khi Create/Update), chỉ là `ExpenseDto` chưa từng trả
+  field này ra qua API nên Web luôn phải suy ngược từ Amount cuối cùng (không chính xác khi có làm
+  tròn, và với Itemized thì hoàn toàn không suy ngược được — Items luôn trống). Đã thêm
+  `SplitConfigJson` vào `ExpenseDto`, `EditModel.MapToInput` giờ ưu tiên đọc trực tiếp từ đó (fallback
+  về suy ngược từ Amount nếu null/parse lỗi — dữ liệu tạo trước bản sửa này). Verify: tạo khoản chi
+  Itemized trên trình duyệt thật, mở lại trang Sửa, món ăn + người ăn hiển thị đúng y hệt lúc tạo
+  (trước đây luôn trống hoàn toàn). Xem test `ExpenseServiceTests` (API trả đúng JSON) và
+  `EditModelTests` (Web parse + map đúng, kể cả fallback khi JSON null/lỗi).
 - Vẽ mã QR dùng thư viện `qrcodejs` từ CDN `cdnjs.cloudflare.com` (đã xác nhận CDN
   `cdn.jsdelivr.net` KHÔNG truy cập được từ môi trường máy chủ dev — trả lỗi 503/404 liên tục khi
   test; nếu đổi CDN trong tương lai, ưu tiên cdnjs).

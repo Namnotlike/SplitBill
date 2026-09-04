@@ -345,5 +345,6 @@ public sealed class ExpenseService : IExpenseService
         expense.OccurredAt,
         expense.Payers.Select(p => new ExpenseMemberAmountDto(p.GroupMemberId, p.Amount)).ToList(),
         expense.Splits.Select(s => new ExpenseMemberAmountDto(s.GroupMemberId, s.Amount)).ToList(),
-        Convert.ToBase64String(expense.RowVersion));
+        Convert.ToBase64String(expense.RowVersion),
+        expense.SplitConfigJson);
 }

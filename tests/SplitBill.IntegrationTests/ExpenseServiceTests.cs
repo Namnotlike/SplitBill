@@ -164,4 +164,71 @@ public sealed class ExpenseServiceTests
         page.TotalCount.Should().Be(3);
         page.Items.Should().HaveCount(2);
     }
+
+    // ===== SplitConfigJson — bổ sung 2026-09-05. Trước đó DB đã lưu field này (ExpenseService dòng
+    // 81/129) nhưng ExpenseDto chưa từng trả nó ra qua API, khiến form Edit trên Web phải suy ngược
+    // trọng số/%/danh sách món ăn từ ExpenseSplit.Amount cuối cùng (không chính xác, và với Itemized
+    // thì hoàn toàn không suy ngược được). Test ở đây xác nhận API giờ trả đúng input gốc, round-trip
+    // được qua System.Text.Json (đúng type SplitConfigInput như phía Web sẽ deserialize). =====
+
+    [Fact]
+    public async Task CreateAsync_Shares_ReturnsSplitConfigJson_RoundTripsOriginalWeights()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+
+        var result = await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "An toi", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 100_000)],
+            "Shares",
+            new SplitConfigInput(Shares: [new SharesInput(ownerMemberId, 1), new SharesInput(guestMemberId, 3)])), CancellationToken.None);
+
+        result.Data.SplitConfigJson.Should().NotBeNullOrEmpty();
+
+        var parsed = System.Text.Json.JsonSerializer.Deserialize<SplitConfigInput>(result.Data.SplitConfigJson!);
+        parsed!.Shares.Should().BeEquivalentTo(new[] { new SharesInput(ownerMemberId, 1), new SharesInput(guestMemberId, 3) });
+    }
+
+    [Fact]
+    public async Task CreateAsync_Itemized_ReturnsSplitConfigJson_RoundTripsItemsAndConsumers()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+
+        var result = await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "Lau + Nuoc ngot", 150_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 150_000)],
+            "Itemized",
+            new SplitConfigInput(Items:
+            [
+                new ItemizedInput("Lau", 100_000, [ownerMemberId, guestMemberId]),
+                new ItemizedInput("Nuoc ngot", 50_000, [guestMemberId]),
+            ])), CancellationToken.None);
+
+        var parsed = System.Text.Json.JsonSerializer.Deserialize<SplitConfigInput>(result.Data.SplitConfigJson!);
+
+        parsed!.Items.Should().HaveCount(2);
+        parsed.Items.Should().ContainSingle(i => i.Name == "Lau" && i.Price == 100_000 && i.ConsumerMemberIds.Count == 2);
+        parsed.Items.Should().ContainSingle(i => i.Name == "Nuoc ngot" && i.Price == 50_000 && i.ConsumerMemberIds.Single() == guestMemberId);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ReplacesSplitConfigJson_WithNewConfig()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        var created = await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "An toi", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 100_000)],
+            "Shares",
+            new SplitConfigInput(Shares: [new SharesInput(ownerMemberId, 1), new SharesInput(guestMemberId, 1)])), CancellationToken.None);
+
+        var updated = await harness.ExpenseService.UpdateAsync(ownerId, created.Data.Id, new UpdateExpenseRequest(
+            "An toi", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 100_000)],
+            "Percentage",
+            new SplitConfigInput(Percentages: [new PercentageInput(ownerMemberId, 30), new PercentageInput(guestMemberId, 70)]),
+            RowVersion: created.Data.RowVersion), CancellationToken.None);
+
+        var parsed = System.Text.Json.JsonSerializer.Deserialize<SplitConfigInput>(updated.Data.SplitConfigJson!);
+        parsed!.Shares.Should().BeNull();
+        parsed.Percentages.Should().BeEquivalentTo(new[] { new PercentageInput(ownerMemberId, 30), new PercentageInput(guestMemberId, 70) });
+    }
 }

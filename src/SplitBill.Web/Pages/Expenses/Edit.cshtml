@@ -11,10 +11,6 @@
 {
     <div class="alert alert-danger">@Model.ErrorMessage</div>
 }
-@if (Model.Input.SplitMode == "Itemized")
-{
-    <div class="alert alert-warning">⚠️ Khoản chi này chia theo món nhưng hệ thống không lưu lại chi tiết từng món — vui lòng nhập lại danh sách món ăn.</div>
-}
 
 <div class="card">
     <div class="card-body p-4">
@@ -121,16 +117,16 @@
                 <tr class="item-row">
                     <td>
                         <input type="hidden" name="Input.Items.Index" value="__INDEX__" />
-                        <input name="Input.Items[__INDEX__].Name" class="form-control form-control-sm" placeholder="VD: Lẩu" />
+                        <input name="Input.Items[__INDEX__].Name" class="form-control form-control-sm item-name-input" placeholder="VD: Lẩu" />
                     </td>
                     <td>
-                        <input name="Input.Items[__INDEX__].Price" type="number" min="0" class="form-control form-control-sm" />
+                        <input name="Input.Items[__INDEX__].Price" type="number" min="0" class="form-control form-control-sm item-price-input" />
                     </td>
                     <td>
                         @foreach (var member in Model.Group.Members)
                         {
                             <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" name="Input.Items[__INDEX__].ConsumerMemberIds" value="@member.Id" id="item__INDEX__-@member.Id" />
+                                <input class="form-check-input item-consumer-checkbox" type="checkbox" name="Input.Items[__INDEX__].ConsumerMemberIds" value="@member.Id" id="item__INDEX__-@member.Id" />
                                 <label class="form-check-label" for="item__INDEX__-@member.Id">@member.DisplayName</label>
                             </div>
                         }
@@ -165,8 +161,10 @@
         function addItemRow() {
             var idx = 'i' + (itemIndexCounter++);
             var html = itemTemplateHtml.split('__INDEX__').join(idx);
-            document.getElementById('items-tbody').insertAdjacentHTML('beforeend', html);
+            var tbody = document.getElementById('items-tbody');
+            tbody.insertAdjacentHTML('beforeend', html);
             attachRemoveHandlers();
+            return tbody.lastElementChild;
         }
         function attachRemoveHandlers() {
             document.querySelectorAll('.remove-item-row').forEach(function (btn) {
@@ -174,6 +172,29 @@
             });
         }
         document.getElementById('add-item-btn').addEventListener('click', addItemRow);
-        addItemRow();
+
+        // Khôi phục danh sách món ăn gốc từ SplitConfigJson (nếu khoản chi này vốn chia theo món) —
+        // trước 2026-09-05, trang này luôn bắt đầu với 1 dòng trống dù đang sửa 1 khoản Itemized có
+        // sẵn món ăn, vì API chưa trả SplitConfigJson ra. Nếu không phải Itemized (hoặc parse lỗi),
+        // Model.Input.Items rỗng và hành vi giữ nguyên như cũ: 1 dòng trống để bắt đầu.
+        var existingItems = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            Model.Input.Items.Select(i => new { i.Name, i.Price, i.ConsumerMemberIds }),
+            new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+
+        if (existingItems.length > 0) {
+            existingItems.forEach(function (item) {
+                var row = addItemRow();
+                row.querySelector('.item-name-input').value = item.name;
+                row.querySelector('.item-price-input').value = item.price;
+                (item.consumerMemberIds || []).forEach(function (memberId) {
+                    var checkbox = row.querySelector('.item-consumer-checkbox[value="' + memberId + '"]');
+                    if (checkbox) {
+                        checkbox.checked = true;
+                    }
+                });
+            });
+        } else {
+            addItemRow();
+        }
     </script>
 }
