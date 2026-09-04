@@ -58,6 +58,8 @@ public sealed class TestHarness : IDisposable
         var splitCalculator = new ExpenseSplitCalculator();
         var balanceCalculator = new BalanceCalculator();
         var vietQrGenerator = new VietQrGenerator();
+        var settlementRanker = new SocialSettlementRanker();
+        var settlementPlanner = new SocialSettlementPlanner(settlementRanker);
 
         AuthService = new AuthService(userRepository, refreshTokenRepository, unitOfWork, jwtTokenGenerator);
         UserService = new UserService(userRepository, unitOfWork);
@@ -66,7 +68,7 @@ public sealed class TestHarness : IDisposable
             auditLogRepository, unitOfWork, shareTokenGenerator, balanceCalculator);
         ExpenseService = new ExpenseService(
             expenseRepository, groupRepository, auditLogRepository, unitOfWork, splitCalculator, receiptImageRepository);
-        BalanceService = new BalanceService(groupRepository, expenseRepository, settlementRepository, balanceCalculator, vietQrGenerator);
+        BalanceService = new BalanceService(groupRepository, expenseRepository, settlementRepository, balanceCalculator, vietQrGenerator, settlementPlanner);
         SettlementRecordService = new SettlementRecordService(groupRepository, settlementRepository, auditLogRepository, unitOfWork);
         ExportService = new ExportService(ExpenseService, GroupService, BalanceService);
     }

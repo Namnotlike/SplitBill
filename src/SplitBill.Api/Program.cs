@@ -133,6 +133,8 @@ try
     builder.Services.AddSingleton<IExpenseSplitCalculator, ExpenseSplitCalculator>();
     builder.Services.AddSingleton<IBalanceCalculator, BalanceCalculator>();
     builder.Services.AddSingleton<IVietQrGenerator, VietQrGenerator>();
+    builder.Services.AddSingleton<ISettlementRanker, SocialSettlementRanker>();
+    builder.Services.AddSingleton<SocialSettlementPlanner>();
 
     // ===== Application services (nghiệp vụ) =====
     builder.Services.AddScoped<IAuthService, AuthService>();

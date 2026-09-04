@@ -437,7 +437,40 @@ Khi có nhiều phương án cùng số giao dịch tối thiểu, ưu tiên the
 2. Tránh để một người phải thực hiện quá 3 lượt chuyển đi.
 3. Ưu tiên số tiền tròn hơn (chia hết cho 1000đ) khi chênh lệch không đáng kể.
 
-Triển khai bằng `ISettlementRanker` chấm điểm và chọn phương án tốt nhất. Phần này làm ở milestone sau, không thuộc MVP.
+Triển khai bằng `ISettlementRanker` chấm điểm và chọn phương án tốt nhất.
+
+> ✅ **Đã triển khai (2026-09-05)**, không còn là "milestone sau" nữa. Kiến trúc thực tế:
+> - `SocialSettlementPlanner.Plan(balances, pastPairs)` (namespace `SplitBill.Application.Settlement`,
+>   class thuần không phụ thuộc EF Core) sinh 3 phương án ứng viên bằng 3
+>   `SettlementTieBreakStrategy` khác nhau — `OrdinalAscending` (baseline, hành vi gốc mục 6.2 không
+>   đổi), `PastPairAffinity` (nhắm tiêu chí 1), `LoadBalancing` (nhắm tiêu chí 2) — rồi gọi
+>   `ISettlementRanker.SelectBest(...)` chọn phương án tốt nhất.
+> - `SocialSettlementRanker : ISettlementRanker` chấm điểm lexicographic đúng thứ tự 3 tiêu chí trên;
+>   tiêu chí 2 đo bằng tổng phần vượt ngưỡng 3 lượt chuyển (không phải cờ nhị phân), tiêu chí 3 chỉ
+>   thật sự quyết định khi 2 tiêu chí đầu hòa (đúng tinh thần "chênh lệch không đáng kể").
+> - `GreedySettlementSolver` nhận thêm `SettlementTieBreakStrategy` — khi có HÒA ĐIỂM thật (nhiều
+>   debtor/creditor cùng Remaining lớn nhất), thay vì luôn lấy phần tử đầu theo ordinal, re-chọn trong
+>   đúng nhóm hòa đó theo strategy. Nếu không có hòa điểm nào, mọi strategy cho kết quả giống hệt nhau
+>   (đã có test xác nhận) — đây là bản chất của "ràng buộc mềm": chỉ có tác dụng KHI có nhiều phương án
+>   ngang nhau thật sự, không bao giờ làm tăng số giao dịch.
+>
+> ⚠️ **Lỗi thật phát hiện lúc viết test (quan trọng, dễ tái phạm nếu sửa lại thuật toán này sau này):**
+> `OptimalSettlementSolver`'s DP bitmask (mục 6.3) LUÔN bắt buộc mỗi mask chỉ xét các subset chứa đúng
+> bit thấp nhất ("lowBit") của mask đó (kỹ thuật chuẩn để tránh trùng lặp trong bitmask DP). Lần cài
+> đặt đầu tiên chỉ so sánh điểm past-pair CỦA RIÊNG subset đang xét ở mỗi mức — nhưng nếu thành viên có
+> cặp quen thuộc KHÔNG PHẢI là lowBit ở mức đang xét, tie-break không bao giờ có cơ hội tác động (vì
+> thuật toán về cấu trúc không xét đến các subset không chứa lowBit), khiến kết quả **flaky ngẫu nhiên
+> 50/50** tùy thứ tự ordinal của GUID sinh ra mỗi lần chạy — phát hiện qua
+> `GetSettlementPlanAsync_WithTieAndPastSettlement_RoutesThroughPastPair` (IntegrationTests) thất bại
+> ngẫu nhiên dù `SocialSettlementPlannerTests` (UnitTests, chạy trước) lại "tình cờ" pass do may mắn về
+> thứ tự GUID trong lần chạy đó — verify bằng cách chạy lại filter test 20 lần liên tiếp, thấy fail rate
+> ~40%. Sửa đúng: DP phải dùng **2 khóa lexicographic** — `dpCount[mask]` (số nhóm tổng-0, khóa chính,
+> không đổi) VÀ `dpScore[mask]` (tổng điểm past-pair CỘNG DỒN qua đệ quy — `dpScore[mask^sub] +
+> điểm(sub)`, không phải chỉ điểm của riêng `sub`). Khóa phụ phải lan truyền qua đệ quy để "nhìn xa"
+> được: chọn nhóm cho lowBit hiện tại có thể ảnh hưởng tới việc phần còn lại (xử lý ở mức đệ quy sâu
+> hơn) có ghép được cặp quen thuộc hay không. Sau khi sửa, chạy lại filter test 20/20 lần đều pass.
+> Khi `pastPairs` rỗng (mặc định), `dpScore` luôn bằng 0 ở mọi mask nên tie-break không bao giờ kích
+> hoạt — hành vi DP giống hệt bản gốc, không ảnh hưởng gì tới các test S1–S7/S3b đã có từ trước.
 
 ### 6.5 Chế độ không tối ưu
 
@@ -712,7 +745,8 @@ Link chia sẻ, VietQR, upload ảnh hóa đơn, chế độ `SimplifyDebts = fa
 người dùng 2026-09-04: CSV khoản chi + số dư, xem mục 8 `/export/expenses.csv` và `/export/balances.csv`).
 
 **M6 — Về sau**
-Ràng buộc mềm (6.4), itemized split, đa tiền tệ, thông báo.
+~~Ràng buộc mềm (6.4)~~ — đã làm 2026-09-05 (xem mục 6.4), itemized split — đã làm (xem mục 10b), còn
+lại: đa tiền tệ, thông báo.
 
 **M7 — Frontend (SplitBill.Web)**
 Đã triển khai theo quyết định người dùng 2026-09-03 (xem mục 10b ngay dưới đây). Không thuộc phạm

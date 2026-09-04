@@ -12,14 +12,24 @@ public sealed class OptimalSettlementSolver : ISettlementSolver
     private static readonly TimeSpan SolveTimeout = TimeSpan.FromSeconds(2);
 
     private readonly ISettlementSolver _fallback;
+    private readonly IReadOnlyCollection<(Guid MemberA, Guid MemberB)> _pastPairs;
 
-    public OptimalSettlementSolver() : this(new GreedySettlementSolver())
+    public OptimalSettlementSolver() : this(new GreedySettlementSolver(), Array.Empty<(Guid, Guid)>())
     {
     }
 
-    public OptimalSettlementSolver(ISettlementSolver fallback)
+    public OptimalSettlementSolver(ISettlementSolver fallback) : this(fallback, Array.Empty<(Guid, Guid)>())
+    {
+    }
+
+    /// <param name="fallback">Solver dùng để giải cụ thể từng nhóm con tổng-0 sau khi đã phân hoạch.</param>
+    /// <param name="pastPairs">Ràng buộc mềm (CLAUDE.md mục 6.4, tiêu chí 1) — khi phân hoạch có NHIỀU
+    /// cách tách đạt cùng số nhóm tổng-0 tối đa, ưu tiên cách tách có nhiều cặp thành viên trong CÙNG
+    /// 1 nhóm đã từng có Settlement với nhau. Rỗng thì DP hoạt động y hệt bản gốc (không đổi hành vi).</param>
+    public OptimalSettlementSolver(ISettlementSolver fallback, IReadOnlyCollection<(Guid MemberA, Guid MemberB)> pastPairs)
     {
         _fallback = fallback;
+        _pastPairs = pastPairs;
     }
 
     public IReadOnlyList<SettlementTransaction> Solve(IReadOnlyList<MemberBalance> balances)
@@ -63,7 +73,7 @@ public sealed class OptimalSettlementSolver : ISettlementSolver
     /// nhóm tổng-0 là nhiều nhất có thể; phần tử không tách được vào nhóm tổng-0 nào được gộp thành
     /// đúng 1 nhóm "leftover" duy nhất ở cuối.
     /// </summary>
-    private static List<List<int>> FindOptimalPartition(List<MemberBalance> members, CancellationToken cancellationToken)
+    private List<List<int>> FindOptimalPartition(List<MemberBalance> members, CancellationToken cancellationToken)
     {
         var n = members.Count;
         var fullMask = (1 << n) - 1;
@@ -76,7 +86,17 @@ public sealed class OptimalSettlementSolver : ISettlementSolver
             sum[mask] = sum[mask ^ lowBit] + members[lowIndex].Net;
         }
 
-        var dp = new int[1 << n];
+        // DP 2 khóa (lexicographic): khóa chính dpCount[mask] = số nhóm tổng-0 nhiều nhất có thể tách
+        // (mục 6.3, không đổi so với bản gốc); khóa phụ dpScore[mask] = tổng "điểm cặp quen thuộc"
+        // (mục 6.4, tiêu chí 1) LỚN NHẤT đạt được TRONG SỐ các cách tách vẫn giữ nguyên dpCount[mask]
+        // tối đa. Khóa phụ phải được CỘNG DỒN qua đệ quy (dpScore[mask^sub] + điểm của sub) chứ không
+        // chỉ so sánh điểm của riêng subset đang xét ở mức hiện tại — nếu chỉ so 1 mức, tie-break sẽ
+        // bỏ sót trường hợp thành viên có cặp quen thuộc không phải là "lowBit" (đại diện bắt buộc)
+        // của mask hiện tại, dẫn tới kết quả không xác định (đã phát hiện qua test integration
+        // GetSettlementPlanAsync_WithTieAndPastSettlement_RoutesThroughPastPair chạy flaky trước khi
+        // sửa thành 2 khóa — xem CLAUDE.md mục 6.4).
+        var dpCount = new int[1 << n];
+        var dpScore = new int[1 << n];
         // choice[mask]: 0 nghĩa là "bit thấp nhất của mask là leftover, dp[mask] = dp[mask ^ lowBit]".
         // Khác 0 nghĩa là subset (chứa bit thấp nhất) được tách thành 1 nhóm tổng-0.
         var choice = new int[1 << n];
@@ -90,7 +110,8 @@ public sealed class OptimalSettlementSolver : ISettlementSolver
 
             // Nhánh 1: bit thấp nhất KHÔNG tách vào nhóm tổng-0 nào (bắt buộc phải xét — xem
             // ghi chú sửa lỗi ở CLAUDE.md mục 6.3).
-            var best = dp[maskWithoutLowBit];
+            var bestCount = dpCount[maskWithoutLowBit];
+            var bestScore = dpScore[maskWithoutLowBit];
             var bestChoice = 0;
 
             // Nhánh 2: thử mọi tập con chứa bit thấp nhất, có tổng = 0, tách thành 1 nhóm.
@@ -101,15 +122,21 @@ public sealed class OptimalSettlementSolver : ISettlementSolver
                     continue;
                 }
 
-                var candidate = dp[mask ^ sub] + 1;
-                if (candidate > best)
+                var remaining = mask ^ sub;
+                var candidateCount = dpCount[remaining] + 1;
+                var candidateScore = dpScore[remaining] + SubsetPastPairScore(sub, members);
+
+                if (candidateCount > bestCount ||
+                    (candidateCount == bestCount && candidateScore > bestScore))
                 {
-                    best = candidate;
+                    bestCount = candidateCount;
+                    bestScore = candidateScore;
                     bestChoice = sub;
                 }
             }
 
-            dp[mask] = best;
+            dpCount[mask] = bestCount;
+            dpScore[mask] = bestScore;
             choice[mask] = bestChoice;
         }
 
@@ -139,6 +166,33 @@ public sealed class OptimalSettlementSolver : ISettlementSolver
         }
 
         return groups;
+    }
+
+    /// <summary>Số cặp thành viên TRONG CÙNG subset đã từng có Settlement với nhau (mục 6.4, tiêu chí
+    /// 1). subsetMask = 0 (leftover) luôn cho điểm 0.</summary>
+    private int SubsetPastPairScore(int subsetMask, List<MemberBalance> members)
+    {
+        if (subsetMask == 0 || _pastPairs.Count == 0)
+        {
+            return 0;
+        }
+
+        var indexes = BitsToIndexes(subsetMask, members.Count);
+        var score = 0;
+        for (var i = 0; i < indexes.Count; i++)
+        {
+            for (var j = i + 1; j < indexes.Count; j++)
+            {
+                var a = members[indexes[i]].MemberId;
+                var b = members[indexes[j]].MemberId;
+                if (_pastPairs.Any(p => (p.MemberA == a && p.MemberB == b) || (p.MemberA == b && p.MemberB == a)))
+                {
+                    score++;
+                }
+            }
+        }
+
+        return score;
     }
 
     private static List<int> BitsToIndexes(int mask, int n)

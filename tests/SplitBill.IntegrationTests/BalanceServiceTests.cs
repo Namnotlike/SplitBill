@@ -1,6 +1,7 @@
 using FluentAssertions;
 using SplitBill.Application.Expenses;
 using SplitBill.Application.Groups;
+using SplitBill.Application.Settlements;
 using SplitBill.Application.Users;
 using SplitBill.Domain.Exceptions;
 using Xunit;
@@ -96,5 +97,47 @@ public sealed class BalanceServiceTests
         var act = () => harness.BalanceService.GetBalancesAsync(strangerId, group.Id, CancellationToken.None);
 
         (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.MemberNotInGroup);
+    }
+
+    // ===== Ràng buộc mềm (CLAUDE.md mục 6.4) — bổ sung 2026-09-05. Test end-to-end qua toàn bộ
+    // pipeline thật (DB InMemory, không phải gọi thẳng SocialSettlementPlanner như ở UnitTests) để
+    // xác nhận GetPastSettlementPairsAsync đọc đúng lịch sử Settlement từ DB và truyền vào planner. =====
+
+    [Fact]
+    public async Task GetSettlementPlanAsync_WithTieAndPastSettlement_RoutesThroughPastPair()
+    {
+        var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var nam = group.Members[0];
+        var binh = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(null, "Binh"), CancellationToken.None);
+        var chi = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(null, "Chi"), CancellationToken.None);
+        var dung = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(null, "Dung"), CancellationToken.None);
+
+        // Nam trả 100k, Binh gánh toàn bộ -> Nam:+100k, Binh:-100k.
+        await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "Khoan 1", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(nam.Id, 100_000)],
+            "ExactAmount",
+            new SplitConfigInput(ExactAmounts: [new ExactAmountInput(binh.Id, 100_000)])), CancellationToken.None);
+
+        // Chi trả 100k, Dung gánh toàn bộ -> Chi:+100k, Dung:-100k.
+        await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "Khoan 2", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(chi.Id, 100_000)],
+            "ExactAmount",
+            new SplitConfigInput(ExactAmounts: [new ExactAmountInput(dung.Id, 100_000)])), CancellationToken.None);
+
+        // Balances: Nam:+100k, Chi:+100k (hòa), Binh:-100k, Dung:-100k (hòa) -> 2 cách ghép đều tối
+        // thiểu 2 giao dịch. Ghi nhận Binh từng chuyển tiền cho Chi trước đó -> planner phải ưu tiên
+        // ghép Binh->Chi thay vì Binh->Nam.
+        await harness.SettlementRecordService.CreateAsync(
+            ownerId, group.Id, new CreateSettlementRequest(binh.Id, chi.Id, 5_000, "Tra truoc do"), CancellationToken.None);
+
+        var plan = await harness.BalanceService.GetSettlementPlanAsync(ownerId, group.Id, CancellationToken.None);
+
+        plan.TransactionCount.Should().Be(2);
+        plan.Transactions.Should().Contain(t => t.FromMemberId == binh.Id && t.ToMemberId == chi.Id && t.Amount == 100_000);
+        plan.Transactions.Should().Contain(t => t.FromMemberId == dung.Id && t.ToMemberId == nam.Id && t.Amount == 100_000);
     }
 }

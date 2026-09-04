@@ -16,19 +16,22 @@ public sealed class BalanceService : IBalanceService
     private readonly ISettlementRepository _settlementRepository;
     private readonly IBalanceCalculator _balanceCalculator;
     private readonly IVietQrGenerator _vietQrGenerator;
+    private readonly SocialSettlementPlanner _settlementPlanner;
 
     public BalanceService(
         IGroupRepository groupRepository,
         IExpenseRepository expenseRepository,
         ISettlementRepository settlementRepository,
         IBalanceCalculator balanceCalculator,
-        IVietQrGenerator vietQrGenerator)
+        IVietQrGenerator vietQrGenerator,
+        SocialSettlementPlanner settlementPlanner)
     {
         _groupRepository = groupRepository;
         _expenseRepository = expenseRepository;
         _settlementRepository = settlementRepository;
         _balanceCalculator = balanceCalculator;
         _vietQrGenerator = vietQrGenerator;
+        _settlementPlanner = settlementPlanner;
     }
 
     public async Task<IReadOnlyList<MemberBalanceDto>> GetBalancesAsync(Guid callerUserId, Guid groupId, CancellationToken cancellationToken)
@@ -56,10 +59,11 @@ public sealed class BalanceService : IBalanceService
     private async Task<SettlementPlanDto> BuildSimplifiedPlanAsync(Group group, CancellationToken cancellationToken)
     {
         var balances = await ComputeBalancesAsync(group, cancellationToken);
+        var pastPairs = await GetPastSettlementPairsAsync(group.Id, cancellationToken);
 
-        var nonZeroCount = balances.Count(b => b.Net != 0);
-        var solver = SettlementSolverSelector.Choose(nonZeroCount);
-        var transactions = solver.Solve(balances);
+        // Ràng buộc mềm (CLAUDE.md mục 6.4): sinh vài phương án cùng số giao dịch tối thiểu bằng các
+        // tie-break strategy khác nhau, rồi chọn phương án tốt nhất theo tiêu chí xã hội.
+        var transactions = _settlementPlanner.Plan(balances, pastPairs);
 
         var dtos = transactions
             .Select(t => new SettlementTransactionDto(
@@ -156,6 +160,14 @@ public sealed class BalanceService : IBalanceService
         var settlementInputs = settlements.Select(s => new SettlementBalanceInput(s.FromMemberId, s.ToMemberId, s.Amount, s.Status));
 
         return _balanceCalculator.Calculate(expenseInputs, settlementInputs);
+    }
+
+    /// <summary>Các cặp thành viên đã từng có Settlement với nhau trong nhóm (mọi trạng thái, không
+    /// phân biệt chiều) — dùng làm tín hiệu cho ràng buộc mềm ở <see cref="SocialSettlementPlanner"/>.</summary>
+    private async Task<IReadOnlyCollection<(Guid MemberA, Guid MemberB)>> GetPastSettlementPairsAsync(Guid groupId, CancellationToken cancellationToken)
+    {
+        var settlements = await _settlementRepository.GetAllByGroupIdAsync(groupId, cancellationToken);
+        return settlements.Select(s => (s.FromMemberId, s.ToMemberId)).Distinct().ToList();
     }
 
     private async Task<Group> LoadGroupAsync(Guid groupId, CancellationToken cancellationToken) =>
