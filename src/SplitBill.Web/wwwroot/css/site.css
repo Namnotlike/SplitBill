@@ -1,5 +1,25 @@
+/* ===== SplitBill design system ===== */
+
+:root {
+  --sb-brand: #6d5ef7;
+  --sb-brand-dark: #5642e0;
+  --sb-brand-light: #efecff;
+  --sb-ink: #1a1a2e;
+  --sb-muted: #6b7280;
+  --sb-bg: #f6f7fb;
+  --sb-card: #ffffff;
+  --sb-border: #e7e8f1;
+  --sb-success: #16a34a;
+  --sb-success-bg: #ecfdf3;
+  --sb-danger: #e11d48;
+  --sb-danger-bg: #fef1f4;
+  --sb-radius: 14px;
+  --sb-radius-sm: 10px;
+  --sb-shadow: 0 1px 2px rgba(20, 20, 43, 0.04), 0 8px 24px rgba(20, 20, 43, 0.06);
+}
+
 html {
-  font-size: 14px;
+  font-size: 15px;
 }
 
 @media (min-width: 768px) {
@@ -8,17 +28,246 @@ html {
   }
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
-
-html {
-  position: relative;
-  min-height: 100%;
-}
-
 body {
-  margin-bottom: 60px;
+  background: var(--sb-bg);
+  color: var(--sb-ink);
+  font-family: "Be Vietnam Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+body > .container {
+  flex: 1 0 auto;
+}
+
+h1, h2, h3, h4, h5 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: 1.75rem;
+  margin-bottom: 0.25rem;
+}
+
+a {
+  color: var(--sb-brand-dark);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--sb-brand);
+}
+
+.text-muted {
+  color: var(--sb-muted) !important;
+}
+
+/* ===== Navbar ===== */
+
+.navbar {
+  background: var(--sb-card) !important;
+  border-bottom: 1px solid var(--sb-border);
+  box-shadow: 0 1px 2px rgba(20, 20, 43, 0.03);
+}
+
+.navbar-brand {
+  font-weight: 800;
+  font-size: 1.15rem;
+  color: var(--sb-ink) !important;
+  white-space: normal;
+}
+
+.navbar .nav-link {
+  color: var(--sb-ink) !important;
+  font-weight: 500;
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem !important;
+  transition: background-color 0.15s ease;
+}
+
+.navbar .nav-link:hover {
+  background: var(--sb-brand-light);
+}
+
+.navbar .nav-link.text-muted {
+  color: var(--sb-muted) !important;
+  font-weight: 600;
+}
+
+/* ===== Buttons ===== */
+
+.btn {
+  border-radius: 999px;
+  font-weight: 600;
+  padding-inline: 1.1rem;
+}
+
+.btn-sm {
+  padding-inline: 0.85rem;
+}
+
+.btn-primary {
+  background: var(--sb-brand);
+  border-color: var(--sb-brand);
+}
+
+.btn-primary:hover, .btn-primary:focus {
+  background: var(--sb-brand-dark);
+  border-color: var(--sb-brand-dark);
+}
+
+.btn-outline-primary {
+  color: var(--sb-brand-dark);
+  border-color: var(--sb-brand);
+}
+
+.btn-outline-primary:hover {
+  background: var(--sb-brand);
+  border-color: var(--sb-brand);
+}
+
+.btn-outline-secondary, .btn-secondary {
+  border-color: var(--sb-border);
+  color: var(--sb-ink);
+  background: var(--sb-card);
+}
+
+.btn-outline-secondary:hover, .btn-secondary:hover {
+  background: var(--sb-bg);
+  color: var(--sb-ink);
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus, .form-select:focus {
+  box-shadow: 0 0 0 0.2rem var(--sb-brand-light);
+  border-color: var(--sb-brand);
+}
+
+/* ===== Cards ===== */
+
+.card {
+  border: 1px solid var(--sb-border);
+  border-radius: var(--sb-radius);
+  box-shadow: var(--sb-shadow);
+}
+
+.card-body {
+  padding: 1.4rem;
+}
+
+.card-title {
+  font-weight: 700;
+}
+
+/* ===== Forms ===== */
+
+.form-control, .form-select {
+  border-radius: var(--sb-radius-sm);
+  border-color: var(--sb-border);
+  padding: 0.55rem 0.85rem;
+}
+
+.form-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--sb-ink);
+}
+
+/* ===== Tables ===== */
+
+.table {
+  --bs-table-bg: transparent;
+}
+
+.table thead th {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sb-muted);
+  font-weight: 700;
+  border-bottom: 2px solid var(--sb-border);
+}
+
+.table td, .table th {
+  vertical-align: middle;
+  border-color: var(--sb-border);
+}
+
+/* ===== Badges ===== */
+
+.badge {
+  border-radius: 999px;
+  font-weight: 600;
+  padding: 0.4em 0.8em;
+}
+
+/* ===== Alerts ===== */
+
+.alert {
+  border: none;
+  border-radius: var(--sb-radius-sm);
+}
+
+/* ===== Utility: font weight ===== */
+
+.fw-600 {
+  font-weight: 600;
+}
+
+.fw-700 {
+  font-weight: 700;
+}
+
+/* ===== Utility: balance amounts ===== */
+
+.sb-amount-positive {
+  color: var(--sb-success);
+  font-weight: 700;
+}
+
+.sb-amount-negative {
+  color: var(--sb-danger);
+  font-weight: 700;
+}
+
+.sb-balance-card {
+  border-radius: var(--sb-radius);
+  padding: 1.1rem 1.3rem;
+  border: 1px solid var(--sb-border);
+  background: var(--sb-card);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sb-balance-card.positive {
+  background: var(--sb-success-bg);
+  border-color: transparent;
+}
+
+.sb-balance-card.negative {
+  background: var(--sb-danger-bg);
+  border-color: transparent;
+}
+
+/* ===== Auth pages (login/register) ===== */
+
+.sb-auth-card {
+  max-width: 420px;
+  margin: 3rem auto;
+}
+
+/* ===== Footer ===== */
+
+.footer {
+  flex-shrink: 0;
+  width: 100%;
+  line-height: 60px;
+  color: var(--sb-muted);
+  font-size: 0.85rem;
+  border-top: 1px solid var(--sb-border);
+  margin-top: 2rem;
 }
 
 .form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
@@ -28,42 +277,4 @@ body {
 
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
   text-align: start;
-}
-
-/* Gộp từ _Layout.cshtml.css cũ (scoped CSS bundle) — bỏ cơ chế bundle vì gây lỗi 500
-   FileNotFoundException khi chạy dev headless (StaticAssetDevelopmentRuntimeHandler tìm file
-   SplitBill.Web.styles.css không tồn tại vật lý trong wwwroot). */
-a.navbar-brand {
-  white-space: normal;
-  text-align: center;
-  word-break: break-all;
-}
-
-a {
-  color: #0077cc;
-}
-
-.btn-primary {
-  color: #fff;
-  background-color: #1b6ec2;
-  border-color: #1861ac;
-}
-
-.border-top {
-  border-top: 1px solid #e5e5e5;
-}
-.border-bottom {
-  border-bottom: 1px solid #e5e5e5;
-}
-
-.box-shadow {
-  box-shadow: 0 .25rem .75rem rgba(0, 0, 0, .05);
-}
-
-.footer {
-  position: absolute;
-  bottom: 0;
-  width: 100%;
-  white-space: nowrap;
-  line-height: 60px;
 }

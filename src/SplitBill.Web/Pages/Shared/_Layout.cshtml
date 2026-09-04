@@ -5,12 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - SplitBill</title>
     <script type="importmap"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
+        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light mb-4">
             <div class="container">
                 <a class="navbar-brand" asp-area="" asp-page="/Index">💰 SplitBill</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
@@ -22,29 +25,29 @@
                         @if (User.Identity?.IsAuthenticated == true)
                         {
                             <li class="nav-item">
-                                <a class="nav-link text-dark" asp-area="" asp-page="/Groups/Index">Nhóm của tôi</a>
+                                <a class="nav-link" asp-area="" asp-page="/Groups/Index">Nhóm của tôi</a>
                             </li>
                         }
                     </ul>
-                    <ul class="navbar-nav">
+                    <ul class="navbar-nav align-items-sm-center">
                         @if (User.Identity?.IsAuthenticated == true)
                         {
                             <li class="nav-item">
-                                <a class="nav-link text-muted" asp-page="/Account/Profile">@User.Identity!.Name</a>
+                                <a class="nav-link text-muted" asp-page="/Account/Profile">👤 @User.Identity!.Name</a>
                             </li>
                             <li class="nav-item">
                                 <form asp-page="/Account/Logout" method="post" class="d-inline">
-                                    <button type="submit" class="btn btn-link nav-link text-dark">Đăng xuất</button>
+                                    <button type="submit" class="btn btn-link nav-link">Đăng xuất</button>
                                 </form>
                             </li>
                         }
                         else
                         {
                             <li class="nav-item">
-                                <a class="nav-link text-dark" asp-page="/Account/Login">Đăng nhập</a>
+                                <a class="nav-link" asp-page="/Account/Login">Đăng nhập</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link text-dark" asp-page="/Account/Register">Đăng ký</a>
+                                <a asp-page="/Account/Register" class="btn btn-primary btn-sm ms-sm-2">Đăng ký</a>
                             </li>
                         }
                     </ul>
@@ -58,9 +61,9 @@
         </main>
     </div>
 
-    <footer class="border-top footer text-muted">
+    <footer class="footer">
         <div class="container">
-            &copy; 2026 - SplitBill
+            © 2026 SplitBill — chia tiền minh bạch, không lăn tăn.
         </div>
     </footer>
 

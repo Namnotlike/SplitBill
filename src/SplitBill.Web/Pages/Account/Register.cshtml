@@ -4,10 +4,11 @@
     ViewData["Title"] = "Đăng ký";
 }
 
-<h1>Đăng ký tài khoản</h1>
+<div class="card sb-auth-card">
+    <div class="card-body p-4">
+        <h1 class="h3 text-center mb-1">Tạo tài khoản 🎉</h1>
+        <p class="text-muted text-center mb-4">Miễn phí, chỉ mất 30 giây</p>
 
-<div class="row">
-    <div class="col-md-6">
         <form method="post">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             @if (Model.ErrorMessage is not null)
@@ -16,7 +17,7 @@
             }
             <div class="mb-3">
                 <label asp-for="Input.DisplayName" class="form-label">Tên hiển thị</label>
-                <input asp-for="Input.DisplayName" class="form-control" />
+                <input asp-for="Input.DisplayName" class="form-control" autofocus />
                 <span asp-validation-for="Input.DisplayName" class="text-danger"></span>
             </div>
             <div class="mb-3">
@@ -28,9 +29,12 @@
                 <label asp-for="Input.Password" class="form-label">Mật khẩu</label>
                 <input asp-for="Input.Password" type="password" class="form-control" />
                 <span asp-validation-for="Input.Password" class="text-danger"></span>
+                <div class="form-text">Tối thiểu 8 ký tự.</div>
             </div>
-            <button type="submit" class="btn btn-primary">Đăng ký</button>
-            <a asp-page="/Account/Login" class="btn btn-link">Đã có tài khoản? Đăng nhập</a>
+            <button type="submit" class="btn btn-primary w-100 mb-3">Đăng ký</button>
+            <p class="text-center text-muted mb-0">
+                Đã có tài khoản? <a asp-page="/Account/Login">Đăng nhập</a>
+            </p>
         </form>
     </div>
 </div>

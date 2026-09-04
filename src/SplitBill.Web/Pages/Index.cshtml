@@ -4,17 +4,54 @@
     ViewData["Title"] = "Trang chủ";
 }
 
-<div class="text-center py-5">
-    <h1 class="display-4">💰 SplitBill</h1>
-    <p class="lead">Chia tiền cho nhóm bạn — ai ứng, ai chịu, ai còn nợ ai.</p>
+<div class="text-center py-5 py-md-6">
+    <div class="d-inline-flex align-items-center justify-content-center rounded-circle mb-4"
+         style="width: 88px; height: 88px; background: var(--sb-brand-light); font-size: 2.5rem;">
+        💰
+    </div>
+    <h1 class="display-5 fw-800 mb-3">Chia tiền nhóm, khỏi cần tính nhẩm</h1>
+    <p class="lead text-muted mx-auto mb-4" style="max-width: 560px;">
+        Ai ứng bao nhiêu, ai chịu bao nhiêu, cuối cùng ai chuyển cho ai — SplitBill tự tính hết,
+        kèm mã VietQR quét phát chuyển luôn.
+    </p>
 
     @if (User.Identity?.IsAuthenticated == true)
     {
-        <a asp-page="/Groups/Index" class="btn btn-primary btn-lg mt-3">Xem nhóm của tôi</a>
+        <a asp-page="/Groups/Index" class="btn btn-primary btn-lg px-4">Xem nhóm của tôi</a>
     }
     else
     {
-        <a asp-page="/Account/Register" class="btn btn-primary btn-lg mt-3">Bắt đầu ngay</a>
-        <a asp-page="/Account/Login" class="btn btn-outline-secondary btn-lg mt-3">Đăng nhập</a>
+        <a asp-page="/Account/Register" class="btn btn-primary btn-lg px-4 me-2">Bắt đầu miễn phí</a>
+        <a asp-page="/Account/Login" class="btn btn-outline-secondary btn-lg px-4">Đăng nhập</a>
     }
+</div>
+
+<div class="row g-4 mt-2">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="fs-2 mb-2">🧾</div>
+                <h5 class="card-title">Nhiều cách chia</h5>
+                <p class="text-muted mb-0">Chia đều, theo phần, theo %, nhập tay, hoặc theo từng món ăn — làm tròn luôn công bằng.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="fs-2 mb-2">🔀</div>
+                <h5 class="card-title">Gộp nợ tối ưu</h5>
+                <p class="text-muted mb-0">Thuật toán tự tìm số lượt chuyển khoản ít nhất, không ai phải chuyển vòng vo qua người khác.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="fs-2 mb-2">📱</div>
+                <h5 class="card-title">Quét QR chuyển ngay</h5>
+                <p class="text-muted mb-0">Mỗi khoản cần chuyển đều kèm mã VietQR — mở app ngân hàng quét là xong, khỏi gõ số tài khoản.</p>
+            </div>
+        </div>
+    </div>
 </div>

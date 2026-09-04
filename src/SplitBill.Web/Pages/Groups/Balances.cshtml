@@ -4,33 +4,31 @@
     ViewData["Title"] = "Số dư";
 }
 
-<h1>Số dư — @Model.Group.Name</h1>
-<a asp-page="/Groups/Details" asp-route-id="@Model.Group.Id" class="btn btn-outline-secondary btn-sm mb-3">← Về nhóm</a>
+<a asp-page="/Groups/Details" asp-route-id="@Model.Group.Id" class="text-muted small">← Về nhóm</a>
+<h1 class="mt-1">Số dư — @Model.Group.Name</h1>
 
-<table class="table">
-    <thead><tr><th>Thành viên</th><th class="text-end">Số dư</th></tr></thead>
-    <tbody>
-        @foreach (var balance in Model.Balances.OrderByDescending(b => b.Net))
-        {
-            <tr>
-                <td>@balance.MemberName</td>
-                <td class="text-end @(balance.Net > 0 ? "text-success" : balance.Net < 0 ? "text-danger" : "text-muted")">
-                    @if (balance.Net > 0)
-                    {
-                        <text>Được nhận @balance.Net.ToString("N0")đ</text>
-                    }
-                    else if (balance.Net < 0)
-                    {
-                        <text>Còn nợ @Math.Abs(balance.Net).ToString("N0")đ</text>
-                    }
-                    else
-                    {
-                        <text>Đã cân bằng</text>
-                    }
-                </td>
-            </tr>
-        }
-    </tbody>
-</table>
+<div class="row g-3 mt-1 mb-4">
+    @foreach (var balance in Model.Balances.OrderByDescending(b => b.Net))
+    {
+        var cardClass = balance.Net > 0 ? "positive" : balance.Net < 0 ? "negative" : "";
+        <div class="col-md-6 col-lg-4">
+            <div class="sb-balance-card @cardClass">
+                <span class="fw-600">@balance.MemberName</span>
+                @if (balance.Net > 0)
+                {
+                    <span class="sb-amount-positive">+@balance.Net.ToString("N0")đ</span>
+                }
+                else if (balance.Net < 0)
+                {
+                    <span class="sb-amount-negative">@balance.Net.ToString("N0")đ</span>
+                }
+                else
+                {
+                    <span class="text-muted">Đã cân bằng</span>
+                }
+            </div>
+        </div>
+    }
+</div>
 
-<a asp-page="/Groups/SettlementPlan" asp-route-id="@Model.Group.Id" class="btn btn-primary">Xem kế hoạch thanh toán</a>
+<a asp-page="/Groups/SettlementPlan" asp-route-id="@Model.Group.Id" class="btn btn-primary">🔀 Xem kế hoạch thanh toán</a>

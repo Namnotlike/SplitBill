@@ -5,43 +5,54 @@
 }
 
 <h1>Nhóm của tôi</h1>
+<p class="text-muted mb-4">Chọn 1 nhóm để xem chi tiết, hoặc tạo nhóm mới ở bên phải.</p>
 
 @if (Model.ErrorMessage is not null)
 {
     <div class="alert alert-danger">@Model.ErrorMessage</div>
 }
 
-<div class="row">
-    <div class="col-md-7">
+<div class="row g-4">
+    <div class="col-lg-7">
         @if (Model.MyGroups.Count == 0)
         {
-            <p class="text-muted">Chưa có nhóm nào. Tạo nhóm đầu tiên ở bên phải 👉</p>
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <div class="fs-1 mb-2">🗂️</div>
+                    <p class="text-muted mb-0">Chưa có nhóm nào. Tạo nhóm đầu tiên ở bên phải 👉</p>
+                </div>
+            </div>
         }
         else
         {
-            <div class="list-group">
+            <div class="row g-3">
                 @foreach (var group in Model.MyGroups)
                 {
-                    <a asp-page="/Groups/Details" asp-route-id="@group.Id"
-                       class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                        <span>
-                            @group.Name
-                            @if (group.IsArchived)
-                            {
-                                <span class="badge bg-secondary ms-2">Đã lưu trữ</span>
-                            }
-                        </span>
-                        <span class="badge bg-light text-dark">@group.Type</span>
-                    </a>
+                    <div class="col-md-6">
+                        <a asp-page="/Groups/Details" asp-route-id="@group.Id" class="card h-100 text-decoration-none">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h5 class="card-title mb-0 text-body">@group.Name</h5>
+                                    @if (group.IsArchived)
+                                    {
+                                        <span class="badge bg-secondary">Lưu trữ</span>
+                                    }
+                                </div>
+                                <span class="badge" style="background: var(--sb-brand-light); color: var(--sb-brand-dark);">
+                                    @(group.Type == "OneTime" ? "Một lần" : "Dùng lại nhiều lần")
+                                </span>
+                            </div>
+                        </a>
+                    </div>
                 }
             </div>
         }
     </div>
 
-    <div class="col-md-5">
+    <div class="col-lg-5">
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title">Tạo nhóm mới</h5>
+                <h5 class="card-title">+ Tạo nhóm mới</h5>
                 <form method="post" asp-page-handler="Create">
                     <div class="mb-3">
                         <label asp-for="NewGroup.Name" class="form-label">Tên nhóm</label>
@@ -59,7 +70,7 @@
                             <option value="Recurring">Dùng lại nhiều lần</option>
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-primary">Tạo nhóm</button>
+                    <button type="submit" class="btn btn-primary w-100">Tạo nhóm</button>
                 </form>
             </div>
         </div>

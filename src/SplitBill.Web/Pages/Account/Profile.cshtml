@@ -5,18 +5,19 @@
 }
 
 <h1>Hồ sơ của tôi</h1>
+<p class="text-muted mb-4">Thông tin tài khoản ngân hàng dùng để sinh mã VietQR khi người khác cần chuyển tiền cho bạn.</p>
 
 @if (Model.SuccessMessage is not null)
 {
-    <div class="alert alert-success">@Model.SuccessMessage</div>
+    <div class="alert alert-success">✅ @Model.SuccessMessage</div>
 }
 @if (Model.ErrorMessage is not null)
 {
     <div class="alert alert-danger">@Model.ErrorMessage</div>
 }
 
-<div class="row">
-    <div class="col-md-6">
+<div class="card" style="max-width: 480px;">
+    <div class="card-body p-4">
         <form method="post">
             <div class="mb-3">
                 <label asp-for="Input.DisplayName" class="form-label">Tên hiển thị</label>
@@ -27,12 +28,11 @@
                 <input asp-for="Input.BankBin" class="form-control" placeholder="VD: 970436 (Vietcombank)" />
                 <span asp-validation-for="Input.BankBin" class="text-danger"></span>
             </div>
-            <div class="mb-3">
+            <div class="mb-4">
                 <label asp-for="Input.BankAccountNumber" class="form-label">Số tài khoản</label>
                 <input asp-for="Input.BankAccountNumber" class="form-control" />
             </div>
-            <p class="text-muted small">Dùng để sinh mã VietQR khi người khác cần chuyển tiền cho bạn.</p>
-            <button type="submit" class="btn btn-primary">Lưu</button>
+            <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
         </form>
     </div>
 </div>

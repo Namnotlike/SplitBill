@@ -11,24 +11,32 @@
 }
 else if (Model.Group is not null)
 {
-    <div class="alert alert-info">Bạn đang xem nhóm qua link chia sẻ (chỉ xem, không cần đăng nhập).</div>
-    <h1>@Model.Group.Name</h1>
+    <div class="alert alert-info">🔗 Bạn đang xem nhóm qua link chia sẻ (chỉ xem, không cần đăng nhập).</div>
+    <h1 class="mb-1">@Model.Group.Name</h1>
     @if (!string.IsNullOrEmpty(Model.Group.Description))
     {
         <p class="text-muted">@Model.Group.Description</p>
     }
 
-    <h5>Thành viên</h5>
-    <ul class="list-group" style="max-width: 400px;">
-        @foreach (var member in Model.Group.Members)
-        {
-            <li class="list-group-item d-flex justify-content-between">
-                <span>@member.DisplayName</span>
-                @if (member.Role == "Owner")
-                {
-                    <span class="badge bg-warning text-dark">Owner</span>
-                }
-            </li>
-        }
-    </ul>
+    <div class="card mt-3" style="max-width: 480px;">
+        <div class="card-body">
+            <h5 class="card-title">Thành viên (@Model.Group.Members.Count)</h5>
+            <table class="table table-sm mb-0">
+                <tbody>
+                    @foreach (var member in Model.Group.Members)
+                    {
+                        <tr>
+                            <td>@member.DisplayName</td>
+                            <td class="text-end">
+                                @if (member.Role == "Owner")
+                                {
+                                    <span class="badge bg-warning text-dark">Owner</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
 }

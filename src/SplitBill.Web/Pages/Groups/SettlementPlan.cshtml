@@ -4,40 +4,45 @@
     ViewData["Title"] = "Kế hoạch thanh toán";
 }
 
-<h1>Kế hoạch thanh toán — @Model.Group.Name</h1>
-<a asp-page="/Groups/Details" asp-route-id="@Model.Group.Id" class="btn btn-outline-secondary btn-sm mb-3">← Về nhóm</a>
+<a asp-page="/Groups/Details" asp-route-id="@Model.Group.Id" class="text-muted small">← Về nhóm</a>
+<h1 class="mt-1 mb-4">Kế hoạch thanh toán — @Model.Group.Name</h1>
 
 @if (TempData["SuccessMessage"] is string ok)
 {
-    <div class="alert alert-success">@ok</div>
+    <div class="alert alert-success">✅ @ok</div>
 }
 @if (TempData["ErrorMessage"] is string err)
 {
     <div class="alert alert-danger">@err</div>
 }
 
-<h5>
-    @(Model.Plan.Simplified ? "Đề xuất gộp nợ tối ưu" : "Nợ trực tiếp theo từng khoản chi")
-    — @Model.Plan.TransactionCount giao dịch
+<h5 class="mb-3">
+    @(Model.Plan.Simplified ? "🔀 Đề xuất gộp nợ tối ưu" : "Nợ trực tiếp theo từng khoản chi")
+    <span class="text-muted fw-normal">— @Model.Plan.TransactionCount giao dịch</span>
 </h5>
 
 @if (Model.Plan.Transactions.Count == 0)
 {
-    <p class="text-muted">Mọi người đã cân bằng, không cần chuyển gì thêm 🎉</p>
+    <div class="card mb-4">
+        <div class="card-body text-center py-5">
+            <div class="fs-1 mb-2">🎉</div>
+            <p class="text-muted mb-0">Mọi người đã cân bằng, không cần chuyển gì thêm.</p>
+        </div>
+    </div>
 }
 else
 {
-    <div class="row">
+    <div class="row g-3 mb-4">
         @foreach (var tx in Model.Plan.Transactions)
         {
-            <div class="col-md-4 mb-3">
+            <div class="col-md-4">
                 <div class="card h-100">
                     <div class="card-body text-center">
                         <p class="mb-1"><strong>@tx.FromName</strong> chuyển cho <strong>@tx.ToName</strong></p>
-                        <p class="fs-4 mb-2">@tx.Amount.ToString("N0")đ</p>
+                        <p class="fs-4 fw-700 mb-2" style="color: var(--sb-brand-dark);">@tx.Amount.ToString("N0")đ</p>
                         @if (tx.VietQr is not null)
                         {
-                            <div class="qr-canvas d-flex justify-content-center" data-payload="@tx.VietQr.Payload"></div>
+                            <div class="qr-canvas d-flex justify-content-center mb-2" data-payload="@tx.VietQr.Payload"></div>
                             <p class="small text-muted mb-0">Quét để chuyển khoản qua @tx.VietQr.BankBin</p>
                         }
                         else
@@ -60,90 +65,98 @@ else
     </div>
 }
 
-<hr />
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Ghi nhận thanh toán khác</h5>
+        <form method="post" asp-page-handler="Record" asp-route-id="@Model.Group.Id" class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label">Từ</label>
+                <select name="NewSettlement.FromMemberId" class="form-select">
+                    @foreach (var m in Model.Group.Members)
+                    {
+                        <option value="@m.Id">@m.DisplayName</option>
+                    }
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label">Đến</label>
+                <select name="NewSettlement.ToMemberId" class="form-select">
+                    @foreach (var m in Model.Group.Members)
+                    {
+                        <option value="@m.Id">@m.DisplayName</option>
+                    }
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label">Số tiền (đ)</label>
+                <input name="NewSettlement.Amount" type="number" min="1" class="form-control" />
+            </div>
+            <div class="col-auto">
+                <label class="form-label">Ghi chú</label>
+                <input name="NewSettlement.Note" class="form-control" />
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-secondary">Ghi nhận</button>
+            </div>
+        </form>
+    </div>
+</div>
 
-<h5>Ghi nhận thanh toán khác</h5>
-<form method="post" asp-page-handler="Record" asp-route-id="@Model.Group.Id" class="row g-2 align-items-end mb-4">
-    <div class="col-auto">
-        <label class="form-label">Từ</label>
-        <select name="NewSettlement.FromMemberId" class="form-select">
-            @foreach (var m in Model.Group.Members)
-            {
-                <option value="@m.Id">@m.DisplayName</option>
-            }
-        </select>
-    </div>
-    <div class="col-auto">
-        <label class="form-label">Đến</label>
-        <select name="NewSettlement.ToMemberId" class="form-select">
-            @foreach (var m in Model.Group.Members)
-            {
-                <option value="@m.Id">@m.DisplayName</option>
-            }
-        </select>
-    </div>
-    <div class="col-auto">
-        <label class="form-label">Số tiền (đ)</label>
-        <input name="NewSettlement.Amount" type="number" min="1" class="form-control" />
-    </div>
-    <div class="col-auto">
-        <label class="form-label">Ghi chú</label>
-        <input name="NewSettlement.Note" class="form-control" />
-    </div>
-    <div class="col-auto">
-        <button type="submit" class="btn btn-secondary">Ghi nhận</button>
-    </div>
-</form>
-
-<h5>Lịch sử ghi nhận</h5>
-@if (Model.Settlements.Count == 0)
-{
-    <p class="text-muted">Chưa có ghi nhận nào.</p>
-}
-else
-{
-    <table class="table">
-        <thead><tr><th>Từ</th><th>Đến</th><th>Số tiền</th><th>Trạng thái</th><th></th></tr></thead>
-        <tbody>
-            @foreach (var s in Model.Settlements)
-            {
-                <tr>
-                    <td>@Model.MemberName(s.FromMemberId)</td>
-                    <td>@Model.MemberName(s.ToMemberId)</td>
-                    <td>@s.Amount.ToString("N0")đ</td>
-                    <td>
-                        @{
-                            var badgeClass = s.Status switch
-                            {
-                                "Confirmed" => "bg-success",
-                                "Rejected" => "bg-danger",
-                                _ => "bg-warning text-dark",
-                            };
-                        }
-                        <span class="badge @badgeClass">@s.Status</span>
-                    </td>
-                    <td>
-                        @if (s.Status == "Pending" && Model.MyMemberId == s.ToMemberId)
+<div class="card">
+    <div class="card-body @(Model.Settlements.Count > 0 ? "p-0" : "")">
+        <h5 class="card-title @(Model.Settlements.Count > 0 ? "px-4 pt-4" : "")">Lịch sử ghi nhận</h5>
+        @if (Model.Settlements.Count == 0)
+        {
+            <p class="text-muted mb-0">Chưa có ghi nhận nào.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table mb-0">
+                    <thead><tr><th class="ps-4">Từ</th><th>Đến</th><th>Số tiền</th><th>Trạng thái</th><th class="pe-4"></th></tr></thead>
+                    <tbody>
+                        @foreach (var s in Model.Settlements)
                         {
-                            <form method="post" asp-page-handler="Confirm" asp-route-id="@Model.Group.Id" asp-route-settlementId="@s.Id" class="d-inline">
-                                <button type="submit" class="btn btn-sm btn-success">Xác nhận</button>
-                            </form>
-                            <form method="post" asp-page-handler="Reject" asp-route-id="@Model.Group.Id" asp-route-settlementId="@s.Id" class="d-inline">
-                                <button type="submit" class="btn btn-sm btn-outline-danger">Từ chối</button>
-                            </form>
+                            <tr>
+                                <td class="ps-4">@Model.MemberName(s.FromMemberId)</td>
+                                <td>@Model.MemberName(s.ToMemberId)</td>
+                                <td>@s.Amount.ToString("N0")đ</td>
+                                <td>
+                                    @{
+                                        var badgeClass = s.Status switch
+                                        {
+                                            "Confirmed" => "bg-success",
+                                            "Rejected" => "bg-danger",
+                                            _ => "bg-warning text-dark",
+                                        };
+                                    }
+                                    <span class="badge @badgeClass">@s.Status</span>
+                                </td>
+                                <td class="pe-4 text-end">
+                                    @if (s.Status == "Pending" && Model.MyMemberId == s.ToMemberId)
+                                    {
+                                        <form method="post" asp-page-handler="Confirm" asp-route-id="@Model.Group.Id" asp-route-settlementId="@s.Id" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-success">Xác nhận</button>
+                                        </form>
+                                        <form method="post" asp-page-handler="Reject" asp-route-id="@Model.Group.Id" asp-route-settlementId="@s.Id" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Từ chối</button>
+                                        </form>
+                                    }
+                                    @if (s.Status == "Pending")
+                                    {
+                                        <form method="post" asp-page-handler="Delete" asp-route-id="@Model.Group.Id" asp-route-settlementId="@s.Id" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary">Xóa</button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
                         }
-                        @if (s.Status == "Pending")
-                        {
-                            <form method="post" asp-page-handler="Delete" asp-route-id="@Model.Group.Id" asp-route-settlementId="@s.Id" class="d-inline">
-                                <button type="submit" class="btn btn-sm btn-outline-secondary">Xóa</button>
-                            </form>
-                        }
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
 
 @section Scripts {
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
