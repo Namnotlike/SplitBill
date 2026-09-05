@@ -81,6 +81,15 @@ public sealed class GroupsController : ControllerBase
         return Ok(group);
     }
 
+    /// <summary>Tự thêm mình vào nhóm qua link chia sẻ (CLAUDE.md mục 15.6) — YÊU CẦU đăng nhập
+    /// (không có [AllowAnonymous], khác hẳn GetBySharedTokenAsync ở trên vốn chỉ đọc).</summary>
+    [HttpPost("shared/{shareToken}/join")]
+    public async Task<ActionResult<GroupMemberDto>> JoinViaShareTokenAsync(string shareToken, CancellationToken cancellationToken)
+    {
+        var member = await _groupService.JoinViaShareTokenAsync(User.GetUserId(), shareToken, cancellationToken);
+        return Ok(member);
+    }
+
     [HttpPost("{id:guid}/share-token/rotate")]
     public async Task<ActionResult<object>> RotateShareTokenAsync(Guid id, CancellationToken cancellationToken)
     {

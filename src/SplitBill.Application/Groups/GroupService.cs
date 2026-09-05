@@ -184,6 +184,59 @@ public sealed class GroupService : IGroupService
         return newToken;
     }
 
+    public async Task<GroupMemberDto> JoinViaShareTokenAsync(Guid callerUserId, string shareToken, CancellationToken cancellationToken)
+    {
+        var group = await _groupRepository.GetByShareTokenAsync(shareToken, cancellationToken)
+            ?? throw new DomainException(ErrorCodes.GroupNotFound, "Link chia sẻ không hợp lệ hoặc đã bị đổi.");
+
+        var existing = group.Members.FirstOrDefault(m => m.UserId == callerUserId);
+        if (existing is { IsActive: true })
+        {
+            throw new DomainException(ErrorCodes.AlreadyGroupMember, "Bạn đã là thành viên của nhóm này.");
+        }
+
+        var user = await _userRepository.GetByIdAsync(callerUserId, cancellationToken)
+            ?? throw new DomainException(ErrorCodes.MemberNotFound, "Không tìm thấy tài khoản.");
+
+        GroupMember member;
+        if (existing is not null)
+        {
+            // Đã từng là thành viên rồi rời nhóm — kích hoạt lại CÙNG GroupMemberId (không insert mới)
+            // để giữ nguyên lịch sử Expense/Settlement cũ đã gắn với GroupMemberId này, và vì unique
+            // index (GroupId, UserId) sẽ chặn insert mới trùng UserId (xem docstring interface).
+            existing.IsActive = true;
+            existing.DisplayName = user.DisplayName;
+            member = existing;
+            // Action "Restored" (không phải "Updated") — đúng từ vựng đã định nghĩa sẵn ở CLAUDE.md
+            // mục 4.1 cho AuditLog.Action ("Created"|"Updated"|"Deleted"|"Restored"), và tách biệt rõ
+            // với 1 lần đổi tên thường (cũng là "GroupMember"+"Updated" do chính người đó tự đổi tên
+            // mình — ActorMemberId == EntityId giống hệt, nếu dùng chung Action "Updated" thì
+            // BuildSummary không còn cách nào phân biệt 2 tình huống).
+            await WriteAuditLogAsync(group.Id, "GroupMember", member.Id, "Restored", member.Id, null, ToMemberDto(member), cancellationToken);
+        }
+        else
+        {
+            member = new GroupMember
+            {
+                Id = Guid.NewGuid(),
+                GroupId = group.Id,
+                UserId = callerUserId,
+                DisplayName = user.DisplayName,
+                Role = GroupMemberRole.Member,
+                IsActive = true,
+                JoinedAt = DateTimeOffset.UtcNow,
+            };
+            await _groupRepository.AddMemberAsync(member, cancellationToken);
+            // ActorMemberId = chính member vừa tạo — đây là hành động TỰ THÊM MÌNH, không phải người
+            // khác thêm hộ (khác với AddMemberAsync, nơi caller luôn là 1 member khác đã có sẵn).
+            await WriteAuditLogAsync(group.Id, "GroupMember", member.Id, "Created", member.Id, null, ToMemberDto(member), cancellationToken);
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return ToMemberDto(member);
+    }
+
     public async Task<GroupMemberDto> AddMemberAsync(Guid callerUserId, Guid groupId, AddMemberRequest request, CancellationToken cancellationToken)
     {
         var group = await LoadGroupAsync(groupId, cancellationToken);
@@ -412,6 +465,18 @@ public sealed class GroupService : IGroupService
                     return settlementDeleted is null
                         ? "đã xóa 1 khoản thanh toán"
                         : $"đã xóa khoản thanh toán {SupportedCurrencies.Format(settlementDeleted.Amount, currency)} (từ {MemberName(settlementDeleted.FromMemberId)} đến {MemberName(settlementDeleted.ToMemberId)})";
+
+                // Tham gia nhóm qua link chia sẻ (CLAUDE.md mục 15.6): ActorMemberId == EntityId nghĩa
+                // là chính người đó tự thêm mình, khác hẳn "đã thêm X vào nhóm" (ai đó thêm hộ) —
+                // phải bắt riêng TRƯỚC case "Created" chung bên dưới. Lần tham gia lại (sau khi đã
+                // từng rời nhóm) dùng Action "Restored" riêng — KHÔNG dùng chung "Updated" với đổi
+                // tên thường, vì đổi tên chính mình cũng có ActorMemberId == EntityId, sẽ không còn
+                // cách nào phân biệt 2 tình huống nếu gộp chung Action.
+                case ("GroupMember", "Created") when log.ActorMemberId == log.EntityId:
+                    return "đã tham gia nhóm qua link chia sẻ";
+
+                case ("GroupMember", "Restored"):
+                    return "đã tham gia lại nhóm qua link chia sẻ";
 
                 case ("GroupMember", "Created"):
                     var memberCreated = Parse<GroupMemberDto>(log.AfterJson);

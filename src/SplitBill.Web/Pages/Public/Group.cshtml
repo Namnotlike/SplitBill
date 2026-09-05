@@ -5,17 +5,40 @@
     Layout = "_Layout";
 }
 
+@* Group và ErrorMessage KHÔNG loại trừ nhau: OnPostJoinAsync có thể trả về cả hai cùng lúc (vd lỗi
+   "Bạn đã là thành viên") — phải hiện lỗi NHƯNG vẫn hiện được nhóm bên dưới, thay vì thay thế hoàn
+   toàn. Chỉ khi Group null (shareToken không hợp lệ ngay từ GET ban đầu) mới không có gì để hiện. *@
 @if (Model.ErrorMessage is not null)
 {
     <div class="alert alert-danger">@Model.ErrorMessage</div>
 }
-else if (Model.Group is not null)
+@if (Model.Group is not null)
 {
     <div class="alert alert-info">🔗 Bạn đang xem nhóm qua link chia sẻ (chỉ xem, không cần đăng nhập).</div>
     <h1 class="mb-1">@Model.Group.Name</h1>
     @if (!string.IsNullOrEmpty(Model.Group.Description))
     {
         <p class="text-muted">@Model.Group.Description</p>
+    }
+
+    @* ===== Tham gia nhóm qua link (CLAUDE.md mục 15.6) — bổ sung 2026-09-05. Chỉ hiện nút Tham gia
+       khi đã đăng nhập; người xem ẩn danh thấy lời mời đăng nhập/đăng ký, quay lại đúng trang này sau
+       khi xong (ReturnUrl). ===== *@
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <form method="post" asp-page-handler="Join" class="mt-3">
+            <button type="submit" class="btn btn-primary">+ Tham gia nhóm này</button>
+        </form>
+    }
+    else
+    {
+        <div class="card mt-3" style="max-width: 480px;">
+            <div class="card-body">
+                <p class="mb-3">Đăng nhập hoặc tạo tài khoản để tham gia nhóm này.</p>
+                <a asp-page="/Account/Login" asp-route-returnUrl="@($"/Public/Group/{Model.Group.ShareToken}")" class="btn btn-primary me-2">Đăng nhập</a>
+                <a asp-page="/Account/Register" asp-route-returnUrl="@($"/Public/Group/{Model.Group.ShareToken}")" class="btn btn-outline-secondary">Đăng ký</a>
+            </div>
+        </div>
     }
 
     <div class="card mt-3" style="max-width: 480px;">

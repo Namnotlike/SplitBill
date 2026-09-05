@@ -382,4 +382,83 @@ public sealed class GroupServiceTests
 
         harness.EmailSender.SentEmails.Should().BeEmpty();
     }
+
+    // ===== Tham gia nhóm qua link chia sẻ (CLAUDE.md mục 15.6) — bổ sung 2026-09-05 =====
+
+    [Fact]
+    public async Task JoinViaShareTokenAsync_NewUser_AddsAsActiveMember()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var joinerId = await harness.RegisterUserAsync("b@example.com", "Binh");
+
+        var member = await harness.GroupService.JoinViaShareTokenAsync(joinerId, group.ShareToken, CancellationToken.None);
+
+        member.DisplayName.Should().Be("Binh");
+        member.Role.Should().Be("Member");
+        member.IsActive.Should().BeTrue();
+
+        var updatedGroup = await harness.GroupService.GetByIdAsync(joinerId, group.Id, CancellationToken.None);
+        updatedGroup.Members.Should().ContainSingle(m => m.UserId == joinerId && m.IsActive);
+    }
+
+    [Fact]
+    public async Task JoinViaShareTokenAsync_AlreadyMember_ThrowsAlreadyGroupMember()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+
+        var act = () => harness.GroupService.JoinViaShareTokenAsync(ownerId, group.ShareToken, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.AlreadyGroupMember);
+    }
+
+    [Fact]
+    public async Task JoinViaShareTokenAsync_InvalidShareToken_ThrowsGroupNotFound()
+    {
+        using var harness = TestHarness.Create();
+        var userId = await harness.RegisterUserAsync("a@example.com", "Nam");
+
+        var act = () => harness.GroupService.JoinViaShareTokenAsync(userId, "khong-ton-tai", CancellationToken.None);
+
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.GroupNotFound);
+    }
+
+    [Fact]
+    public async Task JoinViaShareTokenAsync_RejoinAfterLeaving_ReactivatesSameMemberId()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var joinerId = await harness.RegisterUserAsync("b@example.com", "Binh");
+
+        var firstJoin = await harness.GroupService.JoinViaShareTokenAsync(joinerId, group.ShareToken, CancellationToken.None);
+        await harness.GroupService.RemoveMemberAsync(joinerId, group.Id, firstJoin.Id, CancellationToken.None);
+
+        // Rời rồi tham gia lại — phải kích hoạt lại CÙNG GroupMemberId (không tạo mới), vì unique
+        // index (GroupId, UserId) chặn insert trùng UserId dù bản ghi cũ đã IsActive=false.
+        var secondJoin = await harness.GroupService.JoinViaShareTokenAsync(joinerId, group.ShareToken, CancellationToken.None);
+
+        secondJoin.Id.Should().Be(firstJoin.Id);
+        secondJoin.IsActive.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task JoinViaShareTokenAsync_RejoinAfterLeaving_SummaryDescribesRejoin()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var joinerId = await harness.RegisterUserAsync("b@example.com", "Binh");
+        var firstJoin = await harness.GroupService.JoinViaShareTokenAsync(joinerId, group.ShareToken, CancellationToken.None);
+        await harness.GroupService.RemoveMemberAsync(joinerId, group.Id, firstJoin.Id, CancellationToken.None);
+
+        await harness.GroupService.JoinViaShareTokenAsync(joinerId, group.ShareToken, CancellationToken.None);
+
+        var page = await harness.GroupService.GetAuditLogsAsync(ownerId, group.Id, 1, 20, CancellationToken.None);
+        page.Items.Should().Contain(l => l.EntityType == "GroupMember" && l.Action == "Restored" && l.Summary == "đã tham gia lại nhóm qua link chia sẻ");
+        page.Items.Should().Contain(l => l.EntityType == "GroupMember" && l.Action == "Created" && l.Summary == "đã tham gia nhóm qua link chia sẻ");
+    }
 }

@@ -16,6 +16,12 @@ public interface IGroupService
     /// <summary>Đổi token chia sẻ — chỉ Owner (CLAUDE.md mục 8, 4.4).</summary>
     Task<string> RotateShareTokenAsync(Guid callerUserId, Guid groupId, CancellationToken cancellationToken);
 
+    /// <summary>Tự thêm mình vào nhóm qua link chia sẻ — CHỈ dành cho user đã đăng nhập (CLAUDE.md
+    /// mục 15.6). Nếu user từng là thành viên rồi rời nhóm, kích hoạt lại CÙNG GroupMemberId thay vì
+    /// tạo mới (unique index (GroupId, UserId) lọc theo UserId, không theo IsActive — CLAUDE.md mục
+    /// 4.3 — nên không thể tạo hàng mới trùng UserId dù hàng cũ đã IsActive=false).</summary>
+    Task<GroupMemberDto> JoinViaShareTokenAsync(Guid callerUserId, string shareToken, CancellationToken cancellationToken);
+
     Task<GroupMemberDto> AddMemberAsync(Guid callerUserId, Guid groupId, AddMemberRequest request, CancellationToken cancellationToken);
     Task<GroupMemberDto> UpdateMemberAsync(Guid callerUserId, Guid groupId, Guid memberId, UpdateMemberRequest request, CancellationToken cancellationToken);
     Task RemoveMemberAsync(Guid callerUserId, Guid groupId, Guid memberId, CancellationToken cancellationToken);

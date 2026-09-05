@@ -27,7 +27,7 @@
             </div>
             <button type="submit" class="btn btn-primary w-100 mb-3">Đăng nhập</button>
             <p class="text-center text-muted mb-0">
-                Chưa có tài khoản? <a asp-page="/Account/Register">Đăng ký ngay</a>
+                Chưa có tài khoản? <a asp-page="/Account/Register" asp-route-returnUrl="@Model.ReturnUrl">Đăng ký ngay</a>
             </p>
         </form>
     </div>

@@ -33,7 +33,7 @@
             </div>
             <button type="submit" class="btn btn-primary w-100 mb-3">Đăng ký</button>
             <p class="text-center text-muted mb-0">
-                Đã có tài khoản? <a asp-page="/Account/Login">Đăng nhập</a>
+                Đã có tài khoản? <a asp-page="/Account/Login" asp-route-returnUrl="@Model.ReturnUrl">Đăng nhập</a>
             </p>
         </form>
     </div>

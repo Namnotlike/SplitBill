@@ -1120,7 +1120,7 @@ thuật toán) + commit riêng:
 3. Nhãn/danh mục khoản chi — mục 15.3 (đã làm).
 4. Bảng tổng quan cá nhân ở trang chủ — mục 15.4 (đã làm).
 5. Timeline hoạt động nhóm — mục 15.5 (đã làm).
-6. Tham gia nhóm qua link chia sẻ (tự thêm mình vào nhóm, không cần Owner thêm tay).
+6. Tham gia nhóm qua link chia sẻ — mục 15.6 (đã làm).
 7. Khoản chi định kỳ (`GroupType.Recurring` — hiện tại chưa khác gì `OneTime`, cần cơ chế tự sinh
    khoản chi mới theo chu kỳ).
 8. Nhắc nợ tự động (dùng lại hạ tầng Notification ở mục 13, nhắc khi Settlement/Expense chưa xác nhận
@@ -1276,3 +1276,46 @@ là JSON kỹ thuật, khó đọc trực tiếp) thành 1 câu tiếng Việt.
 → trang Timeline hiện đúng 4 dòng theo thứ tự mới nhất trước: "đã xóa khoản chi "X" (80.000đ)", "đã
 thêm khoản chi "X" (80.000đ)", "đã thêm {tên} vào nhóm", "đã tạo nhóm" — xác nhận cả tên lẫn số tiền
 khoản chi đã xóa hiển thị đúng (đúng bug đã sửa ở trên).
+
+### 15.6 Tham gia nhóm qua link chia sẻ
+
+Trước đây `GET /groups/shared/{shareToken}` chỉ cho xem (read-only, `[AllowAnonymous]`) — mọi thành
+viên mới đều phải do Owner/Member hiện có gọi `POST /groups/{id}/members` thêm tay. Bổ sung
+`POST /groups/shared/{shareToken}/join` — **yêu cầu đăng nhập** (khác hẳn endpoint xem ở trên), tự
+thêm chính người gọi vào nhóm với `Role = Member`, `DisplayName` lấy theo tên tài khoản hiện tại
+(không cần nhập tay vì đây là tự thêm mình, không phải Owner gõ tên hộ người khác như luồng cũ).
+
+- `IGroupService.JoinViaShareTokenAsync(callerUserId, shareToken)` — ném `ALREADY_GROUP_MEMBER` nếu
+  caller đã là thành viên `IsActive` của nhóm; ném `GROUP_NOT_FOUND` nếu `shareToken` sai/đã đổi.
+  > ⚠️ Điểm kỹ thuật quan trọng: `GroupMember` có unique index `(GroupId, UserId)` lọc theo
+  > `WHERE UserId IS NOT NULL` — **không** lọc thêm theo `IsActive` (CLAUDE.md mục 4.3). Nghĩa là nếu
+  > 1 user đã từng là thành viên rồi rời nhóm (`IsActive = false`), hàng cũ với `UserId` đó **vẫn tồn
+  > tại** và chặn insert 1 hàng `GroupMember` MỚI cùng `(GroupId, UserId)` — join lại kiểu tạo mới sẽ
+  > ném `DbUpdateException` (vi phạm unique index) chứ không im lặng thành công. Vì vậy khi phát hiện
+  > `existing` (dù `IsActive = false`), phải **kích hoạt lại CÙNG `GroupMemberId`** (`existing.IsActive
+  > = true`) thay vì tạo `GroupMember` mới — nhờ vậy còn giữ nguyên được lịch sử `Expense`/`Settlement`
+  > cũ đã gắn với `GroupMemberId` này từ trước khi rời nhóm.
+  > Action ghi vào `AuditLog` cho lần tham gia lại này là `"Restored"` (đã có sẵn trong từ vựng Action ở
+  > mục 4.1: `"Created"|"Updated"|"Deleted"|"Restored"`), KHÔNG dùng chung `"Updated"` với 1 lần đổi tên
+  > thường — vì đổi tên chính mình (`UpdateMemberAsync` khi `target.Id == caller.Id`) cũng có
+  > `ActorMemberId == EntityId` giống hệt trường hợp tham gia lại; nếu gộp chung Action, `BuildSummary`
+  > (mục 15.5) không còn cách nào phân biệt 2 sự kiện khác hẳn nhau này.
+- API: `POST /api/v1/groups/shared/{shareToken}/join` trong `GroupsController` — **không** có
+  `[AllowAnonymous]` (khác `GetBySharedTokenAsync`), nên tự động yêu cầu JWT hợp lệ nhờ `[Authorize]`
+  ở class.
+- Web: `Public/Group.cshtml` — nút "+ Tham gia nhóm này" chỉ hiện khi `User.Identity.IsAuthenticated`;
+  người xem ẩn danh thấy 2 nút Đăng nhập/Đăng ký, cả hai mang `returnUrl` trỏ về đúng trang chia sẻ này
+  để quay lại tự động sau khi đăng nhập/đăng ký xong (`LoginModel`/`RegisterModel` đều đã hỗ trợ
+  `ReturnUrl` — `RegisterModel` trước đây CHƯA có, đã bổ sung tương tự `LoginModel`). Lỗi từ
+  `OnPostJoinAsync` (vd đã là thành viên) hiển thị dạng banner **phía trên**, không thay thế toàn bộ nội
+  dung trang — sửa 1 lỗi UI nhỏ phát hiện khi làm tính năng này: cấu trúc `if/else if` gốc giữa
+  `ErrorMessage` và `Group` là loại trừ lẫn nhau, nhưng 2 field này có thể cùng khác null (lỗi tham gia
+  NHƯNG nhóm vẫn xem được) — đổi thành 2 khối `if` độc lập.
+
+Đã verify sống trên trình duyệt (tài khoản mới hoàn toàn, luồng đầy đủ): xem link chia sẻ khi chưa đăng
+nhập → đúng chỉ thấy nút Đăng nhập/Đăng ký, không có nút Tham gia; bấm Đăng ký (mang `returnUrl`) →
+đăng ký xong tự quay lại đúng trang chia sẻ, giờ đã thấy nút "+ Tham gia nhóm này"; bấm Tham gia →
+chuyển thẳng tới `/Groups/Details/{id}` với thông báo "Bạn đã tham gia nhóm... với tên Joiner", danh
+sách thành viên tăng từ 2 lên 3; trang Timeline hiện đúng dòng "Joiner đã tham gia nhóm qua link chia
+sẻ"; bấm Tham gia lần 2 → hiện đúng lỗi "Bạn đã là thành viên của nhóm này" mà trang vẫn hiện được nội
+dung nhóm bên dưới (không bị thay thế hoàn toàn).

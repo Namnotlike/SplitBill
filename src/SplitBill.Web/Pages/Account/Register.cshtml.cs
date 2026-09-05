@@ -18,6 +18,11 @@ public class RegisterModel : PageModel
     [BindProperty]
     public InputModel Input { get; set; } = new();
 
+    // Cho phép quay lại đúng trang trước đó sau khi đăng ký — cụ thể dùng để "đăng ký rồi tham gia
+    // nhóm qua link chia sẻ" (CLAUDE.md mục 15.6), cùng mẫu ReturnUrl đã có sẵn ở LoginModel.
+    [BindProperty(SupportsGet = true)]
+    public string? ReturnUrl { get; set; }
+
     public string? ErrorMessage { get; set; }
 
     public sealed class InputModel
@@ -48,7 +53,7 @@ public class RegisterModel : PageModel
             var tokens = await _apiClient.RegisterAsync(
                 new RegisterRequest(Input.Email, Input.Password, Input.DisplayName), cancellationToken);
             await SignInHelper.SignInAsync(HttpContext, _apiClient, tokens, Input.DisplayName, cancellationToken);
-            return RedirectToPage("/Groups/Index");
+            return string.IsNullOrEmpty(ReturnUrl) ? RedirectToPage("/Groups/Index") : LocalRedirect(ReturnUrl);
         }
         catch (ApiException ex)
         {

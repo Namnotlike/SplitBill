@@ -63,6 +63,10 @@ public sealed class SplitBillApiClient
     public Task<GroupDto> GetSharedGroupAsync(string shareToken, CancellationToken ct) =>
         GetAsync<GroupDto>($"groups/shared/{shareToken}", ct);
 
+    /// <summary>Tham gia nhóm qua link chia sẻ — yêu cầu đăng nhập (CLAUDE.md mục 15.6).</summary>
+    public Task<GroupMemberDto> JoinGroupAsync(string shareToken, CancellationToken ct) =>
+        PostAsync<object?, GroupMemberDto>($"groups/shared/{shareToken}/join", null, ct);
+
     public async Task<string> RotateShareTokenAsync(Guid id, CancellationToken ct)
     {
         var result = await PostAsync<object?, Dictionary<string, string>>($"groups/{id}/share-token/rotate", null, ct);
