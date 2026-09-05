@@ -21,6 +21,10 @@ public sealed class Settlement
     public bool IsDeleted { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 
+    /// <summary>Lần gần nhất hệ thống đã nhắc người nhận (ToMember) xác nhận settlement này khi còn
+    /// Pending quá lâu (CLAUDE.md mục 15.8, bổ sung 2026-09-05). Null nghĩa là chưa từng nhắc.</summary>
+    public DateTimeOffset? LastReminderSentAt { get; set; }
+
     /// <summary>Optimistic concurrency token (CLAUDE.md mục 4.3/4.4).</summary>
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 

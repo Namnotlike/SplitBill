@@ -1122,8 +1122,7 @@ thuật toán) + commit riêng:
 5. Timeline hoạt động nhóm — mục 15.5 (đã làm).
 6. Tham gia nhóm qua link chia sẻ — mục 15.6 (đã làm).
 7. Khoản chi định kỳ — mục 15.7 (đã làm).
-8. Nhắc nợ tự động (dùng lại hạ tầng Notification ở mục 13, nhắc khi Settlement/Expense chưa xác nhận
-   quá N ngày).
+8. Nhắc nợ tự động — mục 15.8 (đã làm).
 9. Xuất PDF tổng kết chuyến đi — quyết định kỹ thuật: dùng trang HTML in được qua trình duyệt
    (`window.print()` + CSS `@media print`), KHÔNG thêm thư viện sinh PDF mới, để giữ đúng nguyên tắc ở
    mục 2 "không thêm NuGet ngoài danh sách nếu chưa hỏi người dùng".
@@ -1372,3 +1371,39 @@ tạo mẫu "Tiền nhà tháng" 4.000.000đ chu kỳ Monthly → hiện đúng 
 chạy"; bấm "Tắt" → chuyển đúng thành "Đã tắt", nút Tắt biến mất. Riêng phần Runner tự sinh Expense theo
 lịch (không thể chờ thật 1 giờ để quan sát trực tiếp) được phủ bởi 10 integration test chạy trực tiếp
 `RunDueTemplatesAsync` với `asOf` giả lập, bao gồm cả case bù kỳ đã lỡ và Timeline hiển thị đầy đủ.
+
+### 15.8 Nhắc nợ tự động
+
+**Quyết định phạm vi quan trọng:** đề bài gốc là "nhắc khi Expense hoặc Settlement chưa xác
+nhận/chưa thanh toán quá N ngày". Sau khi thiết kế, tính năng CHỈ triển khai đúng 1 trường hợp:
+**Settlement còn `Pending` quá lâu** (nhắc người NHẬN — `ToMember` — xác nhận/từ chối). Cố tình
+**không** triển khai "nhắc thành viên có số dư âm chung chung" — lý do: số dư (`net`) của 1 thành viên
+được cộng dồn từ nhiều `Expense` qua nhiều thời điểm khác nhau (mục 6.1), không có 1 mốc "bắt đầu nợ"
+duy nhất để tính "quá N ngày" một cách rõ ràng và nhất quán — mọi cách quy ước mốc đó (ví dụ "kể từ
+expense gần nhất khiến net < 0") đều tùy tiện và dễ gây hiểu lầm hơn là hữu ích. Ngược lại, mỗi
+`Settlement` có `CreatedAt` là mốc thời gian rõ ràng, duy nhất, không tranh cãi — nên chỉ trường hợp
+này được triển khai.
+
+- `Settlement.LastReminderSentAt` (nullable) — lần gần nhất đã nhắc; `null` = chưa từng nhắc. Dùng để
+  vừa tránh nhắc lại ngay lập tức mỗi lượt quét, vừa cho phép **nhắc LẶP LẠI** mỗi khi qua thêm 1 chu
+  kỳ (`DebtReminderRunner.ReminderInterval`, chốt 3 ngày) nếu settlement vẫn còn Pending — không phải
+  chỉ nhắc đúng 1 lần duy nhất trong toàn bộ vòng đời.
+- Điều kiện tới hạn: `Status == Pending && (LastReminderSentAt ?? CreatedAt) <= asOf - ReminderInterval`
+  (`ISettlementRepository.GetPendingDueForReminderAsync`).
+- `IDebtReminderRunner.RunDueRemindersAsync(asOf, ct)` — cùng mẫu thiết kế với
+  `IRecurringExpenseRunner` (mục 15.7): nhận `asOf` làm tham số thay vì tự đọc `UtcNow`, để test được
+  mà không cần chờ thời gian thật. Người nhận là khách vãng lai (không có `User`) vẫn được cập nhật
+  `LastReminderSentAt` (dù không gửi được thông báo nào) — nếu không, settlement đó sẽ mãi bị coi là
+  "chưa từng nhắc" và bị quét lại vô ích mỗi lượt.
+- `DebtReminderBackgroundService` (`SplitBill.Api.BackgroundJobs`) — quét mỗi 6 giờ (đủ mịn so với
+  ngưỡng ngày của `ReminderInterval`, không cần quét sát giờ như khoản chi định kỳ), cùng mẫu
+  `PeriodicTimer` + quét ngay lúc khởi động như `RecurringExpenseBackgroundService`.
+- Dùng chung `INotificationService`/kênh email đã có (mục 13) — loại thông báo mới `"SettlementReminder"`.
+
+Đã verify sống, đầy đủ vòng đời thật: ghi nhận 1 settlement Pending (Joiner → Timeline Tester,
+75.000đ) → lùi `CreatedAt` của đúng bản ghi đó 4 ngày bằng `sqlcmd` trực tiếp trên LocalDB (mô phỏng
+"đã Pending 4 ngày" mà không cần chờ thật) → khởi động lại Api (kích hoạt lượt quét ngay lúc khởi động)
+→ log xác nhận đã `UPDATE Settlements SET LastReminderSentAt`, ghi `Notification` mới, và
+`ConsoleEmailSender` log đúng email "Nhắc xác nhận thanh toán" gửi tới đúng địa chỉ người nhận → đăng
+nhập lại đúng tài khoản người nhận, trang `/Notifications` hiện đúng cả 2 thông báo (thông báo gốc
+"Có người ghi nhận đã chuyển tiền" lúc tạo + thông báo nhắc mới).

@@ -7,6 +7,7 @@ using SplitBill.Application.Export;
 using SplitBill.Application.Groups;
 using SplitBill.Application.Notifications;
 using SplitBill.Application.RecurringExpenses;
+using SplitBill.Application.Reminders;
 using SplitBill.Application.Settlement;
 using SplitBill.Application.Settlements;
 using SplitBill.Application.Splitting;
@@ -37,6 +38,7 @@ public sealed class TestHarness : IDisposable
     public INotificationService NotificationService { get; }
     public IRecurringExpenseService RecurringExpenseService { get; }
     public IRecurringExpenseRunner RecurringExpenseRunner { get; }
+    public IDebtReminderRunner DebtReminderRunner { get; }
     public FakeEmailSender EmailSender { get; }
 
     private TestHarness(SplitBillDbContext dbContext)
@@ -86,6 +88,8 @@ public sealed class TestHarness : IDisposable
         RecurringExpenseRunner = new RecurringExpenseRunner(
             recurringExpenseRepository, groupRepository, expenseRepository, auditLogRepository,
             splitCalculator, NotificationService, unitOfWork, NullLogger<RecurringExpenseRunner>.Instance);
+        DebtReminderRunner = new DebtReminderRunner(
+            settlementRepository, groupRepository, NotificationService, unitOfWork, NullLogger<DebtReminderRunner>.Instance);
     }
 
     public static TestHarness Create()

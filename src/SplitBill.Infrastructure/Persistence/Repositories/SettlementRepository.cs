@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SplitBill.Application.Abstractions;
+using SplitBill.Domain.Enums;
 using SettlementEntity = SplitBill.Domain.Entities.Settlement;
 
 namespace SplitBill.Infrastructure.Persistence.Repositories;
@@ -21,4 +22,9 @@ public sealed class SettlementRepository : ISettlementRepository
 
     public async Task AddAsync(SettlementEntity settlement, CancellationToken cancellationToken) =>
         await _dbContext.Settlements.AddAsync(settlement, cancellationToken);
+
+    public Task<List<SettlementEntity>> GetPendingDueForReminderAsync(DateTimeOffset cutoff, CancellationToken cancellationToken) =>
+        _dbContext.Settlements
+            .Where(s => s.Status == SettlementStatus.Pending && (s.LastReminderSentAt ?? s.CreatedAt) <= cutoff)
+            .ToListAsync(cancellationToken);
 }

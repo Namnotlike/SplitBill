@@ -16,6 +16,7 @@ using SplitBill.Application.Export;
 using SplitBill.Application.Groups;
 using SplitBill.Application.Notifications;
 using SplitBill.Application.RecurringExpenses;
+using SplitBill.Application.Reminders;
 using SplitBill.Application.Settlement;
 using SplitBill.Application.Settlements;
 using SplitBill.Application.Splitting;
@@ -167,12 +168,14 @@ try
     builder.Services.AddScoped<INotificationService, NotificationService>();
     builder.Services.AddScoped<IRecurringExpenseService, RecurringExpenseService>();
     builder.Services.AddScoped<IRecurringExpenseRunner, RecurringExpenseRunner>();
+    builder.Services.AddScoped<IDebtReminderRunner, DebtReminderRunner>();
 
-    // ===== Khoản chi định kỳ (CLAUDE.md mục 15.7) =====
+    // ===== Khoản chi định kỳ (CLAUDE.md mục 15.7) / Nhắc nợ tự động (mục 15.8) =====
     // BackgroundService chạy trong process Api, dùng IServiceScopeFactory tự tạo scope DI mỗi lượt
     // quét (đúng khuyến nghị chính thức của .NET cho hosted service cần dùng service Scoped/DbContext
     // — không thể inject thẳng service Scoped vào 1 Singleton/HostedService).
     builder.Services.AddHostedService<RecurringExpenseBackgroundService>();
+    builder.Services.AddHostedService<DebtReminderBackgroundService>();
 
     // ===== FluentValidation =====
     builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();
