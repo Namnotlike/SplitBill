@@ -1119,7 +1119,7 @@ thuật toán) + commit riêng:
 2. Tìm kiếm/lọc khoản chi — mục 15.2 (đã làm).
 3. Nhãn/danh mục khoản chi — mục 15.3 (đã làm).
 4. Bảng tổng quan cá nhân ở trang chủ — mục 15.4 (đã làm).
-5. Timeline hoạt động nhóm (gộp khoản chi + settlement + audit log thành 1 dòng thời gian).
+5. Timeline hoạt động nhóm — mục 15.5 (đã làm).
 6. Tham gia nhóm qua link chia sẻ (tự thêm mình vào nhóm, không cần Owner thêm tay).
 7. Khoản chi định kỳ (`GroupType.Recurring` — hiện tại chưa khác gì `OneTime`, cần cơ chế tự sinh
    khoản chi mới theo chu kỳ).
@@ -1241,3 +1241,38 @@ Gọi API lỗi (vd token vừa hết hạn) chỉ ẩn lặng lẽ widget này,
 Đã verify sống trên trình duyệt: đăng nhập user có 2 nhóm ("Trip to NYC" - USD, "Test Receipt" - VND)
 → widget hiện đúng cả 2 dòng, mỗi dòng format đúng theo Currency riêng, link điều hướng đúng
 `/Groups/Balances/{id}` của từng nhóm.
+
+### 15.5 Timeline hoạt động nhóm
+
+Phát hiện quan trọng lúc thiết kế: đề bài gốc là "gộp Expense + Settlement + audit log thành 1 dòng
+thời gian" — nhưng bảng `AuditLog` (đã có sẵn từ M1, ghi mọi `Created`/`Updated`/`Deleted` trên
+`Expense`/`Settlement`/`GroupMember`/`Group` trong cùng transaction với thao tác gốc, CLAUDE.md mục 8
+"Mọi thao tác ghi... phải sinh AuditLog") **chính là** nguồn dữ liệu đã-gộp-sẵn đó. Không cần viết
+query hợp nhất 3 nguồn riêng — chỉ cần một tầng hiển thị biến `AuditLog.BeforeJson`/`AfterJson` (vốn
+là JSON kỹ thuật, khó đọc trực tiếp) thành 1 câu tiếng Việt.
+
+- `AuditLogDto` có thêm field `Summary` (string) — dựng sẵn ở `GroupService.BuildSummary` (Application
+  layer, đúng quy ước mục 11 "không đặt logic nghiệp vụ ở Controller/View"), parse `Before`/`AfterJson`
+  theo từng cặp `(EntityType, Action)` thành câu mô tả kèm tên/số tiền cụ thể. Parse lỗi (JSON không
+  đúng shape, dữ liệu cũ) rơi về mô tả chung chung (`"{Action} {EntityType}"`) thay vì ném lỗi — một
+  dòng lịch sử hỏng không được làm sập cả trang Timeline.
+- Trang Web mới `Groups/Timeline.cshtml` (nút "🕒 Hoạt động" trên `Groups/Details`) chỉ gọi
+  `GET /groups/{id}/audit-logs` (endpoint đã có từ đợt rà soát 2026-09-04) và render thẳng
+  `Summary` — không tự suy diễn JSON ở Razor.
+
+> ⚠️ Bug thật phát hiện + sửa khi làm tính năng này: mọi audit log `Action = "Deleted"` (Expense,
+> Settlement, GroupMember) từ trước tới nay đều ghi `BeforeJson = null` — nghĩa là lịch sử chỉ biết
+> "có 1 khoản chi/thanh toán/thành viên bị xóa" mà **không biết là cái nào** (tên khoản chi, số tiền,
+> tên thành viên bị xóa đều mất, vì Delete không giống Update — không có "after" để suy ra, và before
+> chưa từng được chụp). Đây là lỗ hổng có sẵn trong toàn bộ audit trail, không chỉ ảnh hưởng Timeline
+> mới mà ảnh hưởng cả ý nghĩa ban đầu của bảng `AuditLog`. Đã sửa ở cả 3 nơi
+> (`ExpenseService.DeleteAsync`, `SettlementRecordService.DeleteAsync`, `GroupService.RemoveMemberAsync`):
+> chụp `before = ToDto(entity)` **trước khi** đánh dấu `IsDeleted`/`IsActive = false`, rồi truyền vào
+> `WriteAuditLogAsync` thay vì `null`. Không sửa `Group.Deleted` (khi nhóm bị soft-delete, chính nhóm
+> đó biến mất khỏi mọi query có `IsActive`/global query filter nên không còn cách nào xem lại timeline
+> của nó — chụp before ở đây không có giá trị thực tế).
+
+Đã verify sống trên trình duyệt: tạo nhóm mới → thêm 1 thành viên → thêm 1 khoản chi → xóa khoản chi đó
+→ trang Timeline hiện đúng 4 dòng theo thứ tự mới nhất trước: "đã xóa khoản chi "X" (80.000đ)", "đã
+thêm khoản chi "X" (80.000đ)", "đã thêm {tên} vào nhóm", "đã tạo nhóm" — xác nhận cả tên lẫn số tiền
+khoản chi đã xóa hiển thị đúng (đúng bug đã sửa ở trên).

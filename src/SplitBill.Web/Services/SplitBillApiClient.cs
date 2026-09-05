@@ -174,6 +174,10 @@ public sealed class SplitBillApiClient
     public Task<byte[]> ExportBalancesCsvAsync(Guid groupId, CancellationToken ct) =>
         GetBytesAsync($"groups/{groupId}/export/balances.csv", ct);
 
+    /// <summary>Timeline hoạt động nhóm (CLAUDE.md mục 15.5).</summary>
+    public Task<PagedResult<AuditLogDto>> GetAuditLogsAsync(Guid groupId, int page, int pageSize, CancellationToken ct) =>
+        GetAsync<PagedResult<AuditLogDto>>($"groups/{groupId}/audit-logs?page={page}&pageSize={pageSize}", ct);
+
     public Task<SettlementDto> CreateSettlementAsync(Guid groupId, CreateSettlementRequest request, CancellationToken ct) =>
         PostAsync<CreateSettlementRequest, SettlementDto>($"groups/{groupId}/settlements", request, ct);
 

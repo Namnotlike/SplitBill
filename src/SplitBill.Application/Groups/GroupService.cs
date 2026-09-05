@@ -1,9 +1,10 @@
 using System.Text.Json;
 using SplitBill.Application.Abstractions;
 using SplitBill.Application.Common;
-using SplitBill.Application.Expenses; // PagedResult<T>
+using SplitBill.Application.Expenses; // PagedResult<T>, ExpenseDto
 using SplitBill.Application.Notifications;
 using SplitBill.Application.Settlement;
+using SplitBill.Application.Settlements; // SettlementDto — dựng Summary cho timeline (mục 15.5)
 using SplitBill.Application.Splitting;
 using SplitBill.Domain.Entities;
 using SplitBill.Domain.Enums;
@@ -280,9 +281,13 @@ public sealed class GroupService : IGroupService
                 $"Thành viên còn số dư {netBalance}đ chưa quyết toán, không thể rời/xóa khỏi nhóm.");
         }
 
+        // Chụp lại tên trước khi xóa (CLAUDE.md mục 15.5) — để timeline biết CHÍNH XÁC ai đã rời/bị
+        // xóa khỏi nhóm (khác với ActorMemberName vốn chỉ cho biết AI thực hiện hành động, có thể là
+        // Owner xóa người khác chứ không phải chính người bị xóa).
+        var before = ToMemberDto(target);
         target.IsActive = false;
 
-        await WriteAuditLogAsync(group.Id, "GroupMember", target.Id, "Deleted", caller.Id, null, null, cancellationToken);
+        await WriteAuditLogAsync(group.Id, "GroupMember", target.Id, "Deleted", caller.Id, before, null, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
@@ -335,9 +340,125 @@ public sealed class GroupService : IGroupService
             memberNames.GetValueOrDefault(log.ActorMemberId, "(đã rời nhóm)"),
             log.BeforeJson,
             log.AfterJson,
-            log.CreatedAt)).ToList();
+            log.CreatedAt,
+            BuildSummary(log, group.Currency, memberNames))).ToList();
 
         return new PagedResult<AuditLogDto>(dtos, page, pageSize, total);
+    }
+
+    /// <summary>
+    /// Dựng mô tả 1 dòng tiếng Việt cho Timeline hoạt động nhóm (CLAUDE.md mục 15.5) từ
+    /// EntityType/Action/Before/AfterJson. Parse lỗi (JSON không đúng shape mong đợi — dữ liệu cũ
+    /// trước khi field này tồn tại, hoặc trường hợp bất thường khác) rơi về mô tả chung chung thay vì
+    /// ném lỗi, để 1 dòng lịch sử hỏng không làm sập cả trang Timeline.
+    /// </summary>
+    private static string BuildSummary(AuditLog log, string currency, IReadOnlyDictionary<Guid, string> memberNames)
+    {
+        string MemberName(Guid memberId) => memberNames.GetValueOrDefault(memberId, "(đã rời nhóm)");
+        T? Parse<T>(string? json) where T : class
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return null;
+            }
+            try
+            {
+                return JsonSerializer.Deserialize<T>(json);
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+        }
+
+        try
+        {
+            switch (log.EntityType, log.Action)
+            {
+                case ("Expense", "Created"):
+                    var created = Parse<ExpenseDto>(log.AfterJson);
+                    return created is null ? "đã thêm 1 khoản chi" : $"đã thêm khoản chi \"{created.Title}\" ({SupportedCurrencies.Format(created.TotalAmount, currency)})";
+
+                case ("Expense", "Updated"):
+                    var updated = Parse<ExpenseDto>(log.AfterJson);
+                    return updated is null ? "đã sửa 1 khoản chi" : $"đã sửa khoản chi \"{updated.Title}\"";
+
+                case ("Expense", "Deleted"):
+                    var deletedExpense = Parse<ExpenseDto>(log.BeforeJson);
+                    return deletedExpense is null ? "đã xóa 1 khoản chi" : $"đã xóa khoản chi \"{deletedExpense.Title}\" ({SupportedCurrencies.Format(deletedExpense.TotalAmount, currency)})";
+
+                case ("Settlement", "Created"):
+                    var settlementCreated = Parse<SettlementDto>(log.AfterJson);
+                    return settlementCreated is null
+                        ? "đã ghi nhận 1 khoản thanh toán"
+                        : $"đã ghi nhận chuyển {SupportedCurrencies.Format(settlementCreated.Amount, currency)} từ {MemberName(settlementCreated.FromMemberId)} đến {MemberName(settlementCreated.ToMemberId)}";
+
+                case ("Settlement", "Updated"):
+                    var settlementUpdated = Parse<SettlementDto>(log.AfterJson);
+                    if (settlementUpdated is null)
+                    {
+                        return "đã cập nhật 1 khoản thanh toán";
+                    }
+                    var amountText = SupportedCurrencies.Format(settlementUpdated.Amount, currency);
+                    return settlementUpdated.Status switch
+                    {
+                        "Confirmed" => $"đã xác nhận nhận {amountText} từ {MemberName(settlementUpdated.FromMemberId)}",
+                        "Rejected" => $"đã từ chối khoản thanh toán {amountText} từ {MemberName(settlementUpdated.FromMemberId)}",
+                        _ => $"đã cập nhật khoản thanh toán {amountText}",
+                    };
+
+                case ("Settlement", "Deleted"):
+                    var settlementDeleted = Parse<SettlementDto>(log.BeforeJson);
+                    return settlementDeleted is null
+                        ? "đã xóa 1 khoản thanh toán"
+                        : $"đã xóa khoản thanh toán {SupportedCurrencies.Format(settlementDeleted.Amount, currency)} (từ {MemberName(settlementDeleted.FromMemberId)} đến {MemberName(settlementDeleted.ToMemberId)})";
+
+                case ("GroupMember", "Created"):
+                    var memberCreated = Parse<GroupMemberDto>(log.AfterJson);
+                    return memberCreated is null ? "đã thêm 1 thành viên" : $"đã thêm {memberCreated.DisplayName} vào nhóm";
+
+                case ("GroupMember", "Updated"):
+                    var memberBefore = Parse<GroupMemberDto>(log.BeforeJson);
+                    var memberAfter = Parse<GroupMemberDto>(log.AfterJson);
+                    if (memberBefore is not null && memberAfter is not null && memberBefore.DisplayName != memberAfter.DisplayName)
+                    {
+                        return $"đã đổi tên \"{memberBefore.DisplayName}\" thành \"{memberAfter.DisplayName}\"";
+                    }
+                    if (memberBefore is not null && memberAfter is not null && memberBefore.Role != memberAfter.Role)
+                    {
+                        return $"đã đổi vai trò của {memberAfter.DisplayName} thành {memberAfter.Role}";
+                    }
+                    return memberAfter is null ? "đã cập nhật 1 thành viên" : $"đã cập nhật thông tin của {memberAfter.DisplayName}";
+
+                case ("GroupMember", "Deleted"):
+                    var memberDeleted = Parse<GroupMemberDto>(log.BeforeJson);
+                    if (memberDeleted is null)
+                    {
+                        return "đã xóa 1 thành viên khỏi nhóm";
+                    }
+                    return log.ActorMemberId == log.EntityId
+                        ? $"{memberDeleted.DisplayName} đã rời khỏi nhóm"
+                        : $"đã xóa {memberDeleted.DisplayName} khỏi nhóm";
+
+                case ("Group", "Created"):
+                    return "đã tạo nhóm";
+
+                case ("Group", "Updated"):
+                    return log.AfterJson?.Contains("ShareTokenRotated", StringComparison.OrdinalIgnoreCase) == true
+                        ? "đã đổi link chia sẻ nhóm"
+                        : "đã cập nhật thông tin nhóm";
+
+                case ("Group", "Deleted"):
+                    return "đã xóa nhóm";
+
+                default:
+                    return $"{log.Action} {log.EntityType}";
+            }
+        }
+        catch
+        {
+            return $"{log.Action} {log.EntityType}";
+        }
     }
 
     private async Task<long> GetMemberNetBalanceAsync(Guid groupId, Guid memberId, CancellationToken cancellationToken)

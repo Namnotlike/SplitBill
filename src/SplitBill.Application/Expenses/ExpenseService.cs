@@ -183,10 +183,16 @@ public sealed class ExpenseService : IExpenseService
         var group = await LoadGroupAsync(expense.GroupId, cancellationToken);
         var caller = ResolveCallerMember(group, callerUserId);
 
+        // Chụp lại trạng thái TRƯỚC khi xóa (CLAUDE.md mục 15.5) — trước đây AuditLog của hành động
+        // Deleted luôn ghi before=null, khiến không thể biết khoản chi bị xóa tên gì/bao nhiêu tiền
+        // khi xem lại lịch sử (audit log "mù" ở đúng sự kiện quan trọng nhất). Timeline hoạt động nhóm
+        // cần before này để hiển thị "đã xóa khoản chi X".
+        var before = ToDto(expense);
+
         expense.IsDeleted = true;
         expense.UpdatedAt = DateTimeOffset.UtcNow;
 
-        await WriteAuditLogAsync(group.Id, expense.Id, "Deleted", caller.Id, null, null, cancellationToken);
+        await WriteAuditLogAsync(group.Id, expense.Id, "Deleted", caller.Id, before, null, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 

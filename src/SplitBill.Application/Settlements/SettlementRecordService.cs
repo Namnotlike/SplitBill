@@ -156,9 +156,13 @@ public sealed class SettlementRecordService : ISettlementRecordService
             throw new DomainException(ErrorCodes.InsufficientRole, "Chỉ người ghi nhận hoặc Owner mới được xóa.");
         }
 
+        // Chụp lại trạng thái trước khi xóa (CLAUDE.md mục 15.5) — để timeline/audit log biết đã xóa
+        // settlement nào (từ ai, cho ai, bao nhiêu tiền) thay vì chỉ biết "có 1 settlement bị xóa".
+        var before = ToDto(settlement);
+
         settlement.IsDeleted = true;
 
-        await WriteAuditLogAsync(group.Id, settlement.Id, "Deleted", caller.Id, null, null, cancellationToken);
+        await WriteAuditLogAsync(group.Id, settlement.Id, "Deleted", caller.Id, before, null, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 

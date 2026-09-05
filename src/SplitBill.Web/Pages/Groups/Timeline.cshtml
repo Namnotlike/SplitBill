@@ -1,0 +1,55 @@
+@page "{id:guid}"
+@model SplitBill.Web.Pages.Groups.TimelineModel
+@{
+    ViewData["Title"] = "Hoạt động nhóm";
+}
+
+<a asp-page="/Groups/Details" asp-route-id="@Model.Group.Id" class="text-muted small">← Về nhóm</a>
+<h1 class="mt-1 mb-4">Hoạt động — @Model.Group.Name</h1>
+
+@if (TempData["ErrorMessage"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+@if (Model.Logs.Items.Count == 0)
+{
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <div class="fs-1 mb-2">🕒</div>
+            <p class="text-muted mb-0">Chưa có hoạt động nào.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body p-0">
+            <ul class="list-group list-group-flush">
+                @foreach (var log in Model.Logs.Items)
+                {
+                    <li class="list-group-item d-flex gap-3 align-items-start py-3">
+                        <span class="fs-4">@SplitBill.Web.Pages.Groups.TimelineModel.IconFor(log.EntityType)</span>
+                        <div class="flex-fill">
+                            <div><span class="fw-600">@log.ActorMemberName</span> @log.Summary</div>
+                            <div class="small text-muted">@log.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                        </div>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+
+    {
+        var totalPages = (int)Math.Ceiling(Model.Logs.TotalCount / (double)Model.Logs.PageSize);
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <p class="text-muted small mb-0">Trang @Model.Logs.Page/@Math.Max(totalPages, 1) — tổng @Model.Logs.TotalCount hoạt động.</p>
+            <div class="d-flex gap-2">
+                <a class="btn btn-sm btn-outline-secondary @(Model.Logs.Page <= 1 ? "disabled" : "")"
+                   asp-page="/Groups/Timeline" asp-route-id="@Model.Group.Id" asp-route-page="@(Model.Logs.Page - 1)">‹ Trước</a>
+                <a class="btn btn-sm btn-outline-secondary @(Model.Logs.Page >= totalPages ? "disabled" : "")"
+                   asp-page="/Groups/Timeline" asp-route-id="@Model.Group.Id" asp-route-page="@(Model.Logs.Page + 1)">Sau ›</a>
+            </div>
+        </div>
+    }
+}

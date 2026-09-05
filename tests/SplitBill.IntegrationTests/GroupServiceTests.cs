@@ -1,5 +1,7 @@
 using FluentAssertions;
+using SplitBill.Application.Expenses;
 using SplitBill.Application.Groups;
+using SplitBill.Application.Settlements;
 using SplitBill.Domain.Exceptions;
 using Xunit;
 
@@ -278,6 +280,65 @@ public sealed class GroupServiceTests
         page.Items[0].Action.Should().Be("Created");
         page.Items[0].EntityType.Should().Be("GroupMember"); // mới nhất trước
         page.Items[0].ActorMemberName.Should().Be("Nam");
+        page.Items[0].Summary.Should().Be("đã thêm Binh vào nhóm");
+    }
+
+    // ===== Timeline hoạt động nhóm (CLAUDE.md mục 15.5) — Summary dựng từ Before/AfterJson, bổ
+    // sung 2026-09-05 =====
+
+    [Fact]
+    public async Task GetAuditLogsAsync_ExpenseCreatedAndDeleted_SummaryIncludesTitleAndAmount()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var ownerMemberId = group.Members[0].Id;
+        var guest = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(null, "Binh"), CancellationToken.None);
+        var expense = await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "An toi", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 100_000)], "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guest.Id])), CancellationToken.None);
+        await harness.ExpenseService.DeleteAsync(ownerId, expense.Data.Id, CancellationToken.None);
+
+        var page = await harness.GroupService.GetAuditLogsAsync(ownerId, group.Id, 1, 20, CancellationToken.None);
+
+        page.Items.Should().Contain(l => l.EntityType == "Expense" && l.Action == "Created" && l.Summary == "đã thêm khoản chi \"An toi\" (100.000đ)");
+        // Bug thật đã sửa (CLAUDE.md mục 15.5): trước đây Delete ghi BeforeJson=null nên không thể
+        // biết tên/số tiền khoản chi đã xóa — giờ phải hiện đủ trong Summary.
+        page.Items.Should().Contain(l => l.EntityType == "Expense" && l.Action == "Deleted" && l.Summary == "đã xóa khoản chi \"An toi\" (100.000đ)");
+    }
+
+    [Fact]
+    public async Task GetAuditLogsAsync_SettlementConfirmed_SummaryDescribesConfirmation()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var nam = group.Members[0];
+        var binh = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(null, "Binh"), CancellationToken.None);
+        var settlement = await harness.SettlementRecordService.CreateAsync(
+            ownerId, group.Id, new CreateSettlementRequest(binh.Id, nam.Id, 50_000, null), CancellationToken.None);
+        await harness.SettlementRecordService.ConfirmAsync(ownerId, settlement.Id, CancellationToken.None);
+
+        var page = await harness.GroupService.GetAuditLogsAsync(ownerId, group.Id, 1, 20, CancellationToken.None);
+
+        page.Items.Should().Contain(l => l.EntityType == "Settlement" && l.Summary == "đã xác nhận nhận 50.000đ từ Binh");
+    }
+
+    [Fact]
+    public async Task GetAuditLogsAsync_MemberRemoved_SummaryNamesTheRemovedMember()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var guest = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(null, "Binh"), CancellationToken.None);
+        await harness.GroupService.RemoveMemberAsync(ownerId, group.Id, guest.Id, CancellationToken.None);
+
+        var page = await harness.GroupService.GetAuditLogsAsync(ownerId, group.Id, 1, 20, CancellationToken.None);
+
+        // Bug thật đã sửa (CLAUDE.md mục 15.5): trước đây Delete ghi BeforeJson=null nên Summary
+        // không thể nêu tên NGƯỜI BỊ XÓA (khác ActorMemberName vốn chỉ cho biết ai thực hiện hành động).
+        page.Items.Should().Contain(l => l.EntityType == "GroupMember" && l.Action == "Deleted" && l.Summary == "đã xóa Binh khỏi nhóm");
     }
 
     [Fact]

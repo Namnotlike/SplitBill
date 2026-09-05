@@ -37,4 +37,8 @@ public sealed record AuditLogDto(
     string ActorMemberName,
     string? BeforeJson,
     string? AfterJson,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    // Mô tả 1 dòng tiếng Việt, dựng sẵn ở tầng Application từ EntityType/Action/Before/AfterJson —
+    // Timeline hoạt động nhóm (CLAUDE.md mục 15.5) chỉ cần render thẳng field này, không tự suy diễn
+    // JSON ở Razor (đúng quy ước mục 11 "không đặt logic nghiệp vụ ở Controller/View").
+    string Summary);
