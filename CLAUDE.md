@@ -1106,3 +1106,53 @@ phải thiếu sót.
   luôn hardcode `"VND"` khi gọi API, không có cách nào tạo nhóm khác VND qua giao diện. Nhãn các ô nhập
   số tiền trên form Tạo/Sửa khoản chi và Ghi nhận thanh toán hiển thị `(@Model.Group.Currency)` thay vì
   hardcode `(đ)`.
+
+---
+
+## 15. Danh sách tính năng bổ sung sau M6 — theo yêu cầu người dùng 2026-09-05
+
+Sau khi M6 hoàn thành 100%, người dùng yêu cầu gợi ý thêm tính năng hay, rồi chốt **làm toàn bộ** danh
+sách gợi ý, theo thứ tự từ dễ đến khó, mỗi tính năng build + test (chạy lại toàn bộ mục 7 nếu đụng tới
+thuật toán) + commit riêng:
+
+1. Dark mode — mục 15.1 (đã làm).
+2. Tìm kiếm/lọc khoản chi.
+3. Nhãn/danh mục khoản chi.
+4. Bảng tổng quan cá nhân ở trang chủ (tổng số dư gộp mọi nhóm).
+5. Timeline hoạt động nhóm (gộp khoản chi + settlement + audit log thành 1 dòng thời gian).
+6. Tham gia nhóm qua link chia sẻ (tự thêm mình vào nhóm, không cần Owner thêm tay).
+7. Khoản chi định kỳ (`GroupType.Recurring` — hiện tại chưa khác gì `OneTime`, cần cơ chế tự sinh
+   khoản chi mới theo chu kỳ).
+8. Nhắc nợ tự động (dùng lại hạ tầng Notification ở mục 13, nhắc khi Settlement/Expense chưa xác nhận
+   quá N ngày).
+9. Xuất PDF tổng kết chuyến đi — quyết định kỹ thuật: dùng trang HTML in được qua trình duyệt
+   (`window.print()` + CSS `@media print`), KHÔNG thêm thư viện sinh PDF mới, để giữ đúng nguyên tắc ở
+   mục 2 "không thêm NuGet ngoài danh sách nếu chưa hỏi người dùng".
+
+### 15.1 Dark mode
+
+Tận dụng toàn bộ hệ thống CSS custom properties `--sb-*` đã có sẵn trong `site.css` (mục 10b) — không
+cần viết lại rule nào, chỉ cần định nghĩa lại giá trị các token dưới selector
+`:root[data-theme="dark"]`.
+
+- Thuộc tính `data-theme` (light/dark, do site tự định nghĩa) và `data-bs-theme` (chuẩn Bootstrap
+  5.3+, để các thành phần Bootstrap thuần chưa được `site.css` ghi đè riêng — dropdown, modal, close
+  button... — tự đổi theo) được đặt cùng lúc trên `<html>`.
+- Đặt theme **trong `<head>`, bằng `<script>` inline, TRƯỚC** các thẻ `<link>` CSS hoàn tất render —
+  đọc `localStorage['sb-theme']`, fallback `prefers-color-scheme` của hệ điều hành nếu người dùng chưa
+  từng bấm nút chọn, mặc định light nếu trình duyệt chặn cả hai. Làm sớm như vậy để tránh FOUC (trang
+  nháy sáng rồi mới chuyển tối khi tải).
+  > Đã verify sống: tải lại trang khi đã lưu `dark` trong localStorage, trang vào thẳng dark mode
+  > ngay từ khung hình đầu, không có nháy trắng.
+- Nút bấm 🌙/☀️ trên navbar (`_Layout.cshtml`, id `sb-theme-toggle`) đảo `data-theme`/`data-bs-theme`
+  và ghi lại `localStorage`, xử lý trong `site.js`. Icon thể hiện HÀNH ĐỘNG sẽ xảy ra khi bấm (đang
+  sáng hiện 🌙 nghĩa là bấm để chuyển tối), không phải theme hiện tại.
+  > ⚠️ Bug phát hiện qua live-verify: `.card` trong `site.css` không khai báo `background` tường minh,
+  > trước giờ "ăn theo" mặc định `--bs-card-bg` của Bootstrap (`transparent`/trắng, trùng ngẫu nhiên
+  > với nền trang ở light mode). Khi bật `data-bs-theme="dark"`, Bootstrap 5.3+ tự đổi `--bs-card-bg`
+  > sang xám riêng của nó (`rgb(33,37,41)`) — KHÁC với token `--sb-card` (`#1c1c2b`) mà navbar và các
+  > khối khác trong site đang dùng, làm card bị lệch tông so với phần còn lại của trang dù cả hai đều
+  > "nền tối". Đã sửa: `.card` khai báo tường minh `background: var(--sb-card)`, không dựa vào biến
+  > Bootstrap suy ra. Rút kinh nghiệm cho các rule CSS sau này: bất kỳ chỗ nào muốn nền theo đúng thiết
+  > kế riêng của site (không phải theo mặc định Bootstrap) đều phải set tường minh qua token `--sb-*`,
+  > không được để trống rồi trông chờ Bootstrap suy ra đúng ý.

@@ -10,6 +10,22 @@
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <script>
+        // Đặt theme TRƯỚC khi body render để tránh FOUC (nháy sáng rồi mới chuyển tối) — xem
+        // CLAUDE.md mục 15 (Dark mode). Đọc localStorage, fallback prefers-color-scheme của hệ điều
+        // hành nếu người dùng chưa từng chọn, mặc định light nếu trình duyệt không hỗ trợ cả hai.
+        (function () {
+            try {
+                var saved = localStorage.getItem('sb-theme');
+                var theme = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+                document.documentElement.setAttribute('data-theme', theme);
+                // data-bs-theme: vô hại nếu Bootstrap < 5.3 (thuộc tính lạ, bị bỏ qua), nhưng cho
+                // Bootstrap 5.3+ tự đổi biến --bs-* của các thành phần chưa được site.css ghi đè
+                // riêng (dropdown, modal, close button...).
+                document.documentElement.setAttribute('data-bs-theme', theme);
+            } catch (e) { /* localStorage có thể bị chặn (chế độ ẩn danh nghiêm ngặt) — mặc định light */ }
+        })();
+    </script>
 </head>
 <body>
     <header>
@@ -30,6 +46,11 @@
                         }
                     </ul>
                     <ul class="navbar-nav align-items-sm-center">
+                        <li class="nav-item">
+                            <button type="button" id="sb-theme-toggle" class="btn btn-link nav-link" title="Đổi giao diện sáng/tối" aria-label="Đổi giao diện sáng/tối">
+                                <span id="sb-theme-icon">🌙</span>
+                            </button>
+                        </li>
                         @if (User.Identity?.IsAuthenticated == true)
                         {
                             <li class="nav-item">

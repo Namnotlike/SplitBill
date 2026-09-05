@@ -18,6 +18,26 @@
   --sb-shadow: 0 1px 2px rgba(20, 20, 43, 0.04), 0 8px 24px rgba(20, 20, 43, 0.06);
 }
 
+/* ===== Dark mode — bổ sung 2026-09-05. Toggle qua nút trên navbar (site.js), lưu lựa chọn vào
+   localStorage, áp bằng thuộc tính data-theme trên <html> (đặt SỚM nhất có thể trong <head>, xem
+   _Layout.cshtml, để tránh "nháy" sáng rồi mới tối lúc tải trang — FOUC). Chỉ redefine lại đúng các
+   token --sb-*, mọi rule khác trong file này đều tự động ăn theo vì đã dùng token thay vì màu cứng. */
+:root[data-theme="dark"] {
+  --sb-brand: #8b7bff;
+  --sb-brand-dark: #a89bff;
+  --sb-brand-light: #2a2550;
+  --sb-ink: #eef0f8;
+  --sb-muted: #9ba0b4;
+  --sb-bg: #14141f;
+  --sb-card: #1c1c2b;
+  --sb-border: #2e2e42;
+  --sb-success: #4ade80;
+  --sb-success-bg: #123322;
+  --sb-danger: #fb7185;
+  --sb-danger-bg: #3a1520;
+  --sb-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
 html {
   font-size: 15px;
 }
@@ -147,6 +167,11 @@ a:hover {
 /* ===== Cards ===== */
 
 .card {
+  /* Chỉ định tường minh background thay vì để Bootstrap tự suy ra từ --bs-card-bg: khi bật
+     data-bs-theme="dark" (xem _Layout.cshtml), Bootstrap 5.3+ đổi --bs-card-bg sang xám riêng của
+     nó (khác --sb-card), làm card lệch tông so với navbar/các khối khác đang dùng chung token
+     --sb-card — phát hiện qua live-verify dark mode 2026-09-05. */
+  background: var(--sb-card);
   border: 1px solid var(--sb-border);
   border-radius: var(--sb-radius);
   box-shadow: var(--sb-shadow);
