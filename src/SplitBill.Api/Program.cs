@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using SplitBill.Api.BackgroundJobs;
 using SplitBill.Api.Middleware;
 using SplitBill.Application.Abstractions;
 using SplitBill.Application.Auth;
@@ -14,6 +15,7 @@ using SplitBill.Application.Expenses;
 using SplitBill.Application.Export;
 using SplitBill.Application.Groups;
 using SplitBill.Application.Notifications;
+using SplitBill.Application.RecurringExpenses;
 using SplitBill.Application.Settlement;
 using SplitBill.Application.Settlements;
 using SplitBill.Application.Splitting;
@@ -129,6 +131,7 @@ try
     builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
     builder.Services.AddScoped<IReceiptImageRepository, ReceiptImageRepository>();
     builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+    builder.Services.AddScoped<IRecurringExpenseRepository, RecurringExpenseRepository>();
     builder.Services.AddSingleton<IShareTokenGenerator, ShareTokenGenerator>();
     builder.Services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
 
@@ -162,6 +165,14 @@ try
     builder.Services.AddScoped<ISettlementRecordService, SettlementRecordService>();
     builder.Services.AddScoped<IExportService, ExportService>();
     builder.Services.AddScoped<INotificationService, NotificationService>();
+    builder.Services.AddScoped<IRecurringExpenseService, RecurringExpenseService>();
+    builder.Services.AddScoped<IRecurringExpenseRunner, RecurringExpenseRunner>();
+
+    // ===== Khoản chi định kỳ (CLAUDE.md mục 15.7) =====
+    // BackgroundService chạy trong process Api, dùng IServiceScopeFactory tự tạo scope DI mỗi lượt
+    // quét (đúng khuyến nghị chính thức của .NET cho hosted service cần dùng service Scoped/DbContext
+    // — không thể inject thẳng service Scoped vào 1 Singleton/HostedService).
+    builder.Services.AddHostedService<RecurringExpenseBackgroundService>();
 
     // ===== FluentValidation =====
     builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();

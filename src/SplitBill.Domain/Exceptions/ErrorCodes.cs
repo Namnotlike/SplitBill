@@ -22,4 +22,7 @@ public static class ErrorCodes
     public const string NotificationNotFound = "NOTIFICATION_NOT_FOUND";
     // Tham gia nhóm qua link chia sẻ (CLAUDE.md mục 15.6, bổ sung 2026-09-05).
     public const string AlreadyGroupMember = "ALREADY_GROUP_MEMBER";
+    // Khoản chi định kỳ (CLAUDE.md mục 15.7, bổ sung 2026-09-05).
+    public const string GroupTypeNotRecurring = "GROUP_TYPE_NOT_RECURRING";
+    public const string RecurringExpenseNotFound = "RECURRING_EXPENSE_NOT_FOUND";
 }

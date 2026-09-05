@@ -1,0 +1,263 @@
+@page "{groupId:guid}"
+@model SplitBill.Web.Pages.Groups.RecurringExpensesModel
+@{
+    ViewData["Title"] = "Khoản chi định kỳ";
+}
+
+<a asp-page="/Groups/Details" asp-route-id="@Model.GroupId" class="text-muted small">← Về nhóm</a>
+<h1 class="mt-1 mb-4">Khoản chi định kỳ — @Model.Group.Name</h1>
+
+@if (TempData["SuccessMessage"] is string ok)
+{
+    <div class="alert alert-success">✅ @ok</div>
+}
+@if (TempData["ErrorMessage"] is string tempErr)
+{
+    <div class="alert alert-danger">@tempErr</div>
+}
+@if (Model.ErrorMessage is not null)
+{
+    <div class="alert alert-danger">@Model.ErrorMessage</div>
+}
+@if (!ViewData.ModelState.IsValid)
+{
+    <div asp-validation-summary="All" class="alert alert-danger"></div>
+}
+
+@* ===== Danh sách mẫu hiện có (CLAUDE.md mục 15.7) ===== *@
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title mb-3">Các mẫu đang có</h5>
+        @if (Model.Templates.Count == 0)
+        {
+            <p class="text-muted mb-0">Chưa có khoản chi định kỳ nào — tạo mẫu mới bên dưới.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Tiêu đề</th>
+                            <th>Số tiền</th>
+                            <th>Chu kỳ</th>
+                            <th>Lần kế tiếp</th>
+                            <th>Trạng thái</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var template in Model.Templates)
+                        {
+                            <tr>
+                                <td class="fw-600">@template.Title</td>
+                                <td>@SupportedCurrencies.Format(template.TotalAmount, Model.Group.Currency)</td>
+                                <td>@template.Interval</td>
+                                <td>@template.NextRunAt.ToLocalTime().ToString("dd/MM/yyyy")</td>
+                                <td>
+                                    @if (template.IsActive)
+                                    {
+                                        <span class="badge bg-success">Đang chạy</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Đã tắt</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    @if (template.IsActive)
+                                    {
+                                        <form method="post" asp-page-handler="Deactivate" asp-route-templateId="@template.Id" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Tắt</button>
+                                        </form>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@* ===== Form tạo mẫu mới — tái dùng UI cách chia giống Expenses/Create.cshtml ===== *@
+<div class="card">
+    <div class="card-body p-4">
+        <h5 class="card-title mb-3">+ Tạo mẫu mới</h5>
+        <form method="post">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label asp-for="Input.Title" class="form-label">Tiêu đề</label>
+                    <input asp-for="Input.Title" class="form-control" placeholder="VD: Tiền nhà" />
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label asp-for="Input.TotalAmount" class="form-label">Tổng tiền (@Model.Group.Currency)</label>
+                    <input asp-for="Input.TotalAmount" class="form-control" type="number" min="1" />
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label asp-for="Input.ExtraFeeAmount" class="form-label">Phụ phí (@Model.Group.Currency)</label>
+                    <input asp-for="Input.ExtraFeeAmount" class="form-control" type="number" min="0" />
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label asp-for="Input.Category" class="form-label">Danh mục</label>
+                    <select asp-for="Input.Category" class="form-select">
+                        @foreach (var category in ExpenseCategoryOptions.All)
+                        {
+                            <option value="@category.Value">@category.Icon @category.Label</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label asp-for="Input.Interval" class="form-label">Chu kỳ lặp lại</label>
+                    <select asp-for="Input.Interval" class="form-select">
+                        <option value="Daily">Hàng ngày</option>
+                        <option value="Weekly">Hàng tuần</option>
+                        <option value="Monthly">Hàng tháng</option>
+                    </select>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label asp-for="Input.FirstRunAt" class="form-label">Lần đầu tiên sinh khoản chi</label>
+                    <input asp-for="Input.FirstRunAt" class="form-control" type="date" />
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label asp-for="Input.Note" class="form-label">Ghi chú</label>
+                    <input asp-for="Input.Note" class="form-control" />
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label d-block">Cách chia</label>
+                @{
+                    var modes = new[] { ("Equal", "Chia đều"), ("Shares", "Theo phần"), ("Percentage", "Theo %"), ("ExactAmount", "Nhập tay"), ("Itemized", "Theo món") };
+                }
+                <div class="btn-group flex-wrap" role="group">
+                    @foreach (var (value, label) in modes)
+                    {
+                        <input type="radio" class="btn-check split-mode-radio" name="Input.SplitMode" id="mode-@value" value="@value" autocomplete="off"
+                               checked="@(Model.Input.SplitMode == value)" />
+                        <label class="btn btn-outline-primary" for="mode-@value">@label</label>
+                    }
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Thành viên</th>
+                            <th>Ai ứng mỗi lần (@Model.Group.Currency)</th>
+                            <th class="split-col" data-mode="Equal">Tham gia?</th>
+                            <th class="split-col" data-mode="Shares">Trọng số</th>
+                            <th class="split-col" data-mode="Percentage">%</th>
+                            <th class="split-col" data-mode="ExactAmount">Số tiền (@Model.Group.Currency)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (var i = 0; i < Model.Input.Rows.Count; i++)
+                        {
+                            var member = Model.Group.Members.First(m => m.Id == Model.Input.Rows[i].MemberId);
+                            <tr>
+                                <td class="fw-600">
+                                    @member.DisplayName
+                                    <input type="hidden" asp-for="Input.Rows[i].MemberId" />
+                                </td>
+                                <td><input asp-for="Input.Rows[i].PayerAmount" class="form-control form-control-sm" type="number" min="0" /></td>
+                                <td class="split-col" data-mode="Equal">
+                                    <input asp-for="Input.Rows[i].EqualParticipant" class="form-check-input" type="checkbox" />
+                                </td>
+                                <td class="split-col" data-mode="Shares">
+                                    <input asp-for="Input.Rows[i].ShareWeight" class="form-control form-control-sm" type="number" min="0" step="0.1" />
+                                </td>
+                                <td class="split-col" data-mode="Percentage">
+                                    <input asp-for="Input.Rows[i].Percentage" class="form-control form-control-sm" type="number" min="0" max="100" step="0.1" />
+                                </td>
+                                <td class="split-col" data-mode="ExactAmount">
+                                    <input asp-for="Input.Rows[i].ExactAmount" class="form-control form-control-sm" type="number" min="0" />
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="split-col mb-3" data-mode="Itemized">
+                <label class="form-label d-block">Món ăn</label>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th style="width: 25%">Tên món</th>
+                                <th style="width: 15%">Giá (@Model.Group.Currency)</th>
+                                <th>Người ăn</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="items-tbody"></tbody>
+                    </table>
+                </div>
+                <button type="button" id="add-item-btn" class="btn btn-sm btn-secondary">+ Thêm món</button>
+            </div>
+
+            <template id="item-row-template">
+                <tr class="item-row">
+                    <td>
+                        <input type="hidden" name="Input.Items.Index" value="__INDEX__" />
+                        <input name="Input.Items[__INDEX__].Name" class="form-control form-control-sm" placeholder="VD: Lẩu" />
+                    </td>
+                    <td>
+                        <input name="Input.Items[__INDEX__].Price" type="number" min="0" class="form-control form-control-sm" />
+                    </td>
+                    <td>
+                        @foreach (var member in Model.Group.Members)
+                        {
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" name="Input.Items[__INDEX__].ConsumerMemberIds" value="@member.Id" id="item__INDEX__-@member.Id" />
+                                <label class="form-check-label" for="item__INDEX__-@member.Id">@member.DisplayName</label>
+                            </div>
+                        }
+                    </td>
+                    <td><button type="button" class="btn btn-sm btn-outline-danger remove-item-row">Xóa</button></td>
+                </tr>
+            </template>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary">Tạo mẫu định kỳ</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function updateSplitColumns() {
+            var mode = document.querySelector('.split-mode-radio:checked').value;
+            document.querySelectorAll('.split-col').forEach(function (el) {
+                el.style.display = el.dataset.mode === mode ? '' : 'none';
+            });
+        }
+        document.querySelectorAll('.split-mode-radio').forEach(function (el) {
+            el.addEventListener('change', updateSplitColumns);
+        });
+        updateSplitColumns();
+
+        var itemIndexCounter = 0;
+        var itemTemplateHtml = document.getElementById('item-row-template').innerHTML;
+        function addItemRow() {
+            var idx = 'i' + (itemIndexCounter++);
+            var html = itemTemplateHtml.split('__INDEX__').join(idx);
+            document.getElementById('items-tbody').insertAdjacentHTML('beforeend', html);
+            attachRemoveHandlers();
+        }
+        function attachRemoveHandlers() {
+            document.querySelectorAll('.remove-item-row').forEach(function (btn) {
+                btn.onclick = function () { btn.closest('tr').remove(); };
+            });
+        }
+        document.getElementById('add-item-btn').addEventListener('click', addItemRow);
+        addItemRow();
+    </script>
+}

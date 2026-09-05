@@ -1121,8 +1121,7 @@ thuật toán) + commit riêng:
 4. Bảng tổng quan cá nhân ở trang chủ — mục 15.4 (đã làm).
 5. Timeline hoạt động nhóm — mục 15.5 (đã làm).
 6. Tham gia nhóm qua link chia sẻ — mục 15.6 (đã làm).
-7. Khoản chi định kỳ (`GroupType.Recurring` — hiện tại chưa khác gì `OneTime`, cần cơ chế tự sinh
-   khoản chi mới theo chu kỳ).
+7. Khoản chi định kỳ — mục 15.7 (đã làm).
 8. Nhắc nợ tự động (dùng lại hạ tầng Notification ở mục 13, nhắc khi Settlement/Expense chưa xác nhận
    quá N ngày).
 9. Xuất PDF tổng kết chuyến đi — quyết định kỹ thuật: dùng trang HTML in được qua trình duyệt
@@ -1319,3 +1318,57 @@ chuyển thẳng tới `/Groups/Details/{id}` với thông báo "Bạn đã tham
 sách thành viên tăng từ 2 lên 3; trang Timeline hiện đúng dòng "Joiner đã tham gia nhóm qua link chia
 sẻ"; bấm Tham gia lần 2 → hiện đúng lỗi "Bạn đã là thành viên của nhóm này" mà trang vẫn hiện được nội
 dung nhóm bên dưới (không bị thay thế hoàn toàn).
+
+### 15.7 Khoản chi định kỳ
+
+`GroupType.Recurring` từ nay có ý nghĩa thật: nhóm loại này có thể tạo **mẫu khoản chi định kỳ**
+(`RecurringExpenseTemplate`) — giữ nguyên Title/TotalAmount/ExtraFeeAmount/SplitMode/SplitConfig/
+Payers/Category/Note, tự động sinh 1 `Expense` mới mỗi khi tới hạn theo chu kỳ Daily/Weekly/Monthly.
+Nhóm `OneTime` không được tạo mẫu (`GROUP_TYPE_NOT_RECURRING`).
+
+**Kiến trúc 2 tầng, tách rõ "định nghĩa mẫu" khỏi "sinh khoản chi":**
+
+- `IRecurringExpenseService` (CRUD mẫu — Create/GetByGroupId/Deactivate) — có `callerUserId`, chạy
+  trong request HTTP bình thường như mọi service khác.
+- `IRecurringExpenseRunner.RunDueTemplatesAsync(asOf, ct)` — quét mọi mẫu `IsActive` có
+  `NextRunAt <= asOf`, tự sinh `Expense` + advance `NextRunAt`. **Không có `callerUserId`** vì đây là
+  hành động hệ thống tự động, không phải ai đó đang đăng nhập gọi API. Nhận `asOf` làm tham số thay vì
+  tự đọc `DateTimeOffset.UtcNow` bên trong — để unit/integration test kiểm được logic mà không phải
+  chờ thời gian thật trôi qua (chỉ cần đặt `NextRunAt` của mẫu vào quá khứ so với `asOf` truyền vào).
+- `RecurringExpenseBackgroundService` (`SplitBill.Api.BackgroundJobs`, `IHostedService`) — CHỈ lo vòng
+  lặp `PeriodicTimer` (quét mỗi 1 giờ, cộng thêm 1 lượt quét ngay lúc khởi động để mẫu tới hạn từ trước
+  khi restart không phải chờ tới 1 giờ), tự tạo `IServiceScope` mỗi lượt quét (bắt buộc vì
+  `IRecurringExpenseRunner` là Scoped, không inject thẳng được vào 1 Singleton `BackgroundService`
+  theo khuyến nghị chính thức của .NET). Toàn bộ logic nghiệp vụ nằm ở Runner, không nằm ở đây.
+
+**Quy tắc "bù kỳ đã lỡ" (CATCH-UP):** nếu server tắt lâu ngày khiến `NextRunAt` bị lỡ nhiều kỳ (ví dụ
+mẫu Daily nhưng lỡ mất 10 ngày), Runner **chỉ sinh đúng 1 `Expense`** cho lượt quét này — KHÔNG bù lại
+10 khoản chi (tránh dồn cục gây hoảng cho người dùng), rồi nhảy `NextRunAt` thẳng tới kỳ hợp lệ tiếp
+theo (lặp `Advance()` tới khi `> asOf`) chứ không chỉ +1 chu kỳ (nếu chỉ +1, mẫu sẽ vẫn "quá hạn" và
+bị xử lý lại ngay ở lượt quét kế tiếp).
+
+> ⚠️ Bug thật phát hiện + sửa lúc viết tính năng này: lần cài đặt đầu tiên của Runner ghi
+> `AuditLog.AfterJson = null` cho khoản chi tự sinh (khác hẳn `ExpenseService.CreateAsync`, luôn ghi
+> đầy đủ `ExpenseDto`) — do Runner không dùng chung `ExpenseService` (xem lý do tách ở trên) nên không
+> có sẵn `ToDto()` để tái dùng. Hệ quả: Timeline hoạt động nhóm (mục 15.5) hiện dòng cụt lủn "đã thêm 1
+> khoản chi" cho MỌI khoản chi tự sinh từ mẫu định kỳ — không có tên/số tiền, mất hết giá trị so với
+> khoản chi tạo tay dù về bản chất đều là cùng 1 loại sự kiện `("Expense", "Created")`. Đã sửa: Runner
+> tự dựng 1 `ExpenseDto` đầy đủ (copy các field vừa gán cho `Expense` entity) làm `AfterJson`, khớp
+> đúng những gì `BuildSummary` (mục 15.5) mong đợi parse được.
+
+Tái dùng logic đã có: `ExpenseCategoryParser` (tách từ `ExpenseService.ParseCategory` cũ thành
+`SplitBill.Application.Common.ExpenseCategoryParser`, dùng chung cho cả `ExpenseService` và
+`RecurringExpenseService` — tránh khai báo trùng luật "null/rỗng mặc định Other, tên sai thì báo lỗi").
+
+Web: `Groups/RecurringExpenses.cshtml` — chỉ hiện nút "🔁 Khoản chi định kỳ" trên `Groups/Details` khi
+`Group.Type == "Recurring"`; form tạo mẫu tái dùng nguyên UI "Cách chia" (radio SplitMode + bảng thành
+viên + form Itemized) từ `Expenses/Create.cshtml`, chỉ thay `OccurredAt` bằng cặp `Interval` (dropdown
+Daily/Weekly/Monthly) + `FirstRunAt` (ngày sinh khoản chi đầu tiên).
+
+Đã verify sống trên trình duyệt: tạo nhóm loại "Dùng lại nhiều lần" → nút "🔁 Khoản chi định kỳ" hiện
+đúng (nhóm `OneTime` khác không có nút này, và cố tình truy cập thẳng URL bị chặn với thông báo "Chỉ
+nhóm loại \"Dùng lại nhiều lần\" mới có khoản chi định kỳ", trang Details vẫn hiển thị được bên dưới);
+tạo mẫu "Tiền nhà tháng" 4.000.000đ chu kỳ Monthly → hiện đúng trong danh sách mẫu với trạng thái "Đang
+chạy"; bấm "Tắt" → chuyển đúng thành "Đã tắt", nút Tắt biến mất. Riêng phần Runner tự sinh Expense theo
+lịch (không thể chờ thật 1 giờ để quan sát trực tiếp) được phủ bởi 10 integration test chạy trực tiếp
+`RunDueTemplatesAsync` với `asOf` giả lập, bao gồm cả case bù kỳ đã lỡ và Timeline hiển thị đầy đủ.

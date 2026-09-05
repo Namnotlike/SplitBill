@@ -6,6 +6,7 @@ using SplitBill.Application.Expenses;
 using SplitBill.Application.Export;
 using SplitBill.Application.Groups;
 using SplitBill.Application.Notifications;
+using SplitBill.Application.RecurringExpenses;
 using SplitBill.Application.Settlement;
 using SplitBill.Application.Settlements;
 using SplitBill.Application.Splitting;
@@ -34,6 +35,8 @@ public sealed class TestHarness : IDisposable
     public ISettlementRecordService SettlementRecordService { get; }
     public IExportService ExportService { get; }
     public INotificationService NotificationService { get; }
+    public IRecurringExpenseService RecurringExpenseService { get; }
+    public IRecurringExpenseRunner RecurringExpenseRunner { get; }
     public FakeEmailSender EmailSender { get; }
 
     private TestHarness(SplitBillDbContext dbContext)
@@ -65,6 +68,7 @@ public sealed class TestHarness : IDisposable
         var settlementRanker = new SocialSettlementRanker();
         var settlementPlanner = new SocialSettlementPlanner(settlementRanker);
         var notificationRepository = new NotificationRepository(dbContext);
+        var recurringExpenseRepository = new RecurringExpenseRepository(dbContext);
         EmailSender = new FakeEmailSender();
         NotificationService = new NotificationService(notificationRepository, unitOfWork, EmailSender, NullLogger<NotificationService>.Instance);
 
@@ -78,6 +82,10 @@ public sealed class TestHarness : IDisposable
         BalanceService = new BalanceService(groupRepository, expenseRepository, settlementRepository, balanceCalculator, vietQrGenerator, settlementPlanner);
         SettlementRecordService = new SettlementRecordService(groupRepository, settlementRepository, auditLogRepository, unitOfWork, NotificationService);
         ExportService = new ExportService(ExpenseService, GroupService, BalanceService);
+        RecurringExpenseService = new RecurringExpenseService(recurringExpenseRepository, groupRepository, splitCalculator, unitOfWork);
+        RecurringExpenseRunner = new RecurringExpenseRunner(
+            recurringExpenseRepository, groupRepository, expenseRepository, auditLogRepository,
+            splitCalculator, NotificationService, unitOfWork, NullLogger<RecurringExpenseRunner>.Instance);
     }
 
     public static TestHarness Create()

@@ -5,6 +5,7 @@ using SplitBill.Application.Auth;
 using SplitBill.Application.Expenses;
 using SplitBill.Application.Groups;
 using SplitBill.Application.Notifications;
+using SplitBill.Application.RecurringExpenses;
 using SplitBill.Application.Settlements;
 using SplitBill.Application.Users;
 
@@ -132,6 +133,16 @@ public sealed class SplitBillApiClient
 
     public Task<PreviewSplitResult> PreviewSplitAsync(PreviewSplitRequest request, CancellationToken ct) =>
         PostAsync<PreviewSplitRequest, PreviewSplitResult>("expenses/preview-split", request, ct);
+
+    // ===== Khoản chi định kỳ (CLAUDE.md mục 15.7) =====
+    public Task<RecurringExpenseTemplateDto> CreateRecurringExpenseAsync(Guid groupId, CreateRecurringExpenseRequest request, CancellationToken ct) =>
+        PostAsync<CreateRecurringExpenseRequest, RecurringExpenseTemplateDto>($"groups/{groupId}/recurring-expenses", request, ct);
+
+    public Task<IReadOnlyList<RecurringExpenseTemplateDto>> GetRecurringExpensesAsync(Guid groupId, CancellationToken ct) =>
+        GetAsync<IReadOnlyList<RecurringExpenseTemplateDto>>($"groups/{groupId}/recurring-expenses", ct);
+
+    public Task DeactivateRecurringExpenseAsync(Guid templateId, CancellationToken ct) =>
+        PostNoContentAsync($"recurring-expenses/{templateId}/deactivate", new { }, ct);
 
     // Ảnh hóa đơn lưu trong SQL Server, phục vụ qua Api có [Authorize] + kiểm tra thành viên nhóm
     // (CLAUDE.md mục 8) — Web phải proxy qua đây (kèm sẵn Bearer token qua BearerTokenHandler),
