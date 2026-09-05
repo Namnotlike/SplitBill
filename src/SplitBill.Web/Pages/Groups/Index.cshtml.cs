@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using SplitBill.Application.Common;
 using SplitBill.Application.Groups;
 using SplitBill.Web.Services;
 
@@ -31,6 +32,9 @@ public class IndexModel : PageModel
 
         [Required]
         public string Type { get; set; } = "OneTime";
+
+        [Required]
+        public string Currency { get; set; } = SupportedCurrencies.Default;
     }
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
@@ -49,7 +53,7 @@ public class IndexModel : PageModel
         try
         {
             var group = await _apiClient.CreateGroupAsync(
-                new CreateGroupRequest(NewGroup.Name, NewGroup.Description, NewGroup.Type, "VND"), cancellationToken);
+                new CreateGroupRequest(NewGroup.Name, NewGroup.Description, NewGroup.Type, NewGroup.Currency), cancellationToken);
             return RedirectToPage("/Groups/Details", new { id = group.Id });
         }
         catch (ApiException ex)

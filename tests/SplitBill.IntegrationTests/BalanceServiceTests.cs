@@ -76,6 +76,31 @@ public sealed class BalanceServiceTests
         plan.Transactions[0].VietQr!.Payload.Should().StartWith("000201");
     }
 
+    // ===== Đa tiền tệ (CLAUDE.md mục 14) — bổ sung 2026-09-05 =====
+
+    [Fact]
+    public async Task GetSettlementPlanAsync_NonVndGroup_VietQrIsNull_EvenWithBankInfo()
+    {
+        var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich My", null, "OneTime", "USD"), CancellationToken.None);
+        var guest = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(null, "Binh"), CancellationToken.None);
+        var ownerMemberId = group.Members[0].Id;
+        await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "Dinner", 300, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 300)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guest.Id])), CancellationToken.None);
+        // Owner CÓ khai báo tài khoản ngân hàng — nhưng nhóm là USD nên VietQR vẫn phải null
+        // (VietQR là chuẩn ngân hàng Việt Nam, không áp dụng cho USD/EUR — CLAUDE.md mục 9, 14).
+        await harness.UserService.UpdateProfileAsync(ownerId, new UpdateProfileRequest("Nam", "0011001234567", "970436"), CancellationToken.None);
+
+        var plan = await harness.BalanceService.GetSettlementPlanAsync(ownerId, group.Id, CancellationToken.None);
+
+        plan.Transactions.Should().ContainSingle();
+        plan.Transactions[0].VietQr.Should().BeNull();
+    }
+
     [Fact]
     public async Task GetSettlementPlanAsync_NonSimplified_ReturnsDirectTransaction()
     {

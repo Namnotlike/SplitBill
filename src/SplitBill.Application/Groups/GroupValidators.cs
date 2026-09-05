@@ -1,4 +1,5 @@
 using FluentValidation;
+using SplitBill.Application.Common;
 
 namespace SplitBill.Application.Groups;
 
@@ -8,6 +9,11 @@ public sealed class CreateGroupRequestValidator : AbstractValidator<CreateGroupR
     {
         RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Type).NotEmpty();
+        // Rỗng thì GroupService tự mặc định "VND" — chỉ validate khi người dùng có truyền giá trị
+        // (CLAUDE.md mục 14: mỗi nhóm dùng cố định 1 trong danh sách tiền tệ được hỗ trợ).
+        RuleFor(x => x.Currency)
+            .Must(c => string.IsNullOrWhiteSpace(c) || SupportedCurrencies.IsSupported(c))
+            .WithMessage($"Currency phải là một trong: {string.Join(", ", SupportedCurrencies.All.Keys)}.");
     }
 }
 

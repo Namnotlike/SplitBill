@@ -178,9 +178,16 @@ public sealed class BalanceService : IBalanceService
         group.Members.FirstOrDefault(m => m.UserId == callerUserId && m.IsActive)
             ?? throw new DomainException(ErrorCodes.MemberNotInGroup, "Bạn không phải thành viên của nhóm này.");
 
-    /// <summary>Sinh VietQR cho người NHẬN; trả null nếu chưa khai báo tài khoản (CLAUDE.md mục 9).</summary>
+    /// <summary>Sinh VietQR cho người NHẬN; trả null nếu chưa khai báo tài khoản (CLAUDE.md mục 9)
+    /// HOẶC nếu nhóm không dùng VND (CLAUDE.md mục 14) — VietQR là chuẩn chuyển khoản ngân hàng Việt
+    /// Nam, không áp dụng được cho USD/EUR.</summary>
     private VietQrDto? BuildVietQr(Group group, Guid toMemberId, long amount)
     {
+        if (group.Currency != "VND")
+        {
+            return null;
+        }
+
         var toMember = group.Members.FirstOrDefault(m => m.Id == toMemberId);
         var bankBin = toMember?.User?.BankBin;
         var accountNumber = toMember?.User?.BankAccountNumber;

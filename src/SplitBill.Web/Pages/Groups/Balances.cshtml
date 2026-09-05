@@ -16,11 +16,11 @@
                 <span class="fw-600">@balance.MemberName</span>
                 @if (balance.Net > 0)
                 {
-                    <span class="sb-amount-positive">+@balance.Net.ToString("N0")đ</span>
+                    <span class="sb-amount-positive">+@SupportedCurrencies.Format(balance.Net, Model.Group.Currency)</span>
                 }
                 else if (balance.Net < 0)
                 {
-                    <span class="sb-amount-negative">@balance.Net.ToString("N0")đ</span>
+                    <span class="sb-amount-negative">@SupportedCurrencies.Format(balance.Net, Model.Group.Currency)</span>
                 }
                 else
                 {

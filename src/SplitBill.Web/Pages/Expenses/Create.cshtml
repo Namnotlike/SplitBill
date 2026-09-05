@@ -25,11 +25,11 @@
                     <input asp-for="Input.Title" class="form-control" placeholder="VD: Ăn tối" autofocus />
                 </div>
                 <div class="col-md-3 mb-3">
-                    <label asp-for="Input.TotalAmount" class="form-label">Tổng tiền (đ)</label>
+                    <label asp-for="Input.TotalAmount" class="form-label">Tổng tiền (@Model.Group.Currency)</label>
                     <input asp-for="Input.TotalAmount" class="form-control" type="number" min="1" />
                 </div>
                 <div class="col-md-2 mb-3">
-                    <label asp-for="Input.ExtraFeeAmount" class="form-label">Phụ phí (đ)</label>
+                    <label asp-for="Input.ExtraFeeAmount" class="form-label">Phụ phí (@Model.Group.Currency)</label>
                     <input asp-for="Input.ExtraFeeAmount" class="form-control" type="number" min="0" />
                 </div>
                 <div class="col-md-3 mb-3">
@@ -63,11 +63,11 @@
                     <thead>
                         <tr>
                             <th>Thành viên</th>
-                            <th>Đã ứng (đ)</th>
+                            <th>Đã ứng (@Model.Group.Currency)</th>
                             <th class="split-col" data-mode="Equal">Tham gia?</th>
                             <th class="split-col" data-mode="Shares">Trọng số</th>
                             <th class="split-col" data-mode="Percentage">%</th>
-                            <th class="split-col" data-mode="ExactAmount">Số tiền (đ)</th>
+                            <th class="split-col" data-mode="ExactAmount">Số tiền (@Model.Group.Currency)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -105,7 +105,7 @@
                         <thead>
                             <tr>
                                 <th style="width: 25%">Tên món</th>
-                                <th style="width: 15%">Giá (đ)</th>
+                                <th style="width: 15%">Giá (@Model.Group.Currency)</th>
                                 <th>Người ăn</th>
                                 <th></th>
                             </tr>

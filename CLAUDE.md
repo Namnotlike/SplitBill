@@ -746,8 +746,9 @@ Link chia sẻ, VietQR, upload ảnh hóa đơn, chế độ `SimplifyDebts = fa
 người dùng 2026-09-04: CSV khoản chi + số dư, xem mục 8 `/export/expenses.csv` và `/export/balances.csv`).
 
 **M6 — Về sau**
-~~Ràng buộc mềm (6.4)~~ — đã làm 2026-09-05 (xem mục 6.4), itemized split — đã làm (xem mục 10b), còn
-lại: đa tiền tệ, thông báo.
+~~Ràng buộc mềm (6.4)~~ — đã làm 2026-09-05 (xem mục 6.4), itemized split — đã làm (xem mục 10b),
+~~thông báo~~ — đã làm 2026-09-05 (xem mục 13), ~~đa tiền tệ~~ — đã làm 2026-09-05 (xem mục 14). Toàn
+bộ mục 6 (M6) đã hoàn thành.
 
 **M7 — Frontend (SplitBill.Web)**
 Đã triển khai theo quyết định người dùng 2026-09-03 (xem mục 10b ngay dưới đây). Không thuộc phạm
@@ -1058,3 +1059,50 @@ danh sách người nhận + nội dung, tự ghi DB + gọi `IEmailSender` — 
 `SettlementRecordService`, `GroupService` gọi ở đúng 4 điểm nêu ở mục 13 (sau khi
 `_unitOfWork.SaveChangesAsync` của thao tác chính đã thành công, không gộp chung 1 transaction với dữ
 liệu tài chính — thông báo là hệ quả phụ, không phải một phần bất biến `Σ net = 0`).
+
+---
+
+## 14. Đa tiền tệ — bổ sung 2026-09-05, M6 (hạng mục cuối cùng)
+
+Quyết định người dùng: **mỗi `Group` dùng CỐ ĐỊNH đúng 1 loại tiền** (field `Group.Currency` đã có sẵn
+từ đầu dự án, trước đó chưa từng được validate/dùng tới thực sự) — KHÔNG trộn nhiều tiền tệ trong 1
+nhóm, KHÔNG quy đổi tỉ giá, KHÔNG cho đổi currency sau khi nhóm đã tạo (`UpdateGroupRequest` vốn đã
+không có field Currency — đúng ý, giữ nguyên). Nhờ vậy bất biến `Σ net = 0` và toàn bộ thuật toán
+settlement (mục 6) **không đổi một dòng nào** — vẫn chỉ là số nguyên `long`, không cần biết đơn vị là gì.
+
+Danh sách tiền tệ được hỗ trợ: **VND, USD, EUR** (`SplitBill.Application.Common.SupportedCurrencies`).
+
+### 14.1 Đơn giản hóa có chủ đích: không có phần thập phân
+
+`Amount` (long) luôn là **ĐƠN VỊ NGUYÊN** của đồng tiền đó (đồng cho VND, đô-la cho USD, euro cho EUR)
+— KHÔNG phải cent/xu như quy ước "cent là đơn vị nhỏ nhất" thường thấy (Stripe...). Lý do: một app chia
+tiền bạn bè hiếm khi cần chính xác tới xu, và cách này giữ nguyên được TOÀN BỘ form nhập liệu hiện có
+(vẫn nhập số nguyên thuần qua `<input type="number">`), tránh phải viết lại logic quy đổi thập phân
+(nhân/chia 100, định dạng 2 chữ số lẻ...) ở mọi form Create/Edit khoản chi, Settlement — đổi lại là
+USD/EUR hiển thị "$150" thay vì "$150.00" (không có ".00"). Coi đây là giới hạn cố ý cho MVP, không
+phải thiếu sót.
+
+### 14.2 Validate & định dạng
+
+- `CreateGroupRequestValidator` chặn `Currency` không nằm trong danh sách hỗ trợ (rỗng thì
+  `GroupService` tự gán mặc định VND qua `SupportedCurrencies.Default`, không coi là lỗi).
+- `SupportedCurrencies.Format(amount, currencyCode)` — hàm dùng chung (cả Api lẫn Web, Web tham chiếu
+  thẳng vì đã có sẵn cơ chế dùng lại DTO của Application) để định dạng đúng ký hiệu + vị trí
+  (`đ`/`€` là suffix, `$` là prefix).
+  > ⚠️ Bug thật phát hiện qua test tự động lúc viết tính năng này: lần cài đặt đầu tiên dùng
+  > `amount.ToString("N0")` KHÔNG chỉ định `CultureInfo` — dựa vào ambient culture của thread/server.
+  > Trên máy dev này (culture mặc định `vi-VN`), `"N0"` luôn ra dấu CHẤM phân cách hàng nghìn, **kể cả
+  > khi format USD** (`"$1.500"` — dễ đọc nhầm thành "1 đô rưỡi" thay vì 1500 đô, vì dấu chấm thường là
+  > dấu thập phân trong tiếng Anh). Nếu server production chạy ở locale khác (vd `en-US`), kết quả sẽ
+  > lại khác nữa — hoàn toàn không kiểm soát được. Đã sửa: ép cứng `CultureInfo` tường minh cho từng
+  > currency (`vi-VN`-style dấu chấm cho VND/EUR, `InvariantCulture`-style dấu phẩy cho USD) ngay trong
+  > `SupportedCurrencies`, không bao giờ dựa vào `CultureInfo.CurrentCulture`. Điều này cũng vô tình làm
+  > 5 chỗ hiển thị VND cũ (trước đây tự viết `.ToString("N0")` rời rạc, cũng dựa vào ambient culture)
+  > trở nên đáng tin cậy hơn, không phụ thuộc locale server nữa.
+- `BalanceService.BuildVietQr` trả `null` nếu `Group.Currency != "VND"` — VietQR là chuẩn chuyển khoản
+  ngân hàng Việt Nam, không áp dụng được cho USD/EUR (mục 9), bất kể thành viên đã khai báo tài khoản
+  ngân hàng hay chưa.
+- Form Tạo nhóm trên Web (`Groups/Index.cshtml`) có dropdown chọn Currency (mặc định VND) — trước đây
+  luôn hardcode `"VND"` khi gọi API, không có cách nào tạo nhóm khác VND qua giao diện. Nhãn các ô nhập
+  số tiền trên form Tạo/Sửa khoản chi và Ghi nhận thanh toán hiển thị `(@Model.Group.Currency)` thay vì
+  hardcode `(đ)`.

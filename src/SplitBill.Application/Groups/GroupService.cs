@@ -1,5 +1,6 @@
 using System.Text.Json;
 using SplitBill.Application.Abstractions;
+using SplitBill.Application.Common;
 using SplitBill.Application.Expenses; // PagedResult<T>
 using SplitBill.Application.Notifications;
 using SplitBill.Application.Settlement;
@@ -68,7 +69,7 @@ public sealed class GroupService : IGroupService
             Name = request.Name,
             Description = request.Description,
             Type = groupType,
-            Currency = string.IsNullOrWhiteSpace(request.Currency) ? "VND" : request.Currency,
+            Currency = string.IsNullOrWhiteSpace(request.Currency) ? SupportedCurrencies.Default : request.Currency,
             CreatedByUserId = callerUserId,
             ShareToken = shareToken,
             SimplifyDebts = true,
@@ -97,7 +98,7 @@ public sealed class GroupService : IGroupService
     public async Task<IReadOnlyList<GroupSummaryDto>> GetMyGroupsAsync(Guid callerUserId, CancellationToken cancellationToken)
     {
         var groups = await _groupRepository.GetByUserIdAsync(callerUserId, cancellationToken);
-        return groups.Select(g => new GroupSummaryDto(g.Id, g.Name, g.Type.ToString(), g.IsArchived)).ToList();
+        return groups.Select(g => new GroupSummaryDto(g.Id, g.Name, g.Type.ToString(), g.IsArchived, g.Currency)).ToList();
     }
 
     public async Task<GroupDto> GetByIdAsync(Guid callerUserId, Guid groupId, CancellationToken cancellationToken)

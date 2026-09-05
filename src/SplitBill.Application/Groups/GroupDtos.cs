@@ -13,7 +13,7 @@ public sealed record GroupDto(
     string ShareToken,
     IReadOnlyList<GroupMemberDto> Members);
 
-public sealed record GroupSummaryDto(Guid Id, string Name, string Type, bool IsArchived);
+public sealed record GroupSummaryDto(Guid Id, string Name, string Type, bool IsArchived, string Currency);
 
 public sealed record CreateGroupRequest(string Name, string? Description, string Type, string? Currency);
 

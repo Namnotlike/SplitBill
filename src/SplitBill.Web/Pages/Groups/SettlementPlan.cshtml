@@ -39,7 +39,7 @@ else
                 <div class="card h-100">
                     <div class="card-body text-center">
                         <p class="mb-1"><strong>@tx.FromName</strong> chuyển cho <strong>@tx.ToName</strong></p>
-                        <p class="fs-4 fw-700 mb-2" style="color: var(--sb-brand-dark);">@tx.Amount.ToString("N0")đ</p>
+                        <p class="fs-4 fw-700 mb-2" style="color: var(--sb-brand-dark);">@SupportedCurrencies.Format(tx.Amount, Model.Group.Currency)</p>
                         @if (tx.VietQr is not null)
                         {
                             <div class="qr-canvas d-flex justify-content-center mb-2" data-payload="@tx.VietQr.Payload"></div>
@@ -88,7 +88,7 @@ else
                 </select>
             </div>
             <div class="col-auto">
-                <label class="form-label">Số tiền (đ)</label>
+                <label class="form-label">Số tiền (@Model.Group.Currency)</label>
                 <input name="NewSettlement.Amount" type="number" min="1" class="form-control" />
             </div>
             <div class="col-auto">
@@ -120,7 +120,7 @@ else
                             <tr>
                                 <td class="ps-4">@Model.MemberName(s.FromMemberId)</td>
                                 <td>@Model.MemberName(s.ToMemberId)</td>
-                                <td>@s.Amount.ToString("N0")đ</td>
+                                <td>@SupportedCurrencies.Format(s.Amount, Model.Group.Currency)</td>
                                 <td>
                                     @{
                                         var badgeClass = s.Status switch

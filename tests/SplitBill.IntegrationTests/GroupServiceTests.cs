@@ -21,6 +21,30 @@ public sealed class GroupServiceTests
         group.Members[0].DisplayName.Should().Be("Nam");
     }
 
+    // ===== Đa tiền tệ (CLAUDE.md mục 14) — bổ sung 2026-09-05 =====
+
+    [Fact]
+    public async Task CreateAsync_WithUsdCurrency_PersistsCurrency()
+    {
+        using var harness = TestHarness.Create();
+        var userId = await harness.RegisterUserAsync("a@example.com", "Nam");
+
+        var group = await harness.GroupService.CreateAsync(userId, new CreateGroupRequest("Du lich My", null, "OneTime", "USD"), CancellationToken.None);
+
+        group.Currency.Should().Be("USD");
+    }
+
+    [Fact]
+    public async Task CreateAsync_EmptyCurrency_DefaultsToVnd()
+    {
+        using var harness = TestHarness.Create();
+        var userId = await harness.RegisterUserAsync("a@example.com", "Nam");
+
+        var group = await harness.GroupService.CreateAsync(userId, new CreateGroupRequest("Du lich", null, "OneTime", null), CancellationToken.None);
+
+        group.Currency.Should().Be("VND");
+    }
+
     [Fact]
     public async Task AddMember_Guest_DefaultsToMemberRole()
     {

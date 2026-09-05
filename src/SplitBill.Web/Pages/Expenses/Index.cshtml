@@ -49,7 +49,7 @@ else
                         <tr>
                             <td class="ps-4 text-muted">@expense.OccurredAt.ToString("dd/MM/yyyy")</td>
                             <td class="fw-600">@expense.Title</td>
-                            <td>@expense.TotalAmount.ToString("N0")đ</td>
+                            <td>@SupportedCurrencies.Format(expense.TotalAmount, Model.Group.Currency)</td>
                             <td>@string.Join(", ", expense.Payers.Select(p => Model.MemberName(p.MemberId)))</td>
                             <td><span class="badge" style="background: var(--sb-brand-light); color: var(--sb-brand-dark);">@expense.SplitMode</span></td>
                             <td class="pe-4 text-end">

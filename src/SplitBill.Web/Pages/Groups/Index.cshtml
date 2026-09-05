@@ -41,6 +41,7 @@
                                 <span class="badge" style="background: var(--sb-brand-light); color: var(--sb-brand-dark);">
                                     @(group.Type == "OneTime" ? "Một lần" : "Dùng lại nhiều lần")
                                 </span>
+                                <span class="badge bg-secondary">@group.Currency</span>
                             </div>
                         </a>
                     </div>
@@ -69,6 +70,15 @@
                             <option value="OneTime">Một lần (cuộc chơi)</option>
                             <option value="Recurring">Dùng lại nhiều lần</option>
                         </select>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="NewGroup.Currency" class="form-label">Tiền tệ</label>
+                        <select asp-for="NewGroup.Currency" class="form-select">
+                            <option value="VND">VND (đ)</option>
+                            <option value="USD">USD ($)</option>
+                            <option value="EUR">EUR (€)</option>
+                        </select>
+                        <span class="text-muted small">Không đổi được sau khi đã tạo nhóm.</span>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">Tạo nhóm</button>
                 </form>

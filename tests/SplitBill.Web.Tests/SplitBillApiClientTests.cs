@@ -27,7 +27,7 @@ public sealed class SplitBillApiClientTests
     [Fact]
     public async Task GetMyGroupsAsync_ParsesGroupList()
     {
-        var groups = new[] { new GroupSummaryDto(Guid.NewGuid(), "Du lich", "OneTime", false) };
+        var groups = new[] { new GroupSummaryDto(Guid.NewGuid(), "Du lich", "OneTime", false, "VND") };
         var (client, _) = CreateClient(_ => JsonResponse(HttpStatusCode.OK, groups));
 
         var result = await client.GetMyGroupsAsync(CancellationToken.None);
