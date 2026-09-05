@@ -303,3 +303,28 @@ a:hover {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
   text-align: start;
 }
+
+/* ===== In / Xuất PDF (CLAUDE.md mục 15.9) =====
+   Trang tổng kết (Groups/Summary.cshtml) dùng window.print() của trình duyệt — người dùng chọn "Lưu
+   dưới dạng PDF" trong hộp thoại in để có file PDF, không cần thư viện sinh PDF ở backend. Class
+   .no-print đánh dấu các phần tử chỉ có ý nghĩa khi xem trên màn hình (nút bấm, ghi chú...), ẩn hẳn
+   khi in. header/.footer luôn ẩn khi in bất kể trang nào — không riêng gì trang tổng kết. */
+@media print {
+  header, .footer, .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .container {
+    max-width: 100% !important;
+  }
+
+  .card {
+    box-shadow: none;
+    border: 1px solid #ccc;
+    break-inside: avoid;
+  }
+}

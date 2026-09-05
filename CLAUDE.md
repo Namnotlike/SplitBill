@@ -1123,9 +1123,7 @@ thuật toán) + commit riêng:
 6. Tham gia nhóm qua link chia sẻ — mục 15.6 (đã làm).
 7. Khoản chi định kỳ — mục 15.7 (đã làm).
 8. Nhắc nợ tự động — mục 15.8 (đã làm).
-9. Xuất PDF tổng kết chuyến đi — quyết định kỹ thuật: dùng trang HTML in được qua trình duyệt
-   (`window.print()` + CSS `@media print`), KHÔNG thêm thư viện sinh PDF mới, để giữ đúng nguyên tắc ở
-   mục 2 "không thêm NuGet ngoài danh sách nếu chưa hỏi người dùng".
+9. Xuất PDF tổng kết chuyến đi — mục 15.9 (đã làm). Toàn bộ 9 hạng mục đã hoàn thành.
 
 ### 15.1 Dark mode
 
@@ -1407,3 +1405,33 @@ này được triển khai.
 `ConsoleEmailSender` log đúng email "Nhắc xác nhận thanh toán" gửi tới đúng địa chỉ người nhận → đăng
 nhập lại đúng tài khoản người nhận, trang `/Notifications` hiện đúng cả 2 thông báo (thông báo gốc
 "Có người ghi nhận đã chuyển tiền" lúc tạo + thông báo nhắc mới).
+
+### 15.9 Xuất PDF tổng kết chuyến đi
+
+Quyết định kỹ thuật: trang HTML thuần `Groups/Summary.cshtml`, in qua `window.print()` của trình
+duyệt (người dùng chọn "Lưu dưới dạng PDF" trong hộp thoại in để có file PDF) — **không** thêm thư
+viện sinh PDF phía server, giữ đúng nguyên tắc mục 2 "không thêm NuGet ngoài danh sách nếu chưa hỏi
+người dùng".
+
+Nội dung trang: tổng chi tiêu + số khoản chi + số thành viên, **chi tiêu theo danh mục** (tận dụng
+nhãn/danh mục khoản chi ở mục 15.3 — đúng ý "paving the way for future spending stats" đã nêu khi làm
+tính năng đó), số dư từng người, kế hoạch thanh toán, và danh sách đầy đủ mọi khoản chi. Trang tự gộp
+toàn bộ các trang phân trang của `GET /groups/{id}/expenses` (API giới hạn tối đa 100/trang) để không
+bỏ sót khoản chi nào nếu nhóm có hơn 100 khoản.
+
+CSS `@media print` (site.css) ẩn `header`, `.footer`, và mọi phần tử `.no-print` (nút "In/Lưu PDF",
+dòng chữ chân trang) khi in — chỉ nội dung tổng kết xuất hiện trên bản in/PDF, không có navbar hay nút
+bấm không cần thiết trong file PDF cuối cùng.
+
+Đã verify sống trên trình duyệt: nhóm có 0 khoản chi (đã xóa hết) → trang hiện đúng "Chưa có khoản chi
+nào"/"Chưa có khoản chi/thanh toán nào được ghi nhận nên không có số dư để hiển thị" thay vì bảng
+trống; thêm 1 khoản chi "Ăn sáng chung" 150.000đ danh mục Ăn uống, chia 3 người, 1 người ứng toàn bộ →
+trang hiện đúng: tổng 150.000đ, breakdown danh mục "🍜 Ăn uống 150.000đ", số dư đúng (+100.000đ người
+ứng, -50.000đ mỗi người còn lại), kế hoạch thanh toán đúng 2 giao dịch, danh sách khoản chi đúng 1
+dòng; nút "🖨️ In / Lưu PDF" gọi đúng `window.print()`; xác nhận CSS `@media print` đã tải (đọc trực
+tiếp qua `document.styleSheets`) và 2 phần tử `.no-print` tồn tại đúng vị trí.
+
+---
+
+**Toàn bộ 9 tính năng ở mục 15 đã hoàn thành (2026-09-05)**, theo đúng yêu cầu người dùng "Làm hết các
+chức năng gợi ý trên" sau khi M6 hoàn thành 100%.

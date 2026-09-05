@@ -1,0 +1,157 @@
+@page "{id:guid}"
+@model SplitBill.Web.Pages.Groups.SummaryModel
+@{
+    ViewData["Title"] = "Tổng kết";
+    Layout = "_Layout";
+}
+
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2 no-print">
+    <a asp-page="/Groups/Details" asp-route-id="@Model.Group.Id" class="text-muted small">← Về nhóm</a>
+    <button type="button" class="btn btn-primary" onclick="window.print()">🖨️ In / Lưu PDF</button>
+</div>
+
+@* ===== Xuất PDF tổng kết (CLAUDE.md mục 15.9) — trang HTML thuần, in qua trình duyệt bằng
+   window.print(); nút "Lưu dưới dạng PDF" trong hộp thoại in của trình duyệt là cách để có file PDF,
+   không cần thư viện sinh PDF nào ở backend. CSS @@media print trong site.css ẩn header/.footer/
+   .no-print khi in — chỉ nội dung bên dưới xuất hiện trên bản in/PDF. ===== *@
+<div class="text-center mb-4">
+    <h1 class="mb-1">📊 Tổng kết — @Model.Group.Name</h1>
+    @if (!string.IsNullOrEmpty(Model.Group.Description))
+    {
+        <p class="text-muted mb-1">@Model.Group.Description</p>
+    }
+    <p class="text-muted small mb-0">Xuất lúc @Model.GeneratedAt.ToString("dd/MM/yyyy HH:mm")</p>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card h-100 text-center">
+            <div class="card-body">
+                <div class="text-muted small">Tổng chi tiêu</div>
+                <div class="fs-4 fw-700">@SupportedCurrencies.Format(Model.Expenses.Sum(e => e.TotalAmount + e.ExtraFeeAmount), Model.Group.Currency)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 text-center">
+            <div class="card-body">
+                <div class="text-muted small">Số khoản chi</div>
+                <div class="fs-4 fw-700">@Model.Expenses.Count</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 text-center">
+            <div class="card-body">
+                <div class="text-muted small">Số thành viên</div>
+                <div class="fs-4 fw-700">@Model.Group.Members.Count</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (Model.CategoryTotals.Count > 0)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title mb-3">Chi tiêu theo danh mục</h5>
+            <div class="row g-2">
+                @foreach (var (category, total) in Model.CategoryTotals)
+                {
+                    var info = ExpenseCategoryOptions.Get(category);
+                    <div class="col-md-4 d-flex justify-content-between border-bottom py-1">
+                        <span>@info.Icon @info.Label</span>
+                        <span class="fw-600">@SupportedCurrencies.Format(total, Model.Group.Currency)</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title mb-3">Số dư từng người</h5>
+        @if (Model.Balances.Count == 0)
+        {
+            <p class="text-muted mb-0">Chưa có khoản chi/thanh toán nào được ghi nhận nên không có số dư để hiển thị.</p>
+        }
+        else
+        {
+            <div class="row g-2">
+                @foreach (var balance in Model.Balances.OrderByDescending(b => b.Net))
+                {
+                    <div class="col-md-4">
+                        <div class="sb-balance-card @(balance.Net > 0 ? "positive" : balance.Net < 0 ? "negative" : "")">
+                            <span class="fw-600">@balance.MemberName</span>
+                            <span class="@(balance.Net > 0 ? "sb-amount-positive" : balance.Net < 0 ? "sb-amount-negative" : "fw-700")">
+                                @SupportedCurrencies.Format(Math.Abs(balance.Net), Model.Group.Currency)
+                            </span>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title mb-3">Kế hoạch thanh toán (@Model.Plan.TransactionCount giao dịch)</h5>
+        @if (Model.Plan.Transactions.Count == 0)
+        {
+            <p class="text-muted mb-0">Mọi người đã cân bằng.</p>
+        }
+        else
+        {
+            <table class="table table-sm mb-0">
+                <thead><tr><th>Từ</th><th>Đến</th><th>Số tiền</th></tr></thead>
+                <tbody>
+                    @foreach (var t in Model.Plan.Transactions)
+                    {
+                        <tr>
+                            <td>@t.FromName</td>
+                            <td>@t.ToName</td>
+                            <td class="fw-600">@SupportedCurrencies.Format(t.Amount, Model.Group.Currency)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title mb-3">Danh sách khoản chi (@Model.Expenses.Count)</h5>
+        @if (Model.Expenses.Count == 0)
+        {
+            <p class="text-muted mb-0">Chưa có khoản chi nào.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr><th>Ngày</th><th>Tiêu đề</th><th>Danh mục</th><th>Ai ứng</th><th>Số tiền</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var expense in Model.Expenses)
+                        {
+                            var info = ExpenseCategoryOptions.Get(expense.Category);
+                            <tr>
+                                <td class="text-muted">@expense.OccurredAt.ToString("dd/MM/yyyy")</td>
+                                <td>@expense.Title</td>
+                                <td>@info.Icon @info.Label</td>
+                                <td>@string.Join(", ", expense.Payers.Select(p => Model.Group.Members.FirstOrDefault(m => m.Id == p.MemberId)?.DisplayName ?? "?"))</td>
+                                <td class="fw-600">@SupportedCurrencies.Format(expense.TotalAmount, Model.Group.Currency)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+<p class="text-center text-muted small no-print">SplitBill — chia tiền minh bạch, không lăn tăn.</p>
