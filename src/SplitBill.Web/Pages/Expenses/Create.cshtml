@@ -11,6 +11,10 @@
 {
     <div class="alert alert-danger">@Model.ErrorMessage</div>
 }
+@if (!ViewData.ModelState.IsValid)
+{
+    <div asp-validation-summary="All" class="alert alert-danger"></div>
+}
 
 <div class="card">
     <div class="card-body p-4">

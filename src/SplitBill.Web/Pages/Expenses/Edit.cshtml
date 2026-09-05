@@ -11,6 +11,37 @@
 {
     <div class="alert alert-danger">@Model.ErrorMessage</div>
 }
+@if (TempData["SuccessMessage"] is string successMessage)
+{
+    <div class="alert alert-success">✅ @successMessage</div>
+}
+@if (TempData["ErrorMessage"] is string tempErrorMessage)
+{
+    <div class="alert alert-danger">@tempErrorMessage</div>
+}
+@if (!ViewData.ModelState.IsValid)
+{
+    <div asp-validation-summary="All" class="alert alert-danger"></div>
+}
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">🧾 Ảnh hóa đơn</h5>
+        @if (Model.ReceiptImageUrl is not null)
+        {
+            <img src="@Url.Page("/Expenses/Edit", "ReceiptImage", new { expenseId = Model.ExpenseId })"
+                 alt="Ảnh hóa đơn" class="mb-3" style="max-width: 240px; border-radius: var(--sb-radius-sm); border: 1px solid var(--sb-border);" />
+        }
+        else
+        {
+            <p class="text-muted small">Chưa có ảnh hóa đơn.</p>
+        }
+        <form method="post" asp-page-handler="UploadReceipt" enctype="multipart/form-data" class="d-flex gap-2 align-items-center flex-wrap">
+            <input type="file" name="receiptFile" accept=".jpg,.jpeg,.png,.webp" class="form-control" style="max-width: 320px;" />
+            <button type="submit" class="btn btn-sm btn-secondary">@(Model.ReceiptImageUrl is null ? "Tải ảnh lên" : "Thay ảnh khác")</button>
+        </form>
+    </div>
+</div>
 
 <div class="card">
     <div class="card-body p-4">

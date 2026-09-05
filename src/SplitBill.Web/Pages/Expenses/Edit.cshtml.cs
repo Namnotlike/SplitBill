@@ -17,6 +17,9 @@ public class EditModel : PageModel
         _apiClient = apiClient;
     }
 
+    private static readonly HashSet<string> AllowedReceiptExtensions = new(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".webp" };
+    private const long MaxReceiptImageBytes = 10 * 1024 * 1024; // 10MB — khớp giới hạn ở ExpensesController (Api)
+
     [BindProperty(SupportsGet = true)]
     public Guid ExpenseId { get; set; }
 
@@ -26,6 +29,9 @@ public class EditModel : PageModel
     public ExpenseInput Input { get; set; } = new();
 
     public string? ErrorMessage { get; set; }
+
+    /// <summary>Khác null nếu khoản chi đã có ảnh hóa đơn — trang dùng để quyết định hiện thumbnail.</summary>
+    public string? ReceiptImageUrl { get; set; }
 
     public sealed class ExpenseInput
     {
@@ -61,6 +67,7 @@ public class EditModel : PageModel
             var expense = await _apiClient.GetExpenseAsync(ExpenseId, cancellationToken);
             Group = await _apiClient.GetGroupAsync(expense.GroupId, cancellationToken);
             Input = MapToInput(expense, Group);
+            ReceiptImageUrl = expense.ReceiptImageUrl;
             return Page();
         }
         catch (ApiException ex)
@@ -119,6 +126,60 @@ public class EditModel : PageModel
                 ? "Khoản chi đã bị người khác sửa trước đó. Vui lòng tải lại trang và thử lại."
                 : ex.Message;
             return Page();
+        }
+    }
+
+    public async Task<IActionResult> OnPostUploadReceiptAsync(IFormFile? receiptFile, CancellationToken cancellationToken)
+    {
+        var existing = await _apiClient.GetExpenseAsync(ExpenseId, cancellationToken);
+
+        if (receiptFile is null || receiptFile.Length == 0)
+        {
+            TempData["ErrorMessage"] = "Vui lòng chọn 1 file ảnh.";
+            return RedirectToPage(new { expenseId = ExpenseId });
+        }
+
+        if (receiptFile.Length > MaxReceiptImageBytes)
+        {
+            TempData["ErrorMessage"] = "Ảnh hóa đơn tối đa 10MB.";
+            return RedirectToPage(new { expenseId = ExpenseId });
+        }
+
+        if (!AllowedReceiptExtensions.Contains(Path.GetExtension(receiptFile.FileName)))
+        {
+            TempData["ErrorMessage"] = "Chỉ chấp nhận ảnh .jpg, .jpeg, .png, .webp.";
+            return RedirectToPage(new { expenseId = ExpenseId });
+        }
+
+        try
+        {
+            await using var stream = receiptFile.OpenReadStream();
+            await _apiClient.UploadReceiptImageAsync(ExpenseId, stream, receiptFile.FileName, receiptFile.ContentType, cancellationToken);
+            TempData["SuccessMessage"] = "Đã tải ảnh hóa đơn.";
+        }
+        catch (ApiException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
+        return RedirectToPage(new { expenseId = existing.Id });
+    }
+
+    /// <summary>
+    /// Proxy ảnh hóa đơn qua Web — trình duyệt không bao giờ gọi thẳng Api (thiếu Bearer token sẽ bị
+    /// 401), luôn phải qua handler này để <see cref="SplitBillApiClient"/> tự gắn token (CLAUDE.md
+    /// mục 10b, BearerTokenHandler).
+    /// </summary>
+    public async Task<IActionResult> OnGetReceiptImageAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var image = await _apiClient.GetReceiptImageAsync(ExpenseId, cancellationToken);
+            return File(image.Content, image.ContentType, image.FileName);
+        }
+        catch (ApiException)
+        {
+            return NotFound();
         }
     }
 

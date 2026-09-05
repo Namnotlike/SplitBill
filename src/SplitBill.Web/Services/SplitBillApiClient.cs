@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using SplitBill.Application.Auth;
@@ -88,6 +89,34 @@ public sealed class SplitBillApiClient
 
     public Task<PreviewSplitResult> PreviewSplitAsync(PreviewSplitRequest request, CancellationToken ct) =>
         PostAsync<PreviewSplitRequest, PreviewSplitResult>("expenses/preview-split", request, ct);
+
+    // Ảnh hóa đơn lưu trong SQL Server, phục vụ qua Api có [Authorize] + kiểm tra thành viên nhóm
+    // (CLAUDE.md mục 8) — Web phải proxy qua đây (kèm sẵn Bearer token qua BearerTokenHandler),
+    // không bao giờ để trình duyệt gọi thẳng Api (sẽ thiếu token, 401).
+    public async Task UploadReceiptImageAsync(Guid expenseId, Stream content, string fileName, string contentType, CancellationToken ct)
+    {
+        using var form = new MultipartFormDataContent();
+        using var streamContent = new StreamContent(content);
+        streamContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        form.Add(streamContent, "file", fileName);
+
+        var response = await _httpClient.PostAsync($"expenses/{expenseId}/receipt-image", form, ct);
+        await EnsureSuccessAsync(response, ct);
+    }
+
+    public async Task<ReceiptImageContentDto> GetReceiptImageAsync(Guid expenseId, CancellationToken ct)
+    {
+        var response = await _httpClient.GetAsync($"expenses/{expenseId}/receipt-image", ct);
+        await EnsureSuccessAsync(response, ct);
+
+        var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+        var contentType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+        var fileName = response.Content.Headers.ContentDisposition?.FileNameStar?.Trim('"')
+            ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"')
+            ?? "receipt";
+
+        return new ReceiptImageContentDto(bytes, contentType, fileName);
+    }
 
     // ===== Balances / Settlement =====
     public Task<IReadOnlyList<MemberBalanceDto>> GetBalancesAsync(Guid groupId, CancellationToken ct) =>

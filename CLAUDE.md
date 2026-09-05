@@ -913,6 +913,39 @@ Trình duyệt **không bao giờ thấy JWT thật**. Luồng:
   > `docker compose up --build` để verify end-to-end — cấu hình đã rà soát kỹ bằng mắt (đường dẫn COPY,
   > tên service, biến môi trường khớp với `Program.cs`/`appsettings.json`) nhưng nếu Docker sẵn có ở máy
   > khác, nên tự `docker compose up --build` 1 lần trước khi tin tưởng hoàn toàn.
+- **Bổ sung UI upload/xem ảnh hóa đơn (2026-09-05)**: `Expenses/Edit.cshtml` giờ có card "Ảnh hóa đơn"
+  — hiện thumbnail nếu đã có, form upload `.jpg/.jpeg/.png/.webp` tối đa 10MB (khớp giới hạn phía Api).
+  `SplitBillApiClient` thêm `UploadReceiptImageAsync`/`GetReceiptImageAsync`; trang Edit có 2 handler
+  mới: `OnPostUploadReceiptAsync` (multipart upload) và `OnGetReceiptImageAsync` (proxy ảnh — trình
+  duyệt KHÔNG BAO GIỜ gọi thẳng endpoint ảnh của Api vì thiếu Bearer token sẽ bị 401, luôn phải qua
+  proxy này để `SplitBillApiClient` tự gắn token). API upload/download ảnh vốn đã có từ trước, chỉ là
+  chưa từng có UI Web nào dùng tới.
+  > ⚠️ **Bug nghiêm trọng phát hiện khi verify trực tiếp trên trình duyệt (không phải qua test, vì kiến
+  > trúc test hiện tại không chạy qua pipeline model-binding/validation thật của ASP.NET Core):** form
+  > Tạo khoản chi **luôn thất bại âm thầm với MỌI SplitMode trừ Itemized**, từ đúng lúc UI Itemized được
+  > thêm vào (đợt redesign 2026-09-04) tới trước khi phát hiện. Nguyên nhân: `Create.cshtml`/`Edit.cshtml`
+  > luôn tự thêm sẵn 1 dòng "món ăn" trống vào DOM lúc tải trang, kể cả khi SplitMode đang chọn không
+  > phải Itemized (chỉ ẩn bằng CSS `display:none`, các `<input>` bên trong VẪN được trình duyệt submit
+  > bình thường — khác với thuộc tính `disabled`). `ItemInput.Name` (string) và `ItemInput.Price` (long)
+  > lúc đó KHÔNG nullable, nên: (1) ASP.NET Core coi `string Name` không nullable là **implicit required**
+  > (do dự án bật `Nullable enable`), dòng trống có `Name=""` → lỗi "The Name field is required"; (2)
+  > `Price` kiểu `long` không parse được chuỗi rỗng `""` → lỗi "The value '' is invalid". Cả 2 lỗi này
+  > khiến `ModelState.IsValid == false`, `OnPostAsync` trả về `Page()` NGAY LẬP TỨC mà không hề set
+  > `ErrorMessage` — người dùng thấy y hệt trang Tạo lúc đầu, tưởng bấm Lưu không có phản ứng gì, không
+  > một dòng lỗi nào hiển thị. Bug này lẽ ra phải chặn được HOÀN TOÀN việc tạo khoản chi Equal/Shares/
+  > Percentage/ExactAmount trên Web trong suốt khoảng thời gian đó.
+  > Đã sửa 2 việc:
+  > 1. `ItemInput.Name`/`Price` đổi thành nullable (`string?`/`long?`); `BuildSplitConfig` đã sẵn logic
+  >    lọc bỏ dòng rỗng (`Where(i => !string.IsNullOrWhiteSpace(i.Name) && i.Price is > 0 && ...)`) nên
+  >    chỉ cần đổi kiểu là dòng trống tự động được bỏ qua thay vì làm sập ModelState.
+  > 2. Thêm `<div asp-validation-summary="All">` (ẩn khi `ViewData.ModelState.IsValid`) vào cả
+  >    `Create.cshtml` và `Edit.cshtml` — để nếu tương lai có lỗi validate tương tự, người dùng THẤY
+  >    ĐƯỢC lỗi thay vì trang "không phản ứng gì" như lần này.
+  > **Bài học về quy trình**: bug này tồn tại xuyên suốt nhiều lần "verify trên trình duyệt" trước đó
+  > trong cùng phiên làm việc — nhưng mọi lần verify trước đều tình cờ dùng đúng SplitMode Itemized (vì
+  > đang test tính năng Itemized), nên dòng món ăn trống luôn được điền đủ dữ liệu, "vô tình" né được
+  > lỗi. Verify 1 happy-path không đại diện cho MỌI đường dẫn — khi thêm tính năng chạm vào 1 form dùng
+  > chung cho nhiều mode/nhánh, phải test LẦN LƯỢT từng nhánh chính, không chỉ nhánh đang phát triển.
 
 ---
 
