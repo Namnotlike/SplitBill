@@ -38,12 +38,12 @@ public sealed class ExpenseService : IExpenseService
         _notificationService = notificationService;
     }
 
-    public async Task<PagedResult<ExpenseDto>> GetPagedAsync(Guid callerUserId, Guid groupId, int page, int pageSize, CancellationToken cancellationToken)
+    public async Task<PagedResult<ExpenseDto>> GetPagedAsync(Guid callerUserId, Guid groupId, int page, int pageSize, ExpenseFilter filter, CancellationToken cancellationToken)
     {
         var group = await LoadGroupAsync(groupId, cancellationToken);
         ResolveCallerMember(group, callerUserId);
 
-        var (items, total) = await _expenseRepository.GetPagedAsync(groupId, page, pageSize, cancellationToken);
+        var (items, total) = await _expenseRepository.GetPagedAsync(groupId, page, pageSize, filter, cancellationToken);
         return new PagedResult<ExpenseDto>(items.Select(ToDto).ToList(), page, pageSize, total);
     }
 

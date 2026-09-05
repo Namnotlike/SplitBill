@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SplitBill.Application.Abstractions;
+using SplitBill.Application.Expenses;
 using SplitBill.Domain.Entities;
 
 namespace SplitBill.Infrastructure.Persistence.Repositories;
@@ -20,14 +21,45 @@ public sealed class ExpenseRepository : IExpenseRepository
             .FirstOrDefaultAsync(e => e.Id == expenseId, cancellationToken);
 
     public async Task<(IReadOnlyList<Expense> Items, int TotalCount)> GetPagedAsync(
-        Guid groupId, int page, int pageSize, CancellationToken cancellationToken)
+        Guid groupId, int page, int pageSize, ExpenseFilter filter, CancellationToken cancellationToken)
     {
-        var query = _dbContext.Expenses
-            .Where(e => e.GroupId == groupId)
-            .OrderByDescending(e => e.OccurredAt);
+        var query = _dbContext.Expenses.Where(e => e.GroupId == groupId);
 
-        var total = await query.CountAsync(cancellationToken);
-        var items = await query
+        // CLAUDE.md mục 15.2 — mỗi điều kiện chỉ áp dụng khi field tương ứng trong filter có giá trị,
+        // giữ nguyên hành vi cũ (không lọc gì) khi gọi với ExpenseFilter.Empty.
+        if (!string.IsNullOrWhiteSpace(filter.Title))
+        {
+            // Dùng ToLower().Contains() thay vì EF.Functions.Like: dịch được cả sang SQL Server lẫn
+            // EF Core InMemory (dùng cho unit/integration test — CLAUDE.md mục 2), không phân biệt
+            // hoa/thường ở cả hai provider.
+            var titleLower = filter.Title.ToLower();
+            query = query.Where(e => e.Title.ToLower().Contains(titleLower));
+        }
+        if (filter.PayerMemberId is { } payerMemberId)
+        {
+            query = query.Where(e => e.Payers.Any(p => p.GroupMemberId == payerMemberId));
+        }
+        if (filter.FromDate is { } fromDate)
+        {
+            query = query.Where(e => e.OccurredAt >= fromDate);
+        }
+        if (filter.ToDate is { } toDate)
+        {
+            query = query.Where(e => e.OccurredAt <= toDate);
+        }
+        if (filter.MinAmount is { } minAmount)
+        {
+            query = query.Where(e => e.TotalAmount >= minAmount);
+        }
+        if (filter.MaxAmount is { } maxAmount)
+        {
+            query = query.Where(e => e.TotalAmount <= maxAmount);
+        }
+
+        var ordered = query.OrderByDescending(e => e.OccurredAt);
+
+        var total = await ordered.CountAsync(cancellationToken);
+        var items = await ordered
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Include(e => e.Payers)

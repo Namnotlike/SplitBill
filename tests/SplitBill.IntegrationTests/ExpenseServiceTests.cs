@@ -159,11 +159,89 @@ public sealed class ExpenseServiceTests
                 new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId])), CancellationToken.None);
         }
 
-        var page = await harness.ExpenseService.GetPagedAsync(ownerId, group.Id, 1, 2, CancellationToken.None);
+        var page = await harness.ExpenseService.GetPagedAsync(ownerId, group.Id, 1, 2, ExpenseFilter.Empty, CancellationToken.None);
 
         page.TotalCount.Should().Be(3);
         page.Items.Should().HaveCount(2);
     }
+
+    // ===== Tìm kiếm/lọc khoản chi (CLAUDE.md mục 15.2) — bổ sung 2026-09-05 =====
+
+    [Fact]
+    public async Task GetPagedAsync_FilterByTitle_IsCaseInsensitiveContains()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        await CreateSimpleExpenseAsync(harness, ownerId, group.Id, ownerMemberId, guestMemberId, "Ăn tối nhà hàng");
+        await CreateSimpleExpenseAsync(harness, ownerId, group.Id, ownerMemberId, guestMemberId, "Xăng xe");
+
+        var page = await harness.ExpenseService.GetPagedAsync(
+            ownerId, group.Id, 1, 20, new ExpenseFilter(Title: "NHÀ HÀNG"), CancellationToken.None);
+
+        page.Items.Should().ContainSingle(e => e.Title == "Ăn tối nhà hàng");
+    }
+
+    [Fact]
+    public async Task GetPagedAsync_FilterByPayer_OnlyReturnsExpensesPaidByThatMember()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "Owner tra", 10_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 10_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId])), CancellationToken.None);
+        await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "Guest tra", 10_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(guestMemberId, 10_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId])), CancellationToken.None);
+
+        var page = await harness.ExpenseService.GetPagedAsync(
+            ownerId, group.Id, 1, 20, new ExpenseFilter(PayerMemberId: guestMemberId), CancellationToken.None);
+
+        page.Items.Should().ContainSingle(e => e.Title == "Guest tra");
+    }
+
+    [Fact]
+    public async Task GetPagedAsync_FilterByAmountRange_ExcludesOutOfRange()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        await CreateSimpleExpenseAsync(harness, ownerId, group.Id, ownerMemberId, guestMemberId, "Nho", 5_000);
+        await CreateSimpleExpenseAsync(harness, ownerId, group.Id, ownerMemberId, guestMemberId, "Vua", 50_000);
+        await CreateSimpleExpenseAsync(harness, ownerId, group.Id, ownerMemberId, guestMemberId, "Lon", 500_000);
+
+        var page = await harness.ExpenseService.GetPagedAsync(
+            ownerId, group.Id, 1, 20, new ExpenseFilter(MinAmount: 10_000, MaxAmount: 100_000), CancellationToken.None);
+
+        page.Items.Should().ContainSingle(e => e.Title == "Vua");
+    }
+
+    [Fact]
+    public async Task GetPagedAsync_FilterByDateRange_ExcludesOutOfRange()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        var now = DateTimeOffset.UtcNow;
+        await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "Cu", 10_000, 0, now.AddDays(-10),
+            [new ExpensePayerInput(ownerMemberId, 10_000)], "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId])), CancellationToken.None);
+        await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "Gan day", 10_000, 0, now,
+            [new ExpensePayerInput(ownerMemberId, 10_000)], "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId])), CancellationToken.None);
+
+        var page = await harness.ExpenseService.GetPagedAsync(
+            ownerId, group.Id, 1, 20, new ExpenseFilter(FromDate: now.AddDays(-1)), CancellationToken.None);
+
+        page.Items.Should().ContainSingle(e => e.Title == "Gan day");
+    }
+
+    private static Task CreateSimpleExpenseAsync(
+        TestHarness harness, Guid ownerId, Guid groupId, Guid ownerMemberId, Guid guestMemberId, string title, long amount = 10_000) =>
+        harness.ExpenseService.CreateAsync(ownerId, groupId, new CreateExpenseRequest(
+            title, amount, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, amount)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId])), CancellationToken.None);
 
     // ===== SplitConfigJson — bổ sung 2026-09-05. Trước đó DB đã lưu field này (ExpenseService dòng
     // 81/129) nhưng ExpenseDto chưa từng trả nó ra qua API, khiến form Edit trên Web phải suy ngược

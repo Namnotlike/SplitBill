@@ -1116,7 +1116,7 @@ sách gợi ý, theo thứ tự từ dễ đến khó, mỗi tính năng build +
 thuật toán) + commit riêng:
 
 1. Dark mode — mục 15.1 (đã làm).
-2. Tìm kiếm/lọc khoản chi.
+2. Tìm kiếm/lọc khoản chi — mục 15.2 (đã làm).
 3. Nhãn/danh mục khoản chi.
 4. Bảng tổng quan cá nhân ở trang chủ (tổng số dư gộp mọi nhóm).
 5. Timeline hoạt động nhóm (gộp khoản chi + settlement + audit log thành 1 dòng thời gian).
@@ -1156,3 +1156,28 @@ cần viết lại rule nào, chỉ cần định nghĩa lại giá trị các t
   > Bootstrap suy ra. Rút kinh nghiệm cho các rule CSS sau này: bất kỳ chỗ nào muốn nền theo đúng thiết
   > kế riêng của site (không phải theo mặc định Bootstrap) đều phải set tường minh qua token `--sb-*`,
   > không được để trống rồi trông chờ Bootstrap suy ra đúng ý.
+
+### 15.2 Tìm kiếm/lọc khoản chi
+
+`GET /groups/{id}/expenses` nhận thêm 6 query param optional, tất cả áp dụng **trước** phân trang
+(lọc rồi mới đếm `TotalCount`/`Skip`/`Take`, không phải lọc trên 1 trang đã cắt sẵn):
+
+- `title` — so khớp kiểu "chứa" (`Contains`), không phân biệt hoa/thường.
+- `payerMemberId` — chỉ trả khoản chi có member này trong `Payers` (không xét `Splits`).
+- `fromDate`/`toDate` — lọc theo `OccurredAt`, cả hai đều dạng so sánh `>=`/`<=` (bao gồm biên).
+- `minAmount`/`maxAmount` — lọc theo `TotalAmount`.
+
+Field nào không truyền thì bỏ qua tiêu chí đó — gọi không kèm param nào giữ nguyên hành vi cũ (xem
+tất cả). Đóng gói trong `ExpenseFilter` (record, `SplitBill.Application.Expenses`), truyền xuống
+`IExpenseRepository.GetPagedAsync`.
+
+> ⚠️ Lưu ý kỹ thuật: lọc `Title` dùng `e.Title.ToLower().Contains(...)` chứ không dùng
+> `EF.Functions.Like`, vì cần dịch được sang cả hai provider EF Core project đang dùng — SQL Server
+> (production) và InMemory (unit/integration test, CLAUDE.md mục 2) — cùng cho ra kết quả không phân
+> biệt hoa/thường ở cả hai.
+
+Web (`Expenses/Index.cshtml`) có form lọc `method="get"` (title, dropdown người ứng tiền lấy từ
+`Group.Members`, khoảng ngày, khoảng số tiền) — dùng GET để kết quả lọc có URL riêng, bookmark/chia
+sẻ được, và nút Trang trước/sau chỉ cần lặp lại đúng `asp-route-*` hiện tại. Trang cũng được bổ sung
+điều hướng Trang trước/sau (trước đây trang Expenses/Index chỉ hiển thị số trang dạng text, không có
+nút bấm chuyển trang thật).

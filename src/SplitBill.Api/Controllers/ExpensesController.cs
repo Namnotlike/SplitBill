@@ -33,12 +33,22 @@ public sealed class ExpensesController : ControllerBase
 
     [HttpGet("/api/v1/groups/{groupId:guid}/expenses")]
     public async Task<ActionResult<PagedResult<ExpenseDto>>> GetPagedAsync(
-        Guid groupId, [FromQuery] int page = 1, [FromQuery] int pageSize = DefaultPageSize, CancellationToken cancellationToken = default)
+        Guid groupId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = DefaultPageSize,
+        [FromQuery] string? title = null,
+        [FromQuery] Guid? payerMemberId = null,
+        [FromQuery] DateTimeOffset? fromDate = null,
+        [FromQuery] DateTimeOffset? toDate = null,
+        [FromQuery] long? minAmount = null,
+        [FromQuery] long? maxAmount = null,
+        CancellationToken cancellationToken = default)
     {
         page = Math.Max(1, page);
         pageSize = pageSize <= 0 ? DefaultPageSize : Math.Min(pageSize, 100);
 
-        var result = await _expenseService.GetPagedAsync(User.GetUserId(), groupId, page, pageSize, cancellationToken);
+        var filter = new ExpenseFilter(title, payerMemberId, fromDate, toDate, minAmount, maxAmount);
+        var result = await _expenseService.GetPagedAsync(User.GetUserId(), groupId, page, pageSize, filter, cancellationToken);
         return Ok(result);
     }
 

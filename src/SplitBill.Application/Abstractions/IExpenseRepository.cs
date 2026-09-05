@@ -1,3 +1,4 @@
+using SplitBill.Application.Expenses;
 using SplitBill.Domain.Entities;
 
 namespace SplitBill.Application.Abstractions;
@@ -7,8 +8,9 @@ public interface IExpenseRepository
     /// <summary>Nạp Expense kèm Payers/Splits (chỉ expense chưa xóa).</summary>
     Task<Expense?> GetByIdAsync(Guid expenseId, CancellationToken cancellationToken);
 
+    /// <summary><paramref name="filter"/> áp dụng trước khi phân trang — CLAUDE.md mục 15.2.</summary>
     Task<(IReadOnlyList<Expense> Items, int TotalCount)> GetPagedAsync(
-        Guid groupId, int page, int pageSize, CancellationToken cancellationToken);
+        Guid groupId, int page, int pageSize, ExpenseFilter filter, CancellationToken cancellationToken);
 
     /// <summary>Toàn bộ expense chưa xóa của nhóm, kèm Payers/Splits — dùng cho BalanceCalculator.</summary>
     Task<List<Expense>> GetAllByGroupIdAsync(Guid groupId, CancellationToken cancellationToken);

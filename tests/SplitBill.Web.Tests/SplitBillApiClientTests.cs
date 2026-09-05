@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using FluentAssertions;
+using SplitBill.Application.Expenses;
 using SplitBill.Application.Groups;
 using SplitBill.Web.Services;
 using Xunit;
@@ -89,8 +90,28 @@ public sealed class SplitBillApiClientTests
         var (client, handler) = CreateClient(_ => JsonResponse(HttpStatusCode.OK,
             new { items = Array.Empty<object>(), page = 2, pageSize = 20, totalCount = 0 }));
 
-        await client.GetExpensesAsync(groupId, 2, 20, CancellationToken.None);
+        await client.GetExpensesAsync(groupId, 2, 20, ExpenseFilter.Empty, CancellationToken.None);
 
         handler.LastRequest!.RequestUri!.Query.Should().Be("?page=2&pageSize=20");
+    }
+
+    // CLAUDE.md mục 15.2 — Tìm kiếm/lọc khoản chi, bổ sung 2026-09-05.
+    [Fact]
+    public async Task GetExpensesAsync_WithFilter_AppendsOnlyProvidedFields()
+    {
+        var groupId = Guid.NewGuid();
+        var payerMemberId = Guid.NewGuid();
+        var (client, handler) = CreateClient(_ => JsonResponse(HttpStatusCode.OK,
+            new { items = Array.Empty<object>(), page = 1, pageSize = 20, totalCount = 0 }));
+
+        var filter = new ExpenseFilter(Title: "ăn tối", PayerMemberId: payerMemberId, MinAmount: 10_000, MaxAmount: 500_000);
+        await client.GetExpensesAsync(groupId, 1, 20, filter, CancellationToken.None);
+
+        var query = handler.LastRequest!.RequestUri!.Query;
+        query.Should().Contain("page=1").And.Contain("pageSize=20");
+        query.Should().Contain($"payerMemberId={payerMemberId}");
+        query.Should().Contain("minAmount=10000").And.Contain("maxAmount=500000");
+        query.Should().Contain("title=");
+        query.Should().NotContain("fromDate=").And.NotContain("toDate=");
     }
 }

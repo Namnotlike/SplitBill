@@ -75,8 +75,38 @@ public sealed class SplitBillApiClient
         DeleteAsync($"groups/{groupId}/members/{memberId}", ct);
 
     // ===== Expenses =====
-    public Task<PagedResult<ExpenseDto>> GetExpensesAsync(Guid groupId, int page, int pageSize, CancellationToken ct) =>
-        GetAsync<PagedResult<ExpenseDto>>($"groups/{groupId}/expenses?page={page}&pageSize={pageSize}", ct);
+    /// <summary><paramref name="filter"/> theo CLAUDE.md mục 15.2 — mọi field null bị bỏ qua khỏi
+    /// query string, giữ nguyên hành vi "xem tất cả" khi gọi với ExpenseFilter.Empty.</summary>
+    public Task<PagedResult<ExpenseDto>> GetExpensesAsync(Guid groupId, int page, int pageSize, ExpenseFilter filter, CancellationToken ct)
+    {
+        var query = new List<string> { $"page={page}", $"pageSize={pageSize}" };
+        if (!string.IsNullOrWhiteSpace(filter.Title))
+        {
+            query.Add($"title={Uri.EscapeDataString(filter.Title)}");
+        }
+        if (filter.PayerMemberId is { } payerMemberId)
+        {
+            query.Add($"payerMemberId={payerMemberId}");
+        }
+        if (filter.FromDate is { } fromDate)
+        {
+            query.Add($"fromDate={Uri.EscapeDataString(fromDate.ToString("O"))}");
+        }
+        if (filter.ToDate is { } toDate)
+        {
+            query.Add($"toDate={Uri.EscapeDataString(toDate.ToString("O"))}");
+        }
+        if (filter.MinAmount is { } minAmount)
+        {
+            query.Add($"minAmount={minAmount}");
+        }
+        if (filter.MaxAmount is { } maxAmount)
+        {
+            query.Add($"maxAmount={maxAmount}");
+        }
+
+        return GetAsync<PagedResult<ExpenseDto>>($"groups/{groupId}/expenses?{string.Join("&", query)}", ct);
+    }
 
     public Task<ExpenseDto> GetExpenseAsync(Guid expenseId, CancellationToken ct) => GetAsync<ExpenseDto>($"expenses/{expenseId}", ct);
 

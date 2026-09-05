@@ -19,12 +19,64 @@
     <div class="alert alert-success">✅ @ok</div>
 }
 
+@* ===== Tìm kiếm/lọc khoản chi (CLAUDE.md mục 15.2) — bổ sung 2026-09-05. method="get" để kết quả
+   lọc có URL riêng (bookmark/chia sẻ được), page reset về 1 mỗi lần đổi bộ lọc (không có input page ở
+   đây — link phân trang bên dưới tự thêm page). ===== *@
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <input type="hidden" name="groupId" value="@Model.GroupId" />
+            <div class="col-md-3">
+                <label class="form-label">Tiêu đề</label>
+                <input type="text" name="Title" value="@Model.Title" class="form-control" placeholder="Tìm theo tên khoản chi..." />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Người ứng tiền</label>
+                <select name="PayerMemberId" class="form-select">
+                    <option value="">Tất cả</option>
+                    @foreach (var member in Model.Group.Members)
+                    {
+                        <option value="@member.Id" selected="@(Model.PayerMemberId == member.Id)">@member.DisplayName</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Từ ngày</label>
+                <input type="date" name="FromDate" value="@Model.FromDate?.ToString("yyyy-MM-dd")" class="form-control" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Đến ngày</label>
+                <input type="date" name="ToDate" value="@Model.ToDate?.ToString("yyyy-MM-dd")" class="form-control" />
+            </div>
+            <div class="col-md-1">
+                <label class="form-label">Từ (@Model.Group.Currency)</label>
+                <input type="number" name="MinAmount" value="@Model.MinAmount" class="form-control" min="0" />
+            </div>
+            <div class="col-md-1">
+                <label class="form-label">Đến (@Model.Group.Currency)</label>
+                <input type="number" name="MaxAmount" value="@Model.MaxAmount" class="form-control" min="0" />
+            </div>
+            <div class="col-md-1 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-fill">Lọc</button>
+            </div>
+            @if (Model.HasActiveFilter)
+            {
+                <div class="col-12">
+                    <a asp-page="/Expenses/Index" asp-route-groupId="@Model.GroupId" class="small text-muted">✕ Xóa bộ lọc</a>
+                </div>
+            }
+        </form>
+    </div>
+</div>
+
 @if (Model.Expenses.Items.Count == 0)
 {
     <div class="card">
         <div class="card-body text-center py-5">
             <div class="fs-1 mb-2">🧾</div>
-            <p class="text-muted mb-0">Chưa có khoản chi nào.</p>
+            <p class="text-muted mb-0">
+                @(Model.HasActiveFilter ? "Không có khoản chi nào khớp bộ lọc." : "Chưa có khoản chi nào.")
+            </p>
         </div>
     </div>
 }
@@ -65,5 +117,22 @@ else
         </div>
     </div>
 
-    <p class="text-muted small mt-3">Trang @Model.Expenses.Page — tổng @Model.Expenses.TotalCount khoản chi.</p>
+    {
+        var totalPages = (int)Math.Ceiling(Model.Expenses.TotalCount / (double)Model.Expenses.PageSize);
+        <div class="d-flex justify-content-between align-items-center mt-3">
+        <p class="text-muted small mb-0">Trang @Model.Expenses.Page/@Math.Max(totalPages, 1) — tổng @Model.Expenses.TotalCount khoản chi.</p>
+        <div class="d-flex gap-2">
+            <a class="btn btn-sm btn-outline-secondary @(Model.Expenses.Page <= 1 ? "disabled" : "")"
+               asp-page="/Expenses/Index" asp-route-groupId="@Model.GroupId"
+               asp-route-Page="@(Model.Expenses.Page - 1)" asp-route-Title="@Model.Title" asp-route-PayerMemberId="@Model.PayerMemberId"
+               asp-route-FromDate="@Model.FromDate?.ToString("yyyy-MM-dd")" asp-route-ToDate="@Model.ToDate?.ToString("yyyy-MM-dd")"
+               asp-route-MinAmount="@Model.MinAmount" asp-route-MaxAmount="@Model.MaxAmount">‹ Trước</a>
+            <a class="btn btn-sm btn-outline-secondary @(Model.Expenses.Page >= totalPages ? "disabled" : "")"
+               asp-page="/Expenses/Index" asp-route-groupId="@Model.GroupId"
+               asp-route-Page="@(Model.Expenses.Page + 1)" asp-route-Title="@Model.Title" asp-route-PayerMemberId="@Model.PayerMemberId"
+               asp-route-FromDate="@Model.FromDate?.ToString("yyyy-MM-dd")" asp-route-ToDate="@Model.ToDate?.ToString("yyyy-MM-dd")"
+               asp-route-MinAmount="@Model.MinAmount" asp-route-MaxAmount="@Model.MaxAmount">Sau ›</a>
+        </div>
+        </div>
+    }
 }

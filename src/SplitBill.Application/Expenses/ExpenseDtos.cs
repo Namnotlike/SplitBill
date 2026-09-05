@@ -26,6 +26,24 @@ public sealed record ExpenseResult(ExpenseDto Data, IReadOnlyList<Warning> Warni
 
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);
 
+/// <summary>Bộ lọc cho GET /groups/{id}/expenses (CLAUDE.md mục 15.2 — Tìm kiếm/lọc khoản chi, bổ
+/// sung 2026-09-05). Mọi field đều optional — field null nghĩa là không lọc theo tiêu chí đó. So khớp
+/// <see cref="Title"/> không phân biệt hoa/thường, kiểu "chứa" (contains), không phải khớp tuyệt đối.</summary>
+public sealed record ExpenseFilter(
+    string? Title = null,
+    Guid? PayerMemberId = null,
+    DateTimeOffset? FromDate = null,
+    DateTimeOffset? ToDate = null,
+    long? MinAmount = null,
+    long? MaxAmount = null)
+{
+    public static readonly ExpenseFilter Empty = new();
+
+    public bool IsEmpty =>
+        string.IsNullOrWhiteSpace(Title) && PayerMemberId is null && FromDate is null && ToDate is null
+        && MinAmount is null && MaxAmount is null;
+}
+
 // ===== Input DTOs khớp body ở CLAUDE.md mục 8 =====
 
 public sealed record ExpensePayerInput(Guid MemberId, long Amount);
