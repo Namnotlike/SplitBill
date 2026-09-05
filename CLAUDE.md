@@ -1118,7 +1118,7 @@ thuật toán) + commit riêng:
 1. Dark mode — mục 15.1 (đã làm).
 2. Tìm kiếm/lọc khoản chi — mục 15.2 (đã làm).
 3. Nhãn/danh mục khoản chi — mục 15.3 (đã làm).
-4. Bảng tổng quan cá nhân ở trang chủ (tổng số dư gộp mọi nhóm).
+4. Bảng tổng quan cá nhân ở trang chủ — mục 15.4 (đã làm).
 5. Timeline hoạt động nhóm (gộp khoản chi + settlement + audit log thành 1 dòng thời gian).
 6. Tham gia nhóm qua link chia sẻ (tự thêm mình vào nhóm, không cần Owner thêm tay).
 7. Khoản chi định kỳ (`GroupType.Recurring` — hiện tại chưa khác gì `OneTime`, cần cơ chế tự sinh
@@ -1214,3 +1214,30 @@ enum ExpenseCategory { Other = 0, Food = 1, Transport = 2, Accommodation = 3, En
 trong danh sách (khoản chi cũ tạo trước tính năng này hiển thị đúng "📦 Khác"); lọc theo Category
 "Shopping" → chỉ còn đúng khoản chi vừa tạo; mở lại form Edit của khoản chi đó → dropdown Danh mục
 đã pre-select đúng "Shopping".
+
+### 15.4 Bảng tổng quan cá nhân ở trang chủ
+
+`IBalanceService.GetMyOverviewAsync(callerUserId)` — số dư của user hiện tại trong **TỪNG** nhóm họ
+đang là thành viên `IsActive`, trả `PersonalGroupBalanceDto(GroupId, GroupName, Currency, Net)` cho
+mỗi nhóm. Cài đặt tận dụng lại `IGroupRepository.GetByUserIdAsync` (đã lọc đúng nhóm + `Include`
+`Members` sẵn có từ trước) và `ComputeBalancesAsync` private method sẵn có trong `BalanceService`,
+không viết lại logic tính balance.
+
+> ⚠️ Quyết định thiết kế quan trọng: **KHÔNG cộng gộp `Net` thành một con số tổng duy nhất** giữa các
+> nhóm — vì mỗi nhóm có thể dùng đơn vị tiền tệ khác nhau (CLAUDE.md mục 14, quyết định người dùng
+> 2026-09-05 "mỗi nhóm 1 loại tiền cố định"). Cộng thẳng `+100.000đ` của nhóm VND với `-50$` của nhóm
+> USD ra một con số vô nghĩa và có thể đánh lừa người dùng tưởng mình đang dư/nợ ít hơn thực tế. Trang
+> chủ hiển thị **danh sách riêng từng nhóm**, mỗi dòng tự định dạng theo đúng `Currency` của nhóm đó
+> (`SupportedCurrencies.Format`), không có dòng "tổng" nào gộp chúng lại.
+
+API: `GET /api/v1/users/me/balances-overview` (đặt trong `UsersController` vì đây là dữ liệu tổng hợp
+theo **user**, không theo group — khác các endpoint `/groups/{id}/balances` hiện có).
+
+Web: `Pages/Index.cshtml` — widget "Tổng quan số dư của bạn" chỉ hiện khi đã đăng nhập VÀ có ít nhất
+1 nhóm; mỗi nhóm là 1 card link thẳng tới `/Groups/Balances/{id}`, tái dùng class
+`.sb-balance-card`/`.positive`/`.negative` đã có sẵn từ trang Balances (mục 10b) để đồng bộ giao diện.
+Gọi API lỗi (vd token vừa hết hạn) chỉ ẩn lặng lẽ widget này, không chặn phần còn lại của trang chủ.
+
+Đã verify sống trên trình duyệt: đăng nhập user có 2 nhóm ("Trip to NYC" - USD, "Test Receipt" - VND)
+→ widget hiện đúng cả 2 dòng, mỗi dòng format đúng theo Currency riêng, link điều hướng đúng
+`/Groups/Balances/{id}` của từng nhóm.

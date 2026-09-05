@@ -56,6 +56,30 @@ public sealed class BalanceService : IBalanceService
         return await BuildDirectPlanAsync(group, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<PersonalGroupBalanceDto>> GetMyOverviewAsync(Guid callerUserId, CancellationToken cancellationToken)
+    {
+        // GetByUserIdAsync đã lọc đúng nhóm mà callerUserId đang là thành viên IsActive (xem
+        // GroupRepository), nên mọi group ở đây chắc chắn có member khớp callerUserId — không cần lo
+        // ResolveCallerMember ném lỗi "không phải thành viên" như các hàm khác trong class này.
+        var groups = await _groupRepository.GetByUserIdAsync(callerUserId, cancellationToken);
+
+        var overview = new List<PersonalGroupBalanceDto>();
+        foreach (var group in groups)
+        {
+            var member = group.Members.FirstOrDefault(m => m.UserId == callerUserId && m.IsActive);
+            if (member is null)
+            {
+                continue;
+            }
+
+            var balances = await ComputeBalancesAsync(group, cancellationToken);
+            var net = balances.FirstOrDefault(b => b.MemberId == member.Id)?.Net ?? 0;
+            overview.Add(new PersonalGroupBalanceDto(group.Id, group.Name, group.Currency, net));
+        }
+
+        return overview;
+    }
+
     private async Task<SettlementPlanDto> BuildSimplifiedPlanAsync(Group group, CancellationToken cancellationToken)
     {
         var balances = await ComputeBalancesAsync(group, cancellationToken);

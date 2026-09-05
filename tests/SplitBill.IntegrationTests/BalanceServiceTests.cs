@@ -165,4 +165,46 @@ public sealed class BalanceServiceTests
         plan.Transactions.Should().Contain(t => t.FromMemberId == binh.Id && t.ToMemberId == chi.Id && t.Amount == 100_000);
         plan.Transactions.Should().Contain(t => t.FromMemberId == dung.Id && t.ToMemberId == nam.Id && t.Amount == 100_000);
     }
+
+    // ===== Bảng tổng quan cá nhân (CLAUDE.md mục 15.4) — bổ sung 2026-09-05 =====
+
+    [Fact]
+    public async Task GetMyOverviewAsync_ReturnsNetPerGroup_AcrossMultipleGroups()
+    {
+        var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+
+        var group1 = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich A", null, "OneTime", "VND"), CancellationToken.None);
+        var guest1 = await harness.GroupService.AddMemberAsync(ownerId, group1.Id, new AddMemberRequest(null, "Binh"), CancellationToken.None);
+        await harness.ExpenseService.CreateAsync(ownerId, group1.Id, new CreateExpenseRequest(
+            "An toi", 200_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(group1.Members[0].Id, 200_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [group1.Members[0].Id, guest1.Id])), CancellationToken.None);
+
+        var group2 = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich My", null, "OneTime", "USD"), CancellationToken.None);
+        var guest2 = await harness.GroupService.AddMemberAsync(ownerId, group2.Id, new AddMemberRequest(null, "Chi"), CancellationToken.None);
+        await harness.ExpenseService.CreateAsync(ownerId, group2.Id, new CreateExpenseRequest(
+            "Dinner", 100, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(guest2.Id, 100)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [group2.Members[0].Id, guest2.Id])), CancellationToken.None);
+
+        var overview = await harness.BalanceService.GetMyOverviewAsync(ownerId, CancellationToken.None);
+
+        overview.Should().HaveCount(2);
+        overview.Should().ContainSingle(o => o.GroupId == group1.Id && o.Currency == "VND" && o.Net == 100_000);
+        overview.Should().ContainSingle(o => o.GroupId == group2.Id && o.Currency == "USD" && o.Net == -50);
+    }
+
+    [Fact]
+    public async Task GetMyOverviewAsync_UserNotInAnyGroup_ReturnsEmpty()
+    {
+        var harness = TestHarness.Create();
+        var userId = await harness.RegisterUserAsync("solo@example.com", "Solo");
+
+        var overview = await harness.BalanceService.GetMyOverviewAsync(userId, CancellationToken.None);
+
+        overview.Should().BeEmpty();
+    }
 }

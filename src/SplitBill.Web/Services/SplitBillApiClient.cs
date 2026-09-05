@@ -42,6 +42,10 @@ public sealed class SplitBillApiClient
     public Task<UserProfileDto> UpdateMeAsync(UpdateProfileRequest request, CancellationToken ct) =>
         PatchAsync<UpdateProfileRequest, UserProfileDto>("users/me", request, ct);
 
+    /// <summary>Bảng tổng quan cá nhân ở trang chủ (CLAUDE.md mục 15.4).</summary>
+    public Task<IReadOnlyList<PersonalGroupBalanceDto>> GetMyBalancesOverviewAsync(CancellationToken ct) =>
+        GetAsync<IReadOnlyList<PersonalGroupBalanceDto>>("users/me/balances-overview", ct);
+
     // ===== Groups =====
     public Task<IReadOnlyList<GroupSummaryDto>> GetMyGroupsAsync(CancellationToken ct) =>
         GetAsync<IReadOnlyList<GroupSummaryDto>>("groups", ct);

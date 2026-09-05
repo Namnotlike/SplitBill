@@ -26,6 +26,35 @@
     }
 </div>
 
+@* ===== Bảng tổng quan cá nhân (CLAUDE.md mục 15.4) — bổ sung 2026-09-05. Không cộng gộp Net giữa
+   các nhóm vì mỗi nhóm có thể khác đơn vị tiền tệ (mục 14) — hiển thị riêng từng dòng. ===== *@
+@if (User.Identity?.IsAuthenticated == true && Model.MyOverview.Count > 0)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title mb-3">Tổng quan số dư của bạn</h5>
+            <div class="row g-3">
+                @foreach (var item in Model.MyOverview.OrderByDescending(o => o.Net))
+                {
+                    <div class="col-md-4">
+                        <a asp-page="/Groups/Balances" asp-route-id="@item.GroupId" class="sb-balance-card @(item.Net > 0 ? "positive" : item.Net < 0 ? "negative" : "") text-decoration-none d-block">
+                            <div>
+                                <div class="fw-600" style="color: var(--sb-ink);">@item.GroupName</div>
+                                <div class="small text-muted">
+                                    @(item.Net > 0 ? "Được nhận" : item.Net < 0 ? "Còn nợ" : "Đã cân bằng")
+                                </div>
+                            </div>
+                            <div class="@(item.Net > 0 ? "sb-amount-positive" : item.Net < 0 ? "sb-amount-negative" : "fw-700")">
+                                @SupportedCurrencies.Format(Math.Abs(item.Net), item.Currency)
+                            </div>
+                        </a>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
 <div class="row g-4 mt-2">
     <div class="col-md-4">
         <div class="card h-100">
