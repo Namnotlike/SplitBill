@@ -1,6 +1,7 @@
 using System.Text.Json;
 using SplitBill.Application.Abstractions;
 using SplitBill.Application.Expenses; // PagedResult<T>
+using SplitBill.Application.Notifications;
 using SplitBill.Application.Settlement;
 using SplitBill.Application.Splitting;
 using SplitBill.Domain.Entities;
@@ -20,6 +21,7 @@ public sealed class GroupService : IGroupService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IShareTokenGenerator _shareTokenGenerator;
     private readonly IBalanceCalculator _balanceCalculator;
+    private readonly INotificationService _notificationService;
 
     public GroupService(
         IGroupRepository groupRepository,
@@ -29,7 +31,8 @@ public sealed class GroupService : IGroupService
         IAuditLogRepository auditLogRepository,
         IUnitOfWork unitOfWork,
         IShareTokenGenerator shareTokenGenerator,
-        IBalanceCalculator balanceCalculator)
+        IBalanceCalculator balanceCalculator,
+        INotificationService notificationService)
     {
         _groupRepository = groupRepository;
         _userRepository = userRepository;
@@ -39,6 +42,7 @@ public sealed class GroupService : IGroupService
         _unitOfWork = unitOfWork;
         _shareTokenGenerator = shareTokenGenerator;
         _balanceCalculator = balanceCalculator;
+        _notificationService = notificationService;
     }
 
     public async Task<GroupDto> CreateAsync(Guid callerUserId, CreateGroupRequest request, CancellationToken cancellationToken)
@@ -204,6 +208,24 @@ public sealed class GroupService : IGroupService
         await _groupRepository.AddMemberAsync(member, cancellationToken);
         await WriteAuditLogAsync(group.Id, "GroupMember", member.Id, "Created", caller.Id, null, ToMemberDto(member), cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Thông báo "được thêm vào nhóm mới" (CLAUDE.md mục 13) — chỉ áp dụng khi thêm bằng UserId
+        // (có tài khoản), không áp dụng cho khách vãng lai thêm bằng DisplayName.
+        if (request.UserId is { } addedUserId)
+        {
+            var addedUser = await _userRepository.GetByIdAsync(addedUserId, cancellationToken);
+            if (addedUser is not null)
+            {
+                await _notificationService.NotifyAsync(
+                    [new NotificationRecipient(addedUserId, addedUser.Email)],
+                    group.Id,
+                    "MemberAdded",
+                    "Bạn được thêm vào nhóm mới",
+                    $"Bạn đã được thêm vào nhóm \"{group.Name}\".",
+                    $"/Groups/Details/{group.Id}",
+                    cancellationToken);
+            }
+        }
 
         return ToMemberDto(member);
     }

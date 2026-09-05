@@ -35,6 +35,7 @@ Bài toán cốt lõi: nhiều người cùng ứng tiền cho nhiều khoản c
 | Log | Serilog |
 | API docs | Swashbuckle (Swagger) |
 | Password hashing | `Microsoft.AspNetCore.Identity.PasswordHasher<User>` (chỉ dùng riêng class hasher, KHÔNG cài toàn bộ ASP.NET Core Identity/EF Identity) |
+| Gửi email | MailKit (bổ sung 2026-09-05, quyết định người dùng — xem mục 13.3) |
 
 Không thêm thư viện NuGet nào ngoài danh sách trên nếu chưa hỏi người dùng.
 
@@ -969,3 +970,91 @@ Trình duyệt **không bao giờ thấy JWT thật**. Luồng:
 - Không tự ý thêm tính năng ngoài phạm vi milestone đang làm.
 - Khi tạo migration, đặt tên có nghĩa (`AddSettlementConfirmation`), không dùng tên mặc định.
 - Ưu tiên viết test trước cho mọi logic liên quan tới tiền.
+
+---
+
+## 13. Thông báo (Notifications) — bổ sung 2026-09-05, M6
+
+Quyết định người dùng: gửi **cả 2 kênh** — trong app (in-app, lưu DB) và email. 4 sự kiện kích hoạt
+(không hơn, không tự ý thêm sự kiện khác ngoài danh sách này):
+
+1. **Khoản chi mới trong nhóm** — báo cho mọi thành viên khác (có tài khoản, không phải khách vãng
+   lai, không phải người tạo) khi `POST /groups/{id}/expenses` thành công.
+2. **Có người ghi nhận đã chuyển tiền cho mình** — báo cho `ToMemberId` (nếu có tài khoản) khi
+   `POST /groups/{id}/settlements` thành công.
+3. **Settlement của mình được xác nhận/từ chối** — báo cho `FromMemberId` (nếu có tài khoản) khi
+   `POST /settlements/{id}/confirm` hoặc `/reject` thành công.
+4. **Được thêm vào nhóm mới** — báo cho user khi được thêm vào nhóm bằng `UserId` (không áp dụng cho
+   khách vãng lai thêm bằng `DisplayName`).
+
+Guest (`GroupMember.UserId == null`) **không bao giờ** nhận thông báo (không có tài khoản để đăng
+nhập xem in-app, không có email để gửi) — luôn lọc theo `GroupMember.User is not null` trước khi tạo
+thông báo.
+
+### 13.1 Mô hình dữ liệu
+
+```csharp
+Notification {
+    Guid Id
+    Guid UserId             // người nhận — LUÔN là User có tài khoản, không dùng GroupMemberId
+    Guid GroupId
+    string Type             // "ExpenseCreated" | "SettlementRecorded" | "SettlementConfirmed" |
+                             // "SettlementRejected" | "MemberAdded"
+    string Title
+    string Message
+    string? LinkUrl         // đường dẫn tương đối trên Web, vd "/Expenses/Index/{groupId}"
+    bool IsRead
+    DateTimeOffset CreatedAt
+}
+```
+
+Không soft-delete, không global query filter (giống `AuditLog`) — thông báo cũ vẫn giữ nguyên lịch sử.
+Index `(UserId, IsRead, CreatedAt DESC)` để truy vấn "chưa đọc" và phân trang nhanh.
+
+### 13.2 API
+
+```
+GET  /api/v1/notifications                Phân trang (mặc định 20/trang), sort CreatedAt desc,
+                                           chỉ của user hiện tại (theo JWT sub)
+GET  /api/v1/notifications/unread-count   Số thông báo chưa đọc — dùng cho badge
+POST /api/v1/notifications/{id}/read      Đánh dấu 1 thông báo đã đọc (chỉ chủ sở hữu)
+POST /api/v1/notifications/read-all       Đánh dấu tất cả đã đọc
+```
+
+### 13.3 Gửi email
+
+- Thư viện: **MailKit** (bổ sung vào danh sách NuGet được phép ở mục 2 — quyết định người dùng
+  2026-09-05, thay vì `System.Net.Mail` đã bị Microsoft khuyến cáo không dùng cho code mới).
+  > ⚠️ Ghi nhận rủi ro đã biết: bản mới nhất lúc thêm (4.14.0) vẫn bị NuGet cảnh báo NU1902
+  > (moderate severity, GHSA-9j88-vvj5-vhgr) — đã thử các version 4.9.0/4.13.0/4.14.0, cảnh báo vẫn còn
+  > (chưa có bản vá tại thời điểm này). Chỉ dùng tính năng gửi SMTP cơ bản (không dùng S/MIME hay các
+  > tính năng liên quan tới lỗ hổng), rủi ro thực tế thấp cho use-case này, nhưng cần theo dõi và nâng
+  > cấp `MailKit` lên bản vá ngay khi có.
+- `IEmailSender.SendAsync(toEmail, subject, htmlBody, cancellationToken)` — interface thuần trong
+  `SplitBill.Application`, 2 cài đặt ở `SplitBill.Infrastructure`:
+  - `SmtpEmailSender` (MailKit thật) — dùng khi `Smtp:Host` có cấu hình.
+  - `ConsoleEmailSender` (fallback) — chỉ ghi log (Serilog) nội dung email thay vì gửi thật, dùng khi
+    `Smtp:Host` rỗng/chưa cấu hình. Đây là **quyết định người dùng 2026-09-05**: môi trường dev/test
+    chưa có SMTP thật, không fail-fast như `Jwt:SigningKey` — thiếu cấu hình SMTP thì âm thầm chuyển
+    sang log, không chặn ứng dụng chạy. Program.cs chọn implementation dựa trên
+    `string.IsNullOrWhiteSpace(Smtp:Host)`.
+- Lỗi gửi email (SMTP timeout, sai cấu hình...) **không được** làm hỏng thao tác nghiệp vụ chính (tạo
+  khoản chi, ghi nhận settlement...) — luôn bọc try/catch quanh việc gửi thông báo, chỉ log lỗi, không
+  throw ra ngoài. In-app notification (ghi DB) vẫn phải thành công độc lập với email.
+
+### 13.4 Giới hạn đã biết
+
+Form "Thêm thành viên" trên Web (`Groups/Details.cshtml`) **chỉ hỗ trợ thêm khách vãng lai bằng
+DisplayName** (`AddMemberRequest(null, NewMember.DisplayName)` — luôn truyền `UserId: null`), không có
+ô nào để thêm thành viên bằng UserId của 1 tài khoản đã có sẵn. Hệ quả: thông báo "được thêm vào nhóm
+mới" (mục 13, sự kiện #4) trên thực tế **chỉ có thể kích hoạt qua gọi API trực tiếp**
+(`POST /groups/{id}/members` với `userId` khác null), không bao giờ xảy ra khi thao tác hoàn toàn qua
+giao diện Web hiện tại. API vẫn hỗ trợ đầy đủ, chỉ là chưa có UI tìm/chọn user theo email để thêm.
+
+### 13.5 Vị trí gọi trong code
+
+`NotificationService` (namespace `SplitBill.Application.Notifications`) là service thuần nhận
+danh sách người nhận + nội dung, tự ghi DB + gọi `IEmailSender` — được `ExpenseService`,
+`SettlementRecordService`, `GroupService` gọi ở đúng 4 điểm nêu ở mục 13 (sau khi
+`_unitOfWork.SaveChangesAsync` của thao tác chính đã thành công, không gộp chung 1 transaction với dữ
+liệu tài chính — thông báo là hệ quả phụ, không phải một phần bất biến `Σ net = 0`).

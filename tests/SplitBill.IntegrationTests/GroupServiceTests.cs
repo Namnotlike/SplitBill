@@ -268,4 +268,33 @@ public sealed class GroupServiceTests
 
         (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.MemberNotInGroup);
     }
+
+    // ===== Thông báo "được thêm vào nhóm mới" (CLAUDE.md mục 13) — bổ sung 2026-09-05 =====
+
+    [Fact]
+    public async Task AddMemberAsync_WithUserId_NotifiesAddedUser()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var newUserId = await harness.RegisterUserAsync("b@example.com", "Binh");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+
+        await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(newUserId, "Binh"), CancellationToken.None);
+
+        var page = await harness.NotificationService.GetPagedAsync(newUserId, 1, 20, CancellationToken.None);
+        page.Items.Should().ContainSingle(n => n.Type == "MemberAdded");
+        harness.EmailSender.SentEmails.Should().ContainSingle(e => e.ToEmail == "b@example.com");
+    }
+
+    [Fact]
+    public async Task AddMemberAsync_GuestWithoutUserId_NoNotification()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+
+        await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(null, "Khach vang lai"), CancellationToken.None);
+
+        harness.EmailSender.SentEmails.Should().BeEmpty();
+    }
 }

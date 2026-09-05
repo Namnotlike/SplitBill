@@ -58,6 +58,7 @@ public sealed class ExceptionHandlingMiddleware
         ErrorCodes.GroupNotFound => StatusCodes.Status404NotFound,
         ErrorCodes.ExpenseNotFound => StatusCodes.Status404NotFound,
         ErrorCodes.MemberNotFound => StatusCodes.Status404NotFound,
+        ErrorCodes.NotificationNotFound => StatusCodes.Status404NotFound,
         ErrorCodes.EmailAlreadyRegistered => StatusCodes.Status409Conflict,
         ErrorCodes.ConcurrencyConflict => StatusCodes.Status409Conflict,
         ErrorCodes.MemberHasOutstandingBalance => StatusCodes.Status409Conflict,

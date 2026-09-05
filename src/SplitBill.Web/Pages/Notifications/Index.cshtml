@@ -1,0 +1,71 @@
+@page
+@model SplitBill.Web.Pages.Notifications.IndexModel
+@{
+    ViewData["Title"] = "Thông báo";
+
+    static string IconFor(string type) => type switch
+    {
+        "ExpenseCreated" => "🧾",
+        "SettlementRecorded" => "💸",
+        "SettlementConfirmed" => "✅",
+        "SettlementRejected" => "❌",
+        "MemberAdded" => "👋",
+        _ => "🔔",
+    };
+}
+
+<div class="d-flex justify-content-between align-items-center mt-1 mb-4 flex-wrap gap-2">
+    <h1 class="mb-0">🔔 Thông báo</h1>
+    @if (Model.Notifications.Items.Any(n => !n.IsRead))
+    {
+        <form method="post" asp-page-handler="MarkAllRead">
+            <button type="submit" class="btn btn-outline-secondary btn-sm">Đánh dấu tất cả đã đọc</button>
+        </form>
+    }
+</div>
+
+@if (Model.Notifications.Items.Count == 0)
+{
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <div class="fs-1 mb-2">🔔</div>
+            <p class="text-muted mb-0">Chưa có thông báo nào.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="table mb-0">
+                <tbody>
+                    @foreach (var n in Model.Notifications.Items)
+                    {
+                        <tr style="@(n.IsRead ? "" : "background: var(--sb-brand-light);")">
+                            <td class="ps-4" style="width: 40px;">@IconFor(n.Type)</td>
+                            <td>
+                                <div class="fw-600">@n.Title</div>
+                                <div class="text-muted small">@n.Message</div>
+                                <div class="text-muted small">@n.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
+                            </td>
+                            <td class="pe-4 text-end" style="white-space: nowrap;">
+                                @if (n.LinkUrl is not null)
+                                {
+                                    <a href="@n.LinkUrl" class="btn btn-sm btn-outline-primary">Xem</a>
+                                }
+                                @if (!n.IsRead)
+                                {
+                                    <form method="post" asp-page-handler="MarkRead" asp-route-notificationId="@n.Id" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary">Đã đọc</button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <p class="text-muted small mt-3">Trang @Model.Notifications.Page — tổng @Model.Notifications.TotalCount thông báo.</p>
+}

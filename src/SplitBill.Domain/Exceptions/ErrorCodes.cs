@@ -19,4 +19,5 @@ public static class ErrorCodes
     public const string ValidationFailed = "VALIDATION_FAILED";
     public const string ExpenseNotFound = "EXPENSE_NOT_FOUND";
     public const string MemberNotFound = "MEMBER_NOT_FOUND";
+    public const string NotificationNotFound = "NOTIFICATION_NOT_FOUND";
 }

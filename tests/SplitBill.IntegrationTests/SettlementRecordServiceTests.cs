@@ -131,4 +131,68 @@ public sealed class SettlementRecordServiceTests
 
         settlements.Should().ContainSingle();
     }
+
+    // ===== Thông báo (CLAUDE.md mục 13) — bổ sung 2026-09-05 =====
+
+    [Fact]
+    public async Task CreateAsync_NotifiesReceiver()
+    {
+        var (harness, ownerId, _, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+
+        // guest (From) ghi nhận đã chuyển cho owner (To) -> owner phải nhận thông báo.
+        await harness.SettlementRecordService.CreateAsync(
+            ownerId, group.Id, new CreateSettlementRequest(guestMemberId, ownerMemberId, 50_000), CancellationToken.None);
+
+        var page = await harness.NotificationService.GetPagedAsync(ownerId, 1, 20, CancellationToken.None);
+        page.TotalCount.Should().Be(1);
+        page.Items[0].Type.Should().Be("SettlementRecorded");
+        harness.EmailSender.SentEmails.Should().ContainSingle(e => e.ToEmail == "a@example.com");
+    }
+
+    [Fact]
+    public async Task ConfirmAsync_NotifiesSender()
+    {
+        var (harness, ownerId, guestUserId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        var settlement = await harness.SettlementRecordService.CreateAsync(
+            ownerId, group.Id, new CreateSettlementRequest(guestMemberId, ownerMemberId, 50_000), CancellationToken.None);
+        harness.EmailSender.SentEmails.Clear();
+
+        await harness.SettlementRecordService.ConfirmAsync(ownerId, settlement.Id, CancellationToken.None);
+
+        var page = await harness.NotificationService.GetPagedAsync(guestUserId, 1, 20, CancellationToken.None);
+        page.Items.Should().ContainSingle(n => n.Type == "SettlementConfirmed");
+        harness.EmailSender.SentEmails.Should().ContainSingle(e => e.ToEmail == "b@example.com");
+    }
+
+    [Fact]
+    public async Task RejectAsync_NotifiesSender()
+    {
+        var (harness, ownerId, guestUserId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        var settlement = await harness.SettlementRecordService.CreateAsync(
+            ownerId, group.Id, new CreateSettlementRequest(guestMemberId, ownerMemberId, 50_000), CancellationToken.None);
+        harness.EmailSender.SentEmails.Clear();
+
+        await harness.SettlementRecordService.RejectAsync(ownerId, settlement.Id, CancellationToken.None);
+
+        var page = await harness.NotificationService.GetPagedAsync(guestUserId, 1, 20, CancellationToken.None);
+        page.Items.Should().ContainSingle(n => n.Type == "SettlementRejected");
+    }
+
+    [Fact]
+    public async Task CreateAsync_ReceiverIsGuestWithoutAccount_NoNotificationOrEmail()
+    {
+        var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        // Khách vãng lai — không có UserId -> không có tài khoản để nhận thông báo.
+        var guestMember = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(null, "Chi vang lai"), CancellationToken.None);
+        var ownerMemberId = group.Members[0].Id;
+
+        // owner (From) ghi nhận đã chuyển cho khách vãng lai (To) -> không ai có tài khoản để báo.
+        await harness.SettlementRecordService.CreateAsync(
+            ownerId, group.Id, new CreateSettlementRequest(ownerMemberId, guestMember.Id, 50_000), CancellationToken.None);
+
+        (await harness.NotificationService.GetUnreadCountAsync(ownerId, CancellationToken.None)).Should().Be(0);
+        harness.EmailSender.SentEmails.Should().BeEmpty();
+    }
 }

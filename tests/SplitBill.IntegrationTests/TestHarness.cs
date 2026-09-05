@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using SplitBill.Application.Auth;
 using SplitBill.Application.Expenses;
 using SplitBill.Application.Export;
 using SplitBill.Application.Groups;
+using SplitBill.Application.Notifications;
 using SplitBill.Application.Settlement;
 using SplitBill.Application.Settlements;
 using SplitBill.Application.Splitting;
@@ -31,6 +33,8 @@ public sealed class TestHarness : IDisposable
     public IBalanceService BalanceService { get; }
     public ISettlementRecordService SettlementRecordService { get; }
     public IExportService ExportService { get; }
+    public INotificationService NotificationService { get; }
+    public FakeEmailSender EmailSender { get; }
 
     private TestHarness(SplitBillDbContext dbContext)
     {
@@ -60,16 +64,19 @@ public sealed class TestHarness : IDisposable
         var vietQrGenerator = new VietQrGenerator();
         var settlementRanker = new SocialSettlementRanker();
         var settlementPlanner = new SocialSettlementPlanner(settlementRanker);
+        var notificationRepository = new NotificationRepository(dbContext);
+        EmailSender = new FakeEmailSender();
+        NotificationService = new NotificationService(notificationRepository, unitOfWork, EmailSender, NullLogger<NotificationService>.Instance);
 
         AuthService = new AuthService(userRepository, refreshTokenRepository, unitOfWork, jwtTokenGenerator);
         UserService = new UserService(userRepository, unitOfWork);
         GroupService = new GroupService(
             groupRepository, userRepository, expenseRepository, settlementRepository,
-            auditLogRepository, unitOfWork, shareTokenGenerator, balanceCalculator);
+            auditLogRepository, unitOfWork, shareTokenGenerator, balanceCalculator, NotificationService);
         ExpenseService = new ExpenseService(
-            expenseRepository, groupRepository, auditLogRepository, unitOfWork, splitCalculator, receiptImageRepository);
+            expenseRepository, groupRepository, auditLogRepository, unitOfWork, splitCalculator, receiptImageRepository, NotificationService);
         BalanceService = new BalanceService(groupRepository, expenseRepository, settlementRepository, balanceCalculator, vietQrGenerator, settlementPlanner);
-        SettlementRecordService = new SettlementRecordService(groupRepository, settlementRepository, auditLogRepository, unitOfWork);
+        SettlementRecordService = new SettlementRecordService(groupRepository, settlementRepository, auditLogRepository, unitOfWork, NotificationService);
         ExportService = new ExportService(ExpenseService, GroupService, BalanceService);
     }
 

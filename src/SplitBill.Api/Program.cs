@@ -13,11 +13,13 @@ using SplitBill.Application.Auth;
 using SplitBill.Application.Expenses;
 using SplitBill.Application.Export;
 using SplitBill.Application.Groups;
+using SplitBill.Application.Notifications;
 using SplitBill.Application.Settlement;
 using SplitBill.Application.Settlements;
 using SplitBill.Application.Splitting;
 using SplitBill.Application.Users;
 using SplitBill.Application.VietQr;
+using SplitBill.Infrastructure.Email;
 using SplitBill.Infrastructure.Persistence;
 using SplitBill.Infrastructure.Persistence.Repositories;
 using SplitBill.Infrastructure.Security;
@@ -126,8 +128,23 @@ try
     builder.Services.AddScoped<ISettlementRepository, SettlementRepository>();
     builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
     builder.Services.AddScoped<IReceiptImageRepository, ReceiptImageRepository>();
+    builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
     builder.Services.AddSingleton<IShareTokenGenerator, ShareTokenGenerator>();
     builder.Services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
+
+    // ===== Email (CLAUDE.md mục 13.3) =====
+    // Chưa cấu hình SMTP (Smtp:Host rỗng) -> dùng ConsoleEmailSender (chỉ log), không fail-fast như
+    // Jwt:SigningKey — quyết định người dùng 2026-09-05, môi trường dev/test chưa có SMTP thật.
+    builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.SectionName));
+    var smtpHost = builder.Configuration.GetSection(SmtpOptions.SectionName)["Host"];
+    if (string.IsNullOrWhiteSpace(smtpHost))
+    {
+        builder.Services.AddSingleton<IEmailSender, ConsoleEmailSender>();
+    }
+    else
+    {
+        builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
+    }
 
     // ===== Application services (thuật toán thuần — có thể singleton) =====
     builder.Services.AddSingleton<IExpenseSplitCalculator, ExpenseSplitCalculator>();
@@ -144,6 +161,7 @@ try
     builder.Services.AddScoped<IBalanceService, BalanceService>();
     builder.Services.AddScoped<ISettlementRecordService, SettlementRecordService>();
     builder.Services.AddScoped<IExportService, ExportService>();
+    builder.Services.AddScoped<INotificationService, NotificationService>();
 
     // ===== FluentValidation =====
     builder.Services.AddValidatorsFromAssemblyContaining<RegisterRequestValidator>();

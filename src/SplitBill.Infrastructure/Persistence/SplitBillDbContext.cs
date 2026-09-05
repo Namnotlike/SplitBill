@@ -19,6 +19,7 @@ public sealed class SplitBillDbContext : DbContext
     public DbSet<ReceiptImage> ReceiptImages => Set<ReceiptImage>();
     public DbSet<Settlement> Settlements => Set<Settlement>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using SplitBill.Application.Abstractions;
 using SplitBill.Application.Common;
+using SplitBill.Application.Notifications;
 using SplitBill.Application.Splitting;
 using SplitBill.Domain.Entities;
 using SplitBill.Domain.Enums;
@@ -17,6 +18,7 @@ public sealed class ExpenseService : IExpenseService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IExpenseSplitCalculator _splitCalculator;
     private readonly IReceiptImageRepository _receiptImageRepository;
+    private readonly INotificationService _notificationService;
 
     public ExpenseService(
         IExpenseRepository expenseRepository,
@@ -24,7 +26,8 @@ public sealed class ExpenseService : IExpenseService
         IAuditLogRepository auditLogRepository,
         IUnitOfWork unitOfWork,
         IExpenseSplitCalculator splitCalculator,
-        IReceiptImageRepository receiptImageRepository)
+        IReceiptImageRepository receiptImageRepository,
+        INotificationService notificationService)
     {
         _expenseRepository = expenseRepository;
         _groupRepository = groupRepository;
@@ -32,6 +35,7 @@ public sealed class ExpenseService : IExpenseService
         _unitOfWork = unitOfWork;
         _splitCalculator = splitCalculator;
         _receiptImageRepository = receiptImageRepository;
+        _notificationService = notificationService;
     }
 
     public async Task<PagedResult<ExpenseDto>> GetPagedAsync(Guid callerUserId, Guid groupId, int page, int pageSize, CancellationToken cancellationToken)
@@ -102,6 +106,20 @@ public sealed class ExpenseService : IExpenseService
         await _expenseRepository.AddAsync(expense, cancellationToken);
         await WriteAuditLogAsync(group.Id, expense.Id, "Created", caller.Id, null, ToDto(expense), cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Thông báo "khoản chi mới" (CLAUDE.md mục 13) — mọi thành viên khác có tài khoản, trừ người tạo.
+        var recipients = group.Members
+            .Where(m => m.IsActive && m.User is not null && m.Id != caller.Id)
+            .Select(m => new NotificationRecipient(m.User!.Id, m.User.Email))
+            .ToList();
+        await _notificationService.NotifyAsync(
+            recipients,
+            group.Id,
+            "ExpenseCreated",
+            "Khoản chi mới",
+            $"{caller.DisplayName} vừa thêm khoản chi \"{expense.Title}\" ({expense.TotalAmount:N0}đ) trong nhóm \"{group.Name}\".",
+            $"/Expenses/Index/{group.Id}",
+            cancellationToken);
 
         return new ExpenseResult(ToDto(expense), warnings);
     }

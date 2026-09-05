@@ -231,4 +231,34 @@ public sealed class ExpenseServiceTests
         parsed!.Shares.Should().BeNull();
         parsed.Percentages.Should().BeEquivalentTo(new[] { new PercentageInput(ownerMemberId, 30), new PercentageInput(guestMemberId, 70) });
     }
+
+    // ===== Thông báo "khoản chi mới" (CLAUDE.md mục 13) — bổ sung 2026-09-05 =====
+
+    [Fact]
+    public async Task CreateAsync_NotifiesOtherMembersWithAccount_ExcludesCreatorAndGuestsWithoutAccount()
+    {
+        var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var otherUserId = await harness.RegisterUserAsync("c@example.com", "Chi");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var otherMember = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(otherUserId, "Chi"), CancellationToken.None);
+        var guestMember = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(null, "Khach vang lai"), CancellationToken.None);
+        var ownerMemberId = group.Members[0].Id;
+        // Chi đã có sẵn 1 thông báo "MemberAdded" từ AddMemberAsync ở trên — đánh dấu đã đọc để phép
+        // đếm dưới đây chỉ phản ánh đúng thông báo "ExpenseCreated" sắp tạo.
+        await harness.NotificationService.MarkAllAsReadAsync(otherUserId, CancellationToken.None);
+        harness.EmailSender.SentEmails.Clear(); // bỏ qua email "MemberAdded" đã gửi lúc AddMember ở trên
+
+        await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "An toi", 90_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 90_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, otherMember.Id, guestMember.Id])), CancellationToken.None);
+
+        // Chi (có tài khoản) nhận thông báo; Nam (người tạo) và khách vãng lai thì KHÔNG.
+        var chiPage = await harness.NotificationService.GetPagedAsync(otherUserId, 1, 20, CancellationToken.None);
+        chiPage.Items.Should().ContainSingle(n => n.Type == "ExpenseCreated" && !n.IsRead);
+        (await harness.NotificationService.GetUnreadCountAsync(ownerId, CancellationToken.None)).Should().Be(0);
+        harness.EmailSender.SentEmails.Should().ContainSingle(e => e.ToEmail == "c@example.com");
+    }
 }

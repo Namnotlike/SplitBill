@@ -1,5 +1,6 @@
 using System.Text.Json;
 using SplitBill.Application.Abstractions;
+using SplitBill.Application.Notifications;
 using SplitBill.Domain.Entities;
 using SplitBill.Domain.Enums;
 using SplitBill.Domain.Exceptions;
@@ -14,17 +15,20 @@ public sealed class SettlementRecordService : ISettlementRecordService
     private readonly ISettlementRepository _settlementRepository;
     private readonly IAuditLogRepository _auditLogRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly INotificationService _notificationService;
 
     public SettlementRecordService(
         IGroupRepository groupRepository,
         ISettlementRepository settlementRepository,
         IAuditLogRepository auditLogRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        INotificationService notificationService)
     {
         _groupRepository = groupRepository;
         _settlementRepository = settlementRepository;
         _auditLogRepository = auditLogRepository;
         _unitOfWork = unitOfWork;
+        _notificationService = notificationService;
     }
 
     public async Task<SettlementDto> CreateAsync(Guid callerUserId, Guid groupId, CreateSettlementRequest request, CancellationToken cancellationToken)
@@ -62,6 +66,12 @@ public sealed class SettlementRecordService : ISettlementRecordService
         await WriteAuditLogAsync(group.Id, settlement.Id, "Created", caller.Id, null, ToDto(settlement), cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        // Thông báo "có người ghi nhận đã chuyển tiền cho mình" (CLAUDE.md mục 13) — báo cho người NHẬN.
+        await NotifyMemberAsync(
+            group, request.ToMemberId, group.Id, "SettlementRecorded", "Có người ghi nhận đã chuyển tiền",
+            $"{caller.DisplayName} vừa ghi nhận đã chuyển {settlement.Amount:N0}đ cho bạn trong nhóm \"{group.Name}\". Vui lòng xác nhận.",
+            $"/Groups/SettlementPlan/{group.Id}", cancellationToken);
+
         return ToDto(settlement);
     }
 
@@ -90,6 +100,12 @@ public sealed class SettlementRecordService : ISettlementRecordService
         await WriteAuditLogAsync(group.Id, settlement.Id, "Updated", caller.Id, before, ToDto(settlement), cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
+        // Thông báo "settlement của mình được xác nhận" (CLAUDE.md mục 13) — báo cho người GỬI.
+        await NotifyMemberAsync(
+            group, settlement.FromMemberId, group.Id, "SettlementConfirmed", "Thanh toán đã được xác nhận",
+            $"{caller.DisplayName} đã xác nhận nhận {settlement.Amount:N0}đ từ bạn trong nhóm \"{group.Name}\".",
+            $"/Groups/SettlementPlan/{group.Id}", cancellationToken);
+
         return ToDto(settlement);
     }
 
@@ -114,6 +130,12 @@ public sealed class SettlementRecordService : ISettlementRecordService
 
         await WriteAuditLogAsync(group.Id, settlement.Id, "Updated", caller.Id, before, ToDto(settlement), cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Thông báo "settlement của mình bị từ chối" (CLAUDE.md mục 13) — báo cho người GỬI.
+        await NotifyMemberAsync(
+            group, settlement.FromMemberId, group.Id, "SettlementRejected", "Thanh toán bị từ chối",
+            $"{caller.DisplayName} đã từ chối xác nhận {settlement.Amount:N0}đ từ bạn trong nhóm \"{group.Name}\". Vui lòng kiểm tra lại.",
+            $"/Groups/SettlementPlan/{group.Id}", cancellationToken);
 
         return ToDto(settlement);
     }
@@ -160,6 +182,23 @@ public sealed class SettlementRecordService : ISettlementRecordService
     private static GroupMember ResolveCallerMember(Group group, Guid callerUserId) =>
         group.Members.FirstOrDefault(m => m.UserId == callerUserId && m.IsActive)
             ?? throw new DomainException(ErrorCodes.MemberNotInGroup, "Bạn không phải thành viên của nhóm này.");
+
+    /// <summary>Gửi thông báo cho 1 GroupMember cụ thể — chỉ gửi nếu member đó có tài khoản
+    /// (CLAUDE.md mục 13: khách vãng lai không bao giờ nhận thông báo).</summary>
+    private Task NotifyMemberAsync(
+        Group group, Guid memberId, Guid groupId, string type, string title, string message, string? linkUrl,
+        CancellationToken cancellationToken)
+    {
+        var member = group.Members.FirstOrDefault(m => m.Id == memberId);
+        if (member?.User is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        return _notificationService.NotifyAsync(
+            [new NotificationRecipient(member.User.Id, member.User.Email)],
+            groupId, type, title, message, linkUrl, cancellationToken);
+    }
 
     private static void RequireMemberInGroup(Group group, Guid memberId)
     {

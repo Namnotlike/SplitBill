@@ -4,6 +4,7 @@ using System.Text.Json;
 using SplitBill.Application.Auth;
 using SplitBill.Application.Expenses;
 using SplitBill.Application.Groups;
+using SplitBill.Application.Notifications;
 using SplitBill.Application.Settlements;
 using SplitBill.Application.Users;
 
@@ -145,6 +146,19 @@ public sealed class SplitBillApiClient
         PostAsync<object?, SettlementDto>($"settlements/{settlementId}/reject", null, ct);
 
     public Task DeleteSettlementAsync(Guid settlementId, CancellationToken ct) => DeleteAsync($"settlements/{settlementId}", ct);
+
+    // ===== Notifications (CLAUDE.md mục 13) =====
+    public Task<PagedResult<NotificationDto>> GetNotificationsAsync(int page, int pageSize, CancellationToken ct) =>
+        GetAsync<PagedResult<NotificationDto>>($"notifications?page={page}&pageSize={pageSize}", ct);
+
+    public Task<UnreadCountDto> GetUnreadNotificationCountAsync(CancellationToken ct) =>
+        GetAsync<UnreadCountDto>("notifications/unread-count", ct);
+
+    public Task MarkNotificationAsReadAsync(Guid id, CancellationToken ct) =>
+        PostNoContentAsync($"notifications/{id}/read", new { }, ct);
+
+    public Task MarkAllNotificationsAsReadAsync(CancellationToken ct) =>
+        PostNoContentAsync("notifications/read-all", new { }, ct);
 
     // ===== Helpers =====
     private async Task<TResponse> GetAsync<TResponse>(string path, CancellationToken ct)
