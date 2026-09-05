@@ -42,12 +42,13 @@ public sealed class ExpensesController : ControllerBase
         [FromQuery] DateTimeOffset? toDate = null,
         [FromQuery] long? minAmount = null,
         [FromQuery] long? maxAmount = null,
+        [FromQuery] string? category = null,
         CancellationToken cancellationToken = default)
     {
         page = Math.Max(1, page);
         pageSize = pageSize <= 0 ? DefaultPageSize : Math.Min(pageSize, 100);
 
-        var filter = new ExpenseFilter(title, payerMemberId, fromDate, toDate, minAmount, maxAmount);
+        var filter = new ExpenseFilter(title, payerMemberId, fromDate, toDate, minAmount, maxAmount, category);
         var result = await _expenseService.GetPagedAsync(User.GetUserId(), groupId, page, pageSize, filter, cancellationToken);
         return Ok(result);
     }

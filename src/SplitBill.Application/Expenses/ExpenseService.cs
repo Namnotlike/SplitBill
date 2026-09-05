@@ -82,6 +82,7 @@ public sealed class ExpenseService : IExpenseService
             TotalAmount = request.TotalAmount,
             ExtraFeeAmount = request.ExtraFeeAmount,
             SplitMode = splitMode,
+            Category = ParseCategory(request.Category),
             SplitConfigJson = JsonSerializer.Serialize(request.SplitConfig),
             Note = request.Note,
             ReceiptImageUrl = request.ReceiptImageUrl,
@@ -144,6 +145,7 @@ public sealed class ExpenseService : IExpenseService
         expense.TotalAmount = request.TotalAmount;
         expense.ExtraFeeAmount = request.ExtraFeeAmount;
         expense.SplitMode = splitMode;
+        expense.Category = ParseCategory(request.Category);
         expense.SplitConfigJson = JsonSerializer.Serialize(request.SplitConfig);
         expense.Note = request.Note;
         expense.ReceiptImageUrl = request.ReceiptImageUrl;
@@ -247,6 +249,23 @@ public sealed class ExpenseService : IExpenseService
         return new PreviewSplitResult(
             result.Splits.Select(s => new ExpenseMemberAmountDto(s.MemberId, s.Amount)).ToList(),
             result.Warnings);
+    }
+
+    /// <summary>CLAUDE.md mục 15.3 — null/rỗng mặc định Other; giá trị không hợp lệ báo lỗi rõ ràng
+    /// thay vì âm thầm rơi về Other (tránh người dùng tưởng đã gán nhãn nhưng thực ra gõ sai tên).</summary>
+    private static ExpenseCategory ParseCategory(string? categoryText)
+    {
+        if (string.IsNullOrWhiteSpace(categoryText))
+        {
+            return ExpenseCategory.Other;
+        }
+
+        if (!Enum.TryParse<ExpenseCategory>(categoryText, ignoreCase: true, out var category))
+        {
+            throw new DomainException(ErrorCodes.ValidationFailed, $"Category '{categoryText}' không hợp lệ.");
+        }
+
+        return category;
     }
 
     private (SplitMode Mode, IReadOnlyList<MemberAmount> Splits, List<Warning> Warnings) ComputeSplits(
@@ -364,5 +383,6 @@ public sealed class ExpenseService : IExpenseService
         expense.Payers.Select(p => new ExpenseMemberAmountDto(p.GroupMemberId, p.Amount)).ToList(),
         expense.Splits.Select(s => new ExpenseMemberAmountDto(s.GroupMemberId, s.Amount)).ToList(),
         Convert.ToBase64String(expense.RowVersion),
-        expense.SplitConfigJson);
+        expense.SplitConfigJson,
+        expense.Category.ToString());
 }

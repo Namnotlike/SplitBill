@@ -45,6 +45,9 @@ public class CreateModel : PageModel
         [Required]
         public string SplitMode { get; set; } = "Equal";
 
+        // Nhãn/danh mục khoản chi (CLAUDE.md mục 15.3) — bổ sung 2026-09-05.
+        public string Category { get; set; } = "Other";
+
         public List<MemberRowInput> Rows { get; set; } = new();
 
         public List<ItemInput> Items { get; set; } = new();
@@ -98,7 +101,7 @@ public class CreateModel : PageModel
         {
             var result = await _apiClient.CreateExpenseAsync(
                 GroupId,
-                new CreateExpenseRequest(Input.Title, Input.TotalAmount, Input.ExtraFeeAmount, occurredAt, payers, Input.SplitMode, splitConfig!, Input.Note),
+                new CreateExpenseRequest(Input.Title, Input.TotalAmount, Input.ExtraFeeAmount, occurredAt, payers, Input.SplitMode, splitConfig!, Input.Note, Category: Input.Category),
                 cancellationToken);
 
             if (result.Warnings.Count > 0)

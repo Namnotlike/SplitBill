@@ -235,6 +235,93 @@ public sealed class ExpenseServiceTests
         page.Items.Should().ContainSingle(e => e.Title == "Gan day");
     }
 
+    // ===== Nhãn/danh mục khoản chi (CLAUDE.md mục 15.3) — bổ sung 2026-09-05 =====
+
+    [Fact]
+    public async Task CreateAsync_WithCategory_IsSavedAndReturned()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+
+        var result = await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "Bun cha", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 100_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId]),
+            Category: "Food"), CancellationToken.None);
+
+        result.Data.Category.Should().Be("Food");
+    }
+
+    [Fact]
+    public async Task CreateAsync_NoCategory_DefaultsToOther()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+
+        var result = await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "Khong ro", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 100_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId])), CancellationToken.None);
+
+        result.Data.Category.Should().Be("Other");
+    }
+
+    [Fact]
+    public async Task CreateAsync_InvalidCategory_ThrowsValidationFailed()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+
+        var act = () => harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "Sai danh muc", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 100_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId]),
+            Category: "KhongTonTai"), CancellationToken.None);
+
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.ValidationFailed);
+    }
+
+    [Fact]
+    public async Task GetPagedAsync_FilterByCategory_OnlyReturnsMatchingCategory()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "An sang", 20_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 20_000)], "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId]), Category: "Food"), CancellationToken.None);
+        await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "Taxi", 20_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 20_000)], "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId]), Category: "Transport"), CancellationToken.None);
+
+        var page = await harness.ExpenseService.GetPagedAsync(
+            ownerId, group.Id, 1, 20, new ExpenseFilter(Category: "Food"), CancellationToken.None);
+
+        page.Items.Should().ContainSingle(e => e.Title == "An sang");
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ChangesCategory()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        var created = await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "An toi", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 100_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId]),
+            Category: "Food"), CancellationToken.None);
+
+        var updated = await harness.ExpenseService.UpdateAsync(ownerId, created.Data.Id, new UpdateExpenseRequest(
+            "An toi", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 100_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId]),
+            created.Data.RowVersion,
+            Category: "Entertainment"), CancellationToken.None);
+
+        updated.Data.Category.Should().Be("Entertainment");
+    }
+
     private static Task CreateSimpleExpenseAsync(
         TestHarness harness, Guid ownerId, Guid groupId, Guid ownerMemberId, Guid guestMemberId, string title, long amount = 10_000) =>
         harness.ExpenseService.CreateAsync(ownerId, groupId, new CreateExpenseRequest(

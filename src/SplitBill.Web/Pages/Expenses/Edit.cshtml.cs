@@ -52,6 +52,9 @@ public class EditModel : PageModel
         [Required]
         public string SplitMode { get; set; } = "Equal";
 
+        // Nhãn/danh mục khoản chi (CLAUDE.md mục 15.3) — bổ sung 2026-09-05.
+        public string Category { get; set; } = "Other";
+
         [Required]
         public string RowVersion { get; set; } = string.Empty;
 
@@ -111,7 +114,7 @@ public class EditModel : PageModel
         {
             var result = await _apiClient.UpdateExpenseAsync(
                 ExpenseId,
-                new UpdateExpenseRequest(Input.Title, Input.TotalAmount, Input.ExtraFeeAmount, occurredAt, payers, Input.SplitMode, splitConfig!, Input.RowVersion, Input.Note),
+                new UpdateExpenseRequest(Input.Title, Input.TotalAmount, Input.ExtraFeeAmount, occurredAt, payers, Input.SplitMode, splitConfig!, Input.RowVersion, Input.Note, Category: Input.Category),
                 cancellationToken);
 
             TempData["SuccessMessage"] = result.Warnings.Count > 0
@@ -248,6 +251,7 @@ public class EditModel : PageModel
             OccurredAt = expense.OccurredAt.LocalDateTime,
             Note = expense.Note,
             SplitMode = expense.SplitMode,
+            Category = expense.Category,
             RowVersion = expense.RowVersion,
             Rows = rows,
             Items = items,

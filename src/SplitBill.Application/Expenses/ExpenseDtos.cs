@@ -20,7 +20,9 @@ public sealed record ExpenseDto(
     // Input gốc người dùng đã nhập lúc tạo/sửa (JSON của SplitConfigInput — CLAUDE.md mục 4.1), để
     // client (form Edit) khôi phục đúng trọng số/%/danh sách món ăn thay vì suy ngược từ Amount cuối
     // cùng. Bổ sung 2026-09-05 — trước đó DB đã lưu field này nhưng API chưa từng trả ra.
-    string? SplitConfigJson);
+    string? SplitConfigJson,
+    // Nhãn/danh mục khoản chi (CLAUDE.md mục 15.3) — bổ sung 2026-09-05.
+    string Category = "Other");
 
 public sealed record ExpenseResult(ExpenseDto Data, IReadOnlyList<Warning> Warnings);
 
@@ -35,13 +37,15 @@ public sealed record ExpenseFilter(
     DateTimeOffset? FromDate = null,
     DateTimeOffset? ToDate = null,
     long? MinAmount = null,
-    long? MaxAmount = null)
+    long? MaxAmount = null,
+    // Nhãn/danh mục (CLAUDE.md mục 15.3) — tên enum ExpenseCategory dạng string, null = không lọc.
+    string? Category = null)
 {
     public static readonly ExpenseFilter Empty = new();
 
     public bool IsEmpty =>
         string.IsNullOrWhiteSpace(Title) && PayerMemberId is null && FromDate is null && ToDate is null
-        && MinAmount is null && MaxAmount is null;
+        && MinAmount is null && MaxAmount is null && string.IsNullOrWhiteSpace(Category);
 }
 
 // ===== Input DTOs khớp body ở CLAUDE.md mục 8 =====
@@ -72,7 +76,9 @@ public sealed record CreateExpenseRequest(
     string SplitMode,
     SplitConfigInput SplitConfig,
     string? Note = null,
-    string? ReceiptImageUrl = null);
+    string? ReceiptImageUrl = null,
+    // Nhãn/danh mục (CLAUDE.md mục 15.3) — null/rỗng mặc định "Other".
+    string? Category = null);
 
 public sealed record UpdateExpenseRequest(
     string Title,
@@ -84,7 +90,8 @@ public sealed record UpdateExpenseRequest(
     SplitConfigInput SplitConfig,
     string RowVersion,
     string? Note = null,
-    string? ReceiptImageUrl = null);
+    string? ReceiptImageUrl = null,
+    string? Category = null);
 
 public sealed record PreviewSplitRequest(
     long TotalAmount,

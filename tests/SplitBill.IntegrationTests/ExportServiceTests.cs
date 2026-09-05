@@ -22,9 +22,11 @@ public sealed class ExportServiceTests
 
         var csv = await harness.ExportService.ExportExpensesCsvAsync(ownerId, group.Id, CancellationToken.None);
 
-        csv.Should().StartWith("Ngày,Tiêu đề");
+        csv.Should().StartWith("Ngày,Tiêu đề,Danh mục");
         // Tiêu đề có dấu phẩy -> phải được escape trong ngoặc kép (RFC 4180).
         csv.Should().Contain("\"An toi, ngon\"");
+        // Không truyền Category lúc tạo -> mặc định "Other" (CLAUDE.md mục 15.3).
+        csv.Should().Contain(",Other,");
         csv.Should().Contain("Nam: 50000");
         csv.Should().Contain("Binh: 50000");
     }

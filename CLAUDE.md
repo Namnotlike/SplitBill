@@ -1117,7 +1117,7 @@ thuật toán) + commit riêng:
 
 1. Dark mode — mục 15.1 (đã làm).
 2. Tìm kiếm/lọc khoản chi — mục 15.2 (đã làm).
-3. Nhãn/danh mục khoản chi.
+3. Nhãn/danh mục khoản chi — mục 15.3 (đã làm).
 4. Bảng tổng quan cá nhân ở trang chủ (tổng số dư gộp mọi nhóm).
 5. Timeline hoạt động nhóm (gộp khoản chi + settlement + audit log thành 1 dòng thời gian).
 6. Tham gia nhóm qua link chia sẻ (tự thêm mình vào nhóm, không cần Owner thêm tay).
@@ -1181,3 +1181,36 @@ Web (`Expenses/Index.cshtml`) có form lọc `method="get"` (title, dropdown ng�
 sẻ được, và nút Trang trước/sau chỉ cần lặp lại đúng `asp-route-*` hiện tại. Trang cũng được bổ sung
 điều hướng Trang trước/sau (trước đây trang Expenses/Index chỉ hiển thị số trang dạng text, không có
 nút bấm chuyển trang thật).
+
+### 15.3 Nhãn/danh mục khoản chi
+
+Thêm `Expense.Category` (`ExpenseCategory` enum, `Other = 0` mặc định) — danh sách **cố định**, không
+cho người dùng tự đặt nhãn tùy ý, để bảng thống kê chi tiêu sau này (M6+) có trục phân loại nhất quán
+thay vì tràn lan nhãn tự do khó gộp nhóm:
+
+```csharp
+enum ExpenseCategory { Other = 0, Food = 1, Transport = 2, Accommodation = 3, Entertainment = 4, Shopping = 5 }
+```
+
+- `Other = 0` để mọi `Expense` tạo trước tính năng này tự động rơi vào đây sau migration
+  (`AddColumn<int>` default `0`), không cần script backfill riêng.
+- `CreateExpenseRequest`/`UpdateExpenseRequest` nhận thêm `Category` (string, optional) — null/rỗng
+  mặc định "Other"; giá trị không khớp tên enum nào ném `ValidationFailed` (không âm thầm rơi về
+  Other, để người dùng biết ngay nếu gõ sai tên khi gọi thẳng API).
+- `ExpenseFilter` (mục 15.2) có thêm field `Category` — lọc theo tên enum, nhưng ở tầng lọc một giá
+  trị không hợp lệ được **khoan dung** (coi như không lọc) thay vì ném lỗi, khác với lúc tạo/sửa —
+  chủ đích: một filter sai không nên chặn xem danh sách, trong khi một lần lưu dữ liệu sai thì nên
+  báo ngay.
+- `SplitBill.Application.Common.ExpenseCategoryOptions` — danh sách nhãn tiếng Việt + icon dùng
+  chung cho cả 3 trang Web (Create/Edit/Index) và có thể tái dùng cho CSV/thống kê sau này, tránh khai
+  báo trùng mảng nhãn ở nhiều nơi (theo đúng mẫu `SupportedCurrencies` ở mục 14).
+- `GET /groups/{id}/export/expenses.csv` (mục 8) có thêm cột "Danh mục".
+- Web: dropdown Danh mục trên form Create/Edit (`asp-for` + `<option>` liệt kê thủ công — ASP.NET Core
+  `SelectTagHelper` tự đánh dấu `selected` đúng theo giá trị hiện tại của model dù không dùng
+  `asp-items`, đã dùng sẵn mẫu này cho `Group.Currency`/`Group.Type`); cột "Danh mục" + dropdown lọc
+  trên `Expenses/Index`.
+
+Đã verify sống trên trình duyệt: tạo khoản chi với Category "Shopping" → hiển thị đúng "🛍️ Mua sắm"
+trong danh sách (khoản chi cũ tạo trước tính năng này hiển thị đúng "📦 Khác"); lọc theo Category
+"Shopping" → chỉ còn đúng khoản chi vừa tạo; mở lại form Edit của khoản chi đó → dropdown Danh mục
+đã pre-select đúng "Shopping".

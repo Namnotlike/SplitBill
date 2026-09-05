@@ -24,13 +24,14 @@ public sealed class ExportService : IExportService
         var expenses = await _expenseService.GetAllForExportAsync(callerUserId, groupId, cancellationToken);
 
         var csv = new CsvBuilder();
-        csv.AddRow("Ngày", "Tiêu đề", "Tổng tiền", "Phụ phí", "Cách chia", "Ai ứng", "Ai chịu", "Ghi chú");
+        csv.AddRow("Ngày", "Tiêu đề", "Danh mục", "Tổng tiền", "Phụ phí", "Cách chia", "Ai ứng", "Ai chịu", "Ghi chú");
 
         foreach (var expense in expenses)
         {
             csv.AddRow(
                 expense.OccurredAt.ToString("yyyy-MM-dd HH:mm"),
                 expense.Title,
+                expense.Category,
                 expense.TotalAmount,
                 expense.ExtraFeeAmount,
                 expense.SplitMode,

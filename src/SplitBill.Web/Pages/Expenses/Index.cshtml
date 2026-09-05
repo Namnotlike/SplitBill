@@ -41,6 +41,16 @@
                 </select>
             </div>
             <div class="col-md-2">
+                <label class="form-label">Danh mục</label>
+                <select name="Category" class="form-select">
+                    <option value="">Tất cả</option>
+                    @foreach (var category in ExpenseCategoryOptions.All)
+                    {
+                        <option value="@category.Value" selected="@(Model.Category == category.Value)">@category.Icon @category.Label</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
                 <label class="form-label">Từ ngày</label>
                 <input type="date" name="FromDate" value="@Model.FromDate?.ToString("yyyy-MM-dd")" class="form-control" />
             </div>
@@ -89,6 +99,7 @@ else
                     <tr>
                         <th class="ps-4">Ngày</th>
                         <th>Tiêu đề</th>
+                        <th>Danh mục</th>
                         <th>Tổng tiền</th>
                         <th>Ai ứng</th>
                         <th>Chia theo</th>
@@ -101,6 +112,7 @@ else
                         <tr>
                             <td class="ps-4 text-muted">@expense.OccurredAt.ToString("dd/MM/yyyy")</td>
                             <td class="fw-600">@expense.Title</td>
+                            <td>@ExpenseCategoryOptions.Get(expense.Category).Icon @ExpenseCategoryOptions.Get(expense.Category).Label</td>
                             <td>@SupportedCurrencies.Format(expense.TotalAmount, Model.Group.Currency)</td>
                             <td>@string.Join(", ", expense.Payers.Select(p => Model.MemberName(p.MemberId)))</td>
                             <td><span class="badge" style="background: var(--sb-brand-light); color: var(--sb-brand-dark);">@expense.SplitMode</span></td>
@@ -126,12 +138,12 @@ else
                asp-page="/Expenses/Index" asp-route-groupId="@Model.GroupId"
                asp-route-Page="@(Model.Expenses.Page - 1)" asp-route-Title="@Model.Title" asp-route-PayerMemberId="@Model.PayerMemberId"
                asp-route-FromDate="@Model.FromDate?.ToString("yyyy-MM-dd")" asp-route-ToDate="@Model.ToDate?.ToString("yyyy-MM-dd")"
-               asp-route-MinAmount="@Model.MinAmount" asp-route-MaxAmount="@Model.MaxAmount">‹ Trước</a>
+               asp-route-MinAmount="@Model.MinAmount" asp-route-MaxAmount="@Model.MaxAmount" asp-route-Category="@Model.Category">‹ Trước</a>
             <a class="btn btn-sm btn-outline-secondary @(Model.Expenses.Page >= totalPages ? "disabled" : "")"
                asp-page="/Expenses/Index" asp-route-groupId="@Model.GroupId"
                asp-route-Page="@(Model.Expenses.Page + 1)" asp-route-Title="@Model.Title" asp-route-PayerMemberId="@Model.PayerMemberId"
                asp-route-FromDate="@Model.FromDate?.ToString("yyyy-MM-dd")" asp-route-ToDate="@Model.ToDate?.ToString("yyyy-MM-dd")"
-               asp-route-MinAmount="@Model.MinAmount" asp-route-MaxAmount="@Model.MaxAmount">Sau ›</a>
+               asp-route-MinAmount="@Model.MinAmount" asp-route-MaxAmount="@Model.MaxAmount" asp-route-Category="@Model.Category">Sau ›</a>
         </div>
         </div>
     }

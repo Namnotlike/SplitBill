@@ -104,6 +104,10 @@ public sealed class SplitBillApiClient
         {
             query.Add($"maxAmount={maxAmount}");
         }
+        if (!string.IsNullOrWhiteSpace(filter.Category))
+        {
+            query.Add($"category={Uri.EscapeDataString(filter.Category)}");
+        }
 
         return GetAsync<PagedResult<ExpenseDto>>($"groups/{groupId}/expenses?{string.Join("&", query)}", ct);
     }

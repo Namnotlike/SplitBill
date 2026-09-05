@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SplitBill.Application.Abstractions;
 using SplitBill.Application.Expenses;
 using SplitBill.Domain.Entities;
+using SplitBill.Domain.Enums;
 
 namespace SplitBill.Infrastructure.Persistence.Repositories;
 
@@ -54,6 +55,13 @@ public sealed class ExpenseRepository : IExpenseRepository
         if (filter.MaxAmount is { } maxAmount)
         {
             query = query.Where(e => e.TotalAmount <= maxAmount);
+        }
+        // Category tên enum không hợp lệ (typo trong query string) coi như "không lọc" thay vì lỗi —
+        // đã validate nghiêm ngặt ở ExpenseService lúc tạo/sửa (CLAUDE.md mục 15.3), tầng lọc chỉ cần
+        // khoan dung.
+        if (!string.IsNullOrWhiteSpace(filter.Category) && Enum.TryParse<ExpenseCategory>(filter.Category, ignoreCase: true, out var category))
+        {
+            query = query.Where(e => e.Category == category);
         }
 
         var ordered = query.OrderByDescending(e => e.OccurredAt);

@@ -44,13 +44,16 @@ public class IndexModel : PageModel
     [BindProperty(SupportsGet = true)]
     public long? MaxAmount { get; set; }
 
+    [BindProperty(SupportsGet = true)]
+    public string? Category { get; set; }
+
     public GroupDto Group { get; set; } = null!;
     public PagedResult<ExpenseDto> Expenses { get; set; } = null!;
     public string? ErrorMessage { get; set; }
 
     public bool HasActiveFilter =>
         !string.IsNullOrWhiteSpace(Title) || PayerMemberId is not null || FromDate is not null
-        || ToDate is not null || MinAmount is not null || MaxAmount is not null;
+        || ToDate is not null || MinAmount is not null || MaxAmount is not null || !string.IsNullOrWhiteSpace(Category);
 
     public async Task<IActionResult> OnGetAsync(CancellationToken cancellationToken)
     {
@@ -63,7 +66,7 @@ public class IndexModel : PageModel
             // đầu ngày, ToDate lấy cuối ngày (23:59:59.999) để bao trọn cả ngày được chọn.
             var fromDate = FromDate is { } from ? ToLocalStartOfDay(from) : (DateTimeOffset?)null;
             var toDate = ToDate is { } to ? ToLocalEndOfDay(to) : (DateTimeOffset?)null;
-            var filter = new ExpenseFilter(Title, PayerMemberId, fromDate, toDate, MinAmount, MaxAmount);
+            var filter = new ExpenseFilter(Title, PayerMemberId, fromDate, toDate, MinAmount, MaxAmount, Category);
 
             Expenses = await _apiClient.GetExpensesAsync(GroupId, Page <= 0 ? 1 : Page, PageSize, filter, cancellationToken);
             return Page();

@@ -17,6 +17,10 @@ public sealed class Expense
 
     public SplitMode SplitMode { get; set; }
 
+    /// <summary>Nhãn/danh mục khoản chi, CLAUDE.md mục 15.3 — mặc định Other cho expense tạo trước
+    /// khi có tính năng này (migration AddColumn với default 0).</summary>
+    public ExpenseCategory Category { get; set; }
+
     /// <summary>Lưu input gốc của người dùng (shares, %, itemized...) dạng JSON.</summary>
     public string? SplitConfigJson { get; set; }
 
