@@ -33,4 +33,6 @@ public static class ErrorCodes
     public const string InvalidResetToken = "INVALID_RESET_TOKEN";
     // Bình luận khoản chi (CLAUDE.md mục 19, bổ sung 2026-09-07).
     public const string ExpenseCommentNotFound = "EXPENSE_COMMENT_NOT_FOUND";
+    // Preset cách chia (CLAUDE.md mục 21, bổ sung 2026-09-07).
+    public const string SplitPresetNotFound = "SPLIT_PRESET_NOT_FOUND";
 }

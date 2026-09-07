@@ -18,6 +18,7 @@ public sealed class SplitBillDbContext : DbContext
     public DbSet<ExpensePayer> ExpensePayers => Set<ExpensePayer>();
     public DbSet<ExpenseSplit> ExpenseSplits => Set<ExpenseSplit>();
     public DbSet<ExpenseComment> ExpenseComments => Set<ExpenseComment>();
+    public DbSet<SplitPreset> SplitPresets => Set<SplitPreset>();
     public DbSet<ReceiptImage> ReceiptImages => Set<ReceiptImage>();
     public DbSet<Settlement> Settlements => Set<Settlement>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();

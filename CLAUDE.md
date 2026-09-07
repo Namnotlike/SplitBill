@@ -1795,3 +1795,71 @@ nhau (nhóm A: Owner ứng tiền, chiều ngược ở nhóm B: BinhTester ứn
 duy nhất "BinhTester" (không tách thành 2 thẻ riêng dù là 2 nhóm khác nhau — xác nhận gộp đúng theo
 người), bên trong đúng 2 dòng theo 2 nhóm với chiều "Nợ bạn"/"Bạn nợ" ngược nhau đúng như đã tạo, mỗi
 dòng đúng tên nhóm + số tiền theo đúng tiền tệ của nhóm đó.
+
+---
+
+## 21. Preset cách chia hay dùng — bổ sung 2026-09-07
+
+Hạng mục 6/8 trong danh sách gợi ý sau mục 16. Lưu lại 1 kiểu chia (vd "Tôi & Bình chia đôi") để chọn
+nhanh lúc tạo khoản chi mới, đỡ phải tick lại từng người mỗi lần.
+
+### 21.1 Mô hình dữ liệu
+
+```csharp
+SplitPreset {
+    Guid Id
+    Guid GroupId
+    string Name
+    string SplitMode
+    string SplitConfigJson     // cùng shape SplitConfigInput với Expense.SplitConfigJson (mục 4.1)
+    Guid CreatedByMemberId
+    bool IsDeleted              // soft-delete, có HasQueryFilter — cùng quy ước ExpenseComment (mục 19)
+    DateTimeOffset CreatedAt
+}
+```
+
+**Cố tình KHÔNG lưu `Payers`/`TotalAmount`** — chỉ phần "chia cho ai, theo tỉ lệ nào" là cái lặp lại
+nhiều lần giữa các khoản chi khác nhau; "ai ứng tiền lần này, bao nhiêu tiền" luôn khác nhau nên nhập
+mới mỗi lần, không có gì để lưu thành preset.
+
+### 21.2 API
+
+```
+GET    /api/v1/groups/{groupId}/split-presets
+POST   /api/v1/groups/{groupId}/split-presets    Body: { name, splitMode, splitConfig }
+DELETE /api/v1/split-presets/{presetId}
+```
+
+**Quyền hạn:** mọi thành viên active đều tạo được. Xóa thì chỉ tác giả hoặc Owner (403
+`INSUFFICIENT_ROLE` — khớp mẫu `ExpenseCommentService.DeleteAsync`, mục 19/4.4). Lúc tạo, mọi
+`GroupMemberId` được tham chiếu trong `SplitConfig` phải **đang active trong nhóm** — 2 bước validate
+tách riêng (`MEMBER_NOT_IN_GROUP` nếu không tồn tại, `MEMBER_NOT_ACTIVE` nếu tồn tại nhưng đã rời),
+cùng nguyên tắc `ExpenseService.ValidateMembersAreActive` (mục 5.4); không có khái niệm "tham chiếu cũ
+được miễn trừ" vì preset không có API Update, chỉ Create/Delete.
+
+`SplitPresetService` (namespace `SplitBill.Application.Expenses`) là service riêng, tách khỏi
+`ExpenseService`, cùng mẫu `ExpenseCommentService`/`NotificationService` đã áp dụng từ trước.
+
+### 21.3 Web
+
+Trang `Expenses/Create.cshtml` thêm khối "📁 Preset đã lưu" (nút áp dụng + nút "×" xóa cho mỗi preset)
+và ô "Lưu cách chia hiện tại thành preset" + nút "💾 Lưu thành preset".
+
+- **"Lưu thành preset" tái dùng logic server-side có sẵn** — nút dùng `formaction="?handler=SavePreset"`
+  trỏ CÙNG 1 `<form>` chính (không lồng form riêng, HTML không cho phép), nên `OnPostSavePresetAsync`
+  nhận được đúng `Input.SplitMode`/`Rows`/`Items` đã bind sẵn, gọi thẳng `ExpenseFormHelpers.
+  BuildSplitConfig` đã có, không cần viết lại logic dựng SplitConfig ở phía client. Nút này (và nút
+  xóa preset) có `formnovalidate` để không bị chặn bởi validate `required`/`min` của Title/TotalAmount
+  — lưu/xóa preset không cần điền các trường đó.
+- **"Áp dụng preset" là thao tác thuần client-side** (không round-trip server) — JS điền lại đúng các
+  input `Rows[i].*`/`Items[i].*` đã render sẵn theo dữ liệu preset (tra hàng theo `MemberId` ẩn trong
+  mỗi `<tr>`), dùng lại đúng cấu trúc DOM đã có, kể cả với món ăn (Itemized) — cùng mẫu khôi phục
+  `SplitConfigJson` đã dùng ở `Expenses/Edit.cshtml` (mục 4.1). `addItemRow()` sửa lại để `return` phần
+  tử vừa thêm (trước đây không trả về gì) — cần thiết để script điền tên/giá/người ăn vào đúng dòng vừa
+  tạo.
+
+Đã verify sống trên trình duyệt (luồng đầy đủ): lưu preset "Toi & Binh chia doi" (Equal, 2/3 thành
+viên) → hiện đúng trong danh sách preset → bấm áp dụng ở lần tải trang MỚI (không phải cùng phiên vừa
+lưu) → đúng 2 checkbox tự tick lại, người thứ 3 vẫn bỏ trống → tạo hẳn 1 khoản chi dùng preset này,
+lưu thành công với đúng cách chia đã áp dụng → xóa preset → danh sách preset rỗng trở lại (xác nhận
+qua cả giao diện lẫn log Api có đúng 1 lệnh `DELETE .../split-presets/{id}` trả `204`).

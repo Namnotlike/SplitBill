@@ -54,6 +54,33 @@
                 </div>
             </div>
 
+            @* ===== Preset cách chia hay dùng (CLAUDE.md mục 21) ===== *@
+            @if (Model.Presets.Count > 0)
+            {
+                <div class="mb-3">
+                    <label class="form-label d-block">📁 Preset đã lưu</label>
+                    <div class="d-flex gap-2 flex-wrap align-items-center">
+                        @foreach (var preset in Model.Presets)
+                        {
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-secondary apply-preset-btn" data-preset-id="@preset.Id">@preset.Name</button>
+                                <button type="submit" formaction="?handler=DeletePreset&amp;presetId=@preset.Id" formnovalidate
+                                        class="btn btn-outline-secondary" title="Xóa preset này">×</button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <div class="mb-3 d-flex gap-2 align-items-end flex-wrap">
+                <div>
+                    <label for="preset-name-input" class="form-label small mb-1">Lưu cách chia hiện tại thành preset</label>
+                    <input type="text" id="preset-name-input" name="PresetName" class="form-control form-control-sm"
+                           placeholder="VD: Tôi & Bình chia đôi" style="min-width: 260px;" />
+                </div>
+                <button type="submit" formaction="?handler=SavePreset" formnovalidate class="btn btn-sm btn-outline-primary">💾 Lưu thành preset</button>
+            </div>
+
             <div class="mb-4">
                 <label class="form-label d-block">Cách chia</label>
                 @{
@@ -131,16 +158,16 @@
                 <tr class="item-row">
                     <td>
                         <input type="hidden" name="Input.Items.Index" value="__INDEX__" />
-                        <input name="Input.Items[__INDEX__].Name" class="form-control form-control-sm" placeholder="VD: Lẩu" />
+                        <input name="Input.Items[__INDEX__].Name" class="form-control form-control-sm item-name-input" placeholder="VD: Lẩu" />
                     </td>
                     <td>
-                        <input name="Input.Items[__INDEX__].Price" type="number" min="0" class="form-control form-control-sm" />
+                        <input name="Input.Items[__INDEX__].Price" type="number" min="0" class="form-control form-control-sm item-price-input" />
                     </td>
                     <td>
                         @foreach (var member in Model.Group.Members)
                         {
                             <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" name="Input.Items[__INDEX__].ConsumerMemberIds" value="@member.Id" id="item__INDEX__-@member.Id" />
+                                <input class="form-check-input item-consumer-checkbox" type="checkbox" name="Input.Items[__INDEX__].ConsumerMemberIds" value="@member.Id" id="item__INDEX__-@member.Id" />
                                 <label class="form-check-label" for="item__INDEX__-@member.Id">@member.DisplayName</label>
                             </div>
                         }
@@ -175,8 +202,10 @@
         function addItemRow() {
             var idx = 'i' + (itemIndexCounter++);
             var html = itemTemplateHtml.split('__INDEX__').join(idx);
-            document.getElementById('items-tbody').insertAdjacentHTML('beforeend', html);
+            var tbody = document.getElementById('items-tbody');
+            tbody.insertAdjacentHTML('beforeend', html);
             attachRemoveHandlers();
+            return tbody.lastElementChild;
         }
         function attachRemoveHandlers() {
             document.querySelectorAll('.remove-item-row').forEach(function (btn) {
@@ -185,5 +214,78 @@
         }
         document.getElementById('add-item-btn').addEventListener('click', addItemRow);
         addItemRow(); // sẵn 1 dòng trống để bắt đầu
+
+        // ===== Preset cách chia hay dùng (CLAUDE.md mục 21) — áp dụng preset là thao tác THUẦN
+        // CLIENT-SIDE (không round-trip server): điền lại đúng các input Rows/Items đã render sẵn
+        // theo dữ liệu preset, dùng chung cấu trúc DOM/tên input với form chính. =====
+        var presets = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+            Model.Presets.Select(p => new { id = p.Id, splitMode = p.SplitMode, splitConfig = p.SplitConfig }),
+            new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+
+        function rowForMember(memberId) {
+            var hidden = Array.from(document.querySelectorAll('input[name$=".MemberId"]'))
+                .find(function (h) { return h.value === memberId; });
+            return hidden ? hidden.closest('tr') : null;
+        }
+
+        function applyPreset(presetId) {
+            var preset = presets.find(function (p) { return p.id === presetId; });
+            if (!preset) {
+                return;
+            }
+
+            var modeRadio = document.getElementById('mode-' + preset.splitMode);
+            if (modeRadio) {
+                modeRadio.checked = true;
+            }
+            updateSplitColumns();
+
+            // Reset toàn bộ giá trị chia cũ trước khi điền lại theo preset — tránh sót giá trị của
+            // chế độ chia trước đó lẫn vào.
+            document.querySelectorAll('[name$=".EqualParticipant"]').forEach(function (cb) { cb.checked = false; });
+            document.querySelectorAll('[name$=".ShareWeight"]').forEach(function (i) { i.value = ''; });
+            document.querySelectorAll('[name$=".Percentage"]').forEach(function (i) { i.value = ''; });
+            document.querySelectorAll('[name$=".ExactAmount"]').forEach(function (i) { i.value = ''; });
+
+            var config = preset.splitConfig || {};
+            (config.memberIds || []).forEach(function (id) {
+                var row = rowForMember(id);
+                if (row) { row.querySelector('[name$=".EqualParticipant"]').checked = true; }
+            });
+            (config.shares || []).forEach(function (s) {
+                var row = rowForMember(s.memberId);
+                if (row) { row.querySelector('[name$=".ShareWeight"]').value = s.weight; }
+            });
+            (config.percentages || []).forEach(function (p) {
+                var row = rowForMember(p.memberId);
+                if (row) { row.querySelector('[name$=".Percentage"]').value = p.percent; }
+            });
+            (config.exactAmounts || []).forEach(function (e) {
+                var row = rowForMember(e.memberId);
+                if (row) { row.querySelector('[name$=".ExactAmount"]').value = e.amount; }
+            });
+
+            // Món ăn (Itemized) — xóa hết dòng cũ rồi dựng lại đúng theo preset, cùng mẫu khôi phục
+            // đã dùng ở Expenses/Edit.cshtml (mục 4.1, SplitConfigJson).
+            document.getElementById('items-tbody').innerHTML = '';
+            var items = config.items || [];
+            if (items.length > 0) {
+                items.forEach(function (item) {
+                    var row = addItemRow();
+                    row.querySelector('.item-name-input').value = item.name;
+                    row.querySelector('.item-price-input').value = item.price;
+                    (item.consumerMemberIds || []).forEach(function (memberId) {
+                        var checkbox = row.querySelector('.item-consumer-checkbox[value="' + memberId + '"]');
+                        if (checkbox) { checkbox.checked = true; }
+                    });
+                });
+            } else {
+                addItemRow(); // giữ đúng hành vi "luôn có 1 dòng trống" nếu preset không phải Itemized
+            }
+        }
+
+        document.querySelectorAll('.apply-preset-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () { applyPreset(btn.dataset.presetId); });
+        });
     </script>
 }

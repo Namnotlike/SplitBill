@@ -146,6 +146,16 @@ public sealed class SplitBillApiClient
 
     public Task DeleteExpenseAsync(Guid expenseId, CancellationToken ct) => DeleteAsync($"expenses/{expenseId}", ct);
 
+    // ===== Preset cách chia hay dùng (CLAUDE.md mục 21) =====
+    public Task<IReadOnlyList<SplitPresetDto>> GetSplitPresetsAsync(Guid groupId, CancellationToken ct) =>
+        GetAsync<IReadOnlyList<SplitPresetDto>>($"groups/{groupId}/split-presets", ct);
+
+    public Task<SplitPresetDto> CreateSplitPresetAsync(Guid groupId, CreateSplitPresetRequest request, CancellationToken ct) =>
+        PostAsync<CreateSplitPresetRequest, SplitPresetDto>($"groups/{groupId}/split-presets", request, ct);
+
+    public Task DeleteSplitPresetAsync(Guid presetId, CancellationToken ct) =>
+        DeleteAsync($"split-presets/{presetId}", ct);
+
     public Task<PreviewSplitResult> PreviewSplitAsync(PreviewSplitRequest request, CancellationToken ct) =>
         PostAsync<PreviewSplitRequest, PreviewSplitResult>("expenses/preview-split", request, ct);
 

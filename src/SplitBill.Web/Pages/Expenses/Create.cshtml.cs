@@ -26,6 +26,12 @@ public class CreateModel : PageModel
 
     public string? ErrorMessage { get; set; }
 
+    // ===== Preset cách chia hay dùng (CLAUDE.md mục 21) =====
+    public IReadOnlyList<SplitPresetDto> Presets { get; set; } = Array.Empty<SplitPresetDto>();
+
+    [BindProperty]
+    public string? PresetName { get; set; }
+
     public sealed class ExpenseInput
     {
         [Required]
@@ -59,6 +65,7 @@ public class CreateModel : PageModel
         {
             Group = await _apiClient.GetGroupAsync(GroupId, cancellationToken);
             Input.Rows = Group.Members.Select(m => new MemberRowInput { MemberId = m.Id, EqualParticipant = true }).ToList();
+            Presets = await _apiClient.GetSplitPresetsAsync(GroupId, cancellationToken);
             return Page();
         }
         catch (ApiException ex)
@@ -74,6 +81,7 @@ public class CreateModel : PageModel
 
         if (!ModelState.IsValid)
         {
+            await LoadPresetsAsync(cancellationToken);
             return Page();
         }
 
@@ -85,6 +93,7 @@ public class CreateModel : PageModel
         if (payers.Count == 0)
         {
             ErrorMessage = "Cần ít nhất 1 người ứng tiền (Amount > 0).";
+            await LoadPresetsAsync(cancellationToken);
             return Page();
         }
 
@@ -92,6 +101,7 @@ public class CreateModel : PageModel
         if (configError is not null)
         {
             ErrorMessage = configError;
+            await LoadPresetsAsync(cancellationToken);
             return Page();
         }
 
@@ -118,7 +128,71 @@ public class CreateModel : PageModel
         catch (ApiException ex)
         {
             ErrorMessage = ex.Message;
+            await LoadPresetsAsync(cancellationToken);
             return Page();
+        }
+    }
+
+    // CLAUDE.md mục 21 — Preset cách chia hay dùng. Tái dùng ĐÚNG Input.SplitMode/Rows/Items đã bind
+    // từ form chính (nút "Lưu thành preset" dùng formaction trỏ về đây, KHÔNG phải 1 <form> lồng
+    // riêng — HTML không cho phép form lồng form) + ExpenseFormHelpers.BuildSplitConfig đã có sẵn,
+    // không cần viết lại logic dựng SplitConfig ở phía client.
+    public async Task<IActionResult> OnPostSavePresetAsync(CancellationToken cancellationToken)
+    {
+        Group = await _apiClient.GetGroupAsync(GroupId, cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(PresetName))
+        {
+            ErrorMessage = "Vui lòng nhập tên cho preset.";
+            await LoadPresetsAsync(cancellationToken);
+            return Page();
+        }
+
+        var splitConfig = ExpenseFormHelpers.BuildSplitConfig(Input.SplitMode, Input.Rows, Input.Items, out var configError);
+        if (configError is not null)
+        {
+            ErrorMessage = configError;
+            await LoadPresetsAsync(cancellationToken);
+            return Page();
+        }
+
+        try
+        {
+            await _apiClient.CreateSplitPresetAsync(GroupId, new CreateSplitPresetRequest(PresetName, Input.SplitMode, splitConfig!), cancellationToken);
+            TempData["SuccessMessage"] = $"Đã lưu preset \"{PresetName}\".";
+        }
+        catch (ApiException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
+        // Quay lại trang trắng (không giữ lại dữ liệu đã nhập) — mục đích chính của thao tác này là
+        // LƯU cách chia để dùng cho các khoản chi SAU này, không phải tiếp tục điền khoản chi hiện tại.
+        return RedirectToPage(new { groupId = GroupId });
+    }
+
+    public async Task<IActionResult> OnPostDeletePresetAsync(Guid presetId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _apiClient.DeleteSplitPresetAsync(presetId, cancellationToken);
+        }
+        catch (ApiException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
+        return RedirectToPage(new { groupId = GroupId });
+    }
+
+    private async Task LoadPresetsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            Presets = await _apiClient.GetSplitPresetsAsync(GroupId, cancellationToken);
+        }
+        catch (ApiException)
+        {
         }
     }
 }
