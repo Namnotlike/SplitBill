@@ -189,6 +189,37 @@ public sealed class RecurringExpenseTests
         createdCount.Should().Be(0);
     }
 
+    // ⚠️ Bảo mật/nghiệp vụ (security-review 2026-09-07, quyết định người dùng "tắt mẫu + báo nhóm"):
+    // GroupMemberId đóng băng trong mẫu lúc tạo có thể rời nhóm trước lần chạy kế tiếp (chỉ rời được
+    // khi net == 0 lúc rời — ở đây guest chưa từng liên quan expense nào nên net sẵn = 0). Runner phải
+    // phát hiện và tắt mẫu thay vì âm thầm sinh Expense gán tiền cho người đã rời nhóm (họ không còn
+    // cách nào xem/tranh chấp vì /balances yêu cầu caller đang active).
+    [Fact]
+    public async Task RunDueTemplatesAsync_TemplateReferencesMemberWhoLeftGroup_DeactivatesTemplateInsteadOfCreatingExpense()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupRecurringGroupAsync();
+        var now = DateTimeOffset.UtcNow;
+        var template = await harness.RecurringExpenseService.CreateAsync(ownerId, group.Id, new CreateRecurringExpenseRequest(
+            "Tien nha", 3_000_000, 0,
+            [new ExpensePayerInput(ownerMemberId, 3_000_000)],
+            "Equal", new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId]),
+            "Monthly", now.AddMinutes(-1)), CancellationToken.None);
+        await harness.GroupService.RemoveMemberAsync(ownerId, group.Id, guestMemberId, CancellationToken.None);
+
+        var createdCount = await harness.RecurringExpenseRunner.RunDueTemplatesAsync(now, CancellationToken.None);
+
+        createdCount.Should().Be(0);
+        var expenses = await harness.ExpenseService.GetPagedAsync(ownerId, group.Id, 1, 20, ExpenseFilter.Empty, CancellationToken.None);
+        expenses.Items.Should().BeEmpty();
+
+        var templates = await harness.RecurringExpenseService.GetByGroupIdAsync(ownerId, group.Id, CancellationToken.None);
+        templates.Single(t => t.Id == template.Id).IsActive.Should().BeFalse();
+
+        // Owner (thành viên active còn lại, có tài khoản) phải được báo về việc mẫu bị tắt.
+        var ownerNotifications = await harness.NotificationService.GetPagedAsync(ownerId, 1, 20, CancellationToken.None);
+        ownerNotifications.Items.Should().Contain(n => n.Type == "RecurringTemplateDeactivated");
+    }
+
     [Fact]
     public async Task RunDueTemplatesAsync_CreatedExpense_AppearsOnTimelineWithFullDetail()
     {

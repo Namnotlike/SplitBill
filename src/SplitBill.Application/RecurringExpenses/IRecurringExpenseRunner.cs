@@ -9,6 +9,8 @@ namespace SplitBill.Application.RecurringExpenses;
 /// </summary>
 public interface IRecurringExpenseRunner
 {
-    /// <summary>Trả về số Expense mới đã được sinh ra trong lượt quét này.</summary>
+    /// <summary>Trả về số Expense mới đã được sinh ra trong lượt quét này — KHÔNG tính các mẫu bị tự
+    /// động tắt thay vì sinh khoản chi (nhóm đã xóa, hoặc mẫu tham chiếu thành viên không còn active
+    /// trong nhóm — xem ghi chú trong <see cref="RecurringExpenseRunner"/>).</summary>
     Task<int> RunDueTemplatesAsync(DateTimeOffset asOf, CancellationToken cancellationToken);
 }

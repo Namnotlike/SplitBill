@@ -50,11 +50,14 @@ public sealed class RecurringExpenseRunner : IRecurringExpenseRunner
         {
             try
             {
-                await ProcessTemplateAsync(template, asOf, cancellationToken);
+                var created = await ProcessTemplateAsync(template, asOf, cancellationToken);
                 // Lưu riêng từng mẫu (không gộp 1 SaveChanges cho cả lượt quét) — 1 mẫu lỗi (vd nhóm đã
                 // bị xóa) không được kéo theo mất tiến độ của các mẫu khác đã xử lý xong trong cùng lượt.
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
-                createdCount++;
+                if (created)
+                {
+                    createdCount++;
+                }
             }
             catch (Exception ex)
             {
@@ -65,7 +68,9 @@ public sealed class RecurringExpenseRunner : IRecurringExpenseRunner
         return createdCount;
     }
 
-    private async Task ProcessTemplateAsync(RecurringExpenseTemplate template, DateTimeOffset asOf, CancellationToken cancellationToken)
+    /// <returns>true nếu đã sinh được 1 Expense mới; false nếu mẫu bị tắt thay vì sinh khoản chi
+    /// (nhóm đã xóa, hoặc mẫu tham chiếu thành viên không còn active — xem ghi chú bên dưới).</returns>
+    private async Task<bool> ProcessTemplateAsync(RecurringExpenseTemplate template, DateTimeOffset asOf, CancellationToken cancellationToken)
     {
         var group = await _groupRepository.GetByIdWithMembersAsync(template.GroupId, cancellationToken);
         if (group is null)
@@ -73,13 +78,52 @@ public sealed class RecurringExpenseRunner : IRecurringExpenseRunner
             // Nhóm đã bị soft-delete sau khi mẫu được tạo — tắt mẫu luôn thay vì cứ lỗi lặp lại mỗi
             // lượt quét.
             template.IsActive = false;
-            return;
+            return false;
         }
 
         var payers = JsonSerializer.Deserialize<List<ExpensePayerInput>>(template.PayersJson) ?? [];
         var splitConfigInput = string.IsNullOrWhiteSpace(template.SplitConfigJson)
             ? new SplitConfigInput()
             : JsonSerializer.Deserialize<SplitConfigInput>(template.SplitConfigJson) ?? new SplitConfigInput();
+
+        // ⚠️ Bảo mật/nghiệp vụ (phát hiện qua security-review 2026-09-07, quyết định người dùng —
+        // "tắt mẫu + báo nhóm"): các GroupMemberId đóng băng trong PayersJson/SplitConfigJson lúc tạo
+        // mẫu có thể không còn active tại thời điểm chạy (thành viên đã rời nhóm — chỉ rời được khi
+        // net == 0 lúc rời, nhưng điều đó không ngăn mẫu định kỳ tiếp tục gán tiền cho họ ở lần chạy
+        // sau). Một khi rời nhóm, họ không còn thấy được /groups/{id}/balances (yêu cầu caller đang
+        // active) nên không có cách nào biết hay tranh chấp khoản nợ "ma" này. Thay vì âm thầm sinh
+        // Expense gán tiền cho người đã rời nhóm, tắt hẳn mẫu và báo cho các thành viên active còn lại
+        // biết để họ chủ động tạo lại mẫu (loại bỏ người đã rời) nếu vẫn muốn dùng tiếp.
+        var activeMemberIds = group.Members.Where(m => m.IsActive).Select(m => m.Id).ToHashSet();
+        var referencedMemberIds = payers.Select(p => p.MemberId)
+            .Concat(splitConfigInput.MemberIds ?? [])
+            .Concat(splitConfigInput.Shares?.Select(s => s.MemberId) ?? [])
+            .Concat(splitConfigInput.Percentages?.Select(p => p.MemberId) ?? [])
+            .Concat(splitConfigInput.ExactAmounts?.Select(e => e.MemberId) ?? [])
+            .Concat(splitConfigInput.Items?.SelectMany(i => i.ConsumerMemberIds) ?? [])
+            .Distinct();
+
+        if (referencedMemberIds.Any(id => !activeMemberIds.Contains(id)))
+        {
+            template.IsActive = false;
+            _logger.LogWarning(
+                "Mẫu khoản chi định kỳ {TemplateId} (nhóm {GroupId}) đã bị tự động tắt vì tham chiếu thành viên không còn active trong nhóm.",
+                template.Id, template.GroupId);
+
+            var deactivationRecipients = group.Members
+                .Where(m => m.IsActive && m.User is not null)
+                .Select(m => new NotificationRecipient(m.User!.Id, m.User.Email))
+                .ToList();
+            await _notificationService.NotifyAsync(
+                deactivationRecipients,
+                group.Id,
+                "RecurringTemplateDeactivated",
+                "Khoản chi định kỳ đã bị tắt",
+                $"Mẫu khoản chi định kỳ \"{template.Title}\" trong nhóm \"{group.Name}\" đã bị tự động tắt vì có thành viên trong mẫu không còn ở trong nhóm. Vui lòng tạo lại mẫu nếu vẫn muốn dùng tiếp.",
+                $"/Groups/RecurringExpenses/{group.Id}",
+                cancellationToken);
+            return false;
+        }
 
         var input = new ExpenseSplitInput(Guid.NewGuid(), template.TotalAmount, template.ExtraFeeAmount, template.SplitMode, BuildSplitConfig(splitConfigInput));
         var result = _splitCalculator.Calculate(input);
@@ -158,6 +202,8 @@ public sealed class RecurringExpenseRunner : IRecurringExpenseRunner
             $"Khoản chi định kỳ \"{expense.Title}\" ({expense.TotalAmount:N0}đ) vừa được tự động thêm vào nhóm \"{group.Name}\".",
             $"/Expenses/Index/{group.Id}",
             cancellationToken);
+
+        return true;
     }
 
     private static DateTimeOffset Advance(DateTimeOffset current, RecurrenceInterval interval) => interval switch

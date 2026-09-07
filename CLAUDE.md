@@ -1385,6 +1385,27 @@ bị xử lý lại ngay ở lượt quét kế tiếp).
 > tự dựng 1 `ExpenseDto` đầy đủ (copy các field vừa gán cho `Expense` entity) làm `AfterJson`, khớp
 > đúng những gì `BuildSummary` (mục 15.5) mong đợi parse được.
 
+> ⚠️ **Lỗ hổng bảo mật/nghiệp vụ phát hiện + sửa qua `security-review` (2026-09-07):**
+> `ProcessTemplateAsync` trước đây gán thẳng `ExpensePayer`/`ExpenseSplit` từ các `GroupMemberId`
+> đóng băng trong `PayersJson`/`SplitConfigJson` lúc tạo mẫu, **không kiểm tra các thành viên đó còn
+> `IsActive` trong nhóm hay không** — khác với đường tạo Expense tương tác (`ExpenseService`,
+> `RecurringExpenseService.CreateAsync`) vốn validate qua `ValidateMembersBelongToGroup` (dù validate
+> đó cũng chỉ kiểm tra "còn tồn tại trong `group.Members`", không lọc `IsActive` — một lỗ hổng rộng
+> hơn, đã ghi nhận nhưng cố tình CHƯA sửa ở đây vì đó là quyết định thiết kế khác, ngoài phạm vi lần
+> sửa này). Một thành viên chỉ rời được nhóm khi `net == 0` **tại thời điểm rời**
+> (`GroupService.RemoveMemberAsync`), nhưng không có gì ngăn 1 mẫu định kỳ tiếp tục gán tiền cho họ ở
+> lần chạy sau đó — và sau khi rời, họ không còn xem được `/groups/{id}/balances` (yêu cầu caller đang
+> active) nên hoàn toàn không biết/không tranh chấp được khoản nợ "ma" này.
+> **Quyết định người dùng (2026-09-07): "tắt mẫu + báo nhóm"** thay vì âm thầm bỏ qua thành viên đó
+> hay vẫn sinh khoản chi. Đã sửa: `ProcessTemplateAsync` gom mọi `GroupMemberId` được tham chiếu
+> (Payers + mọi hình thức `SplitConfigInput`: MemberIds/Shares/Percentages/ExactAmounts/Items), nếu có
+> bất kỳ id nào không còn active → **không sinh Expense**, đặt `template.IsActive = false`, gửi thông
+> báo loại `"RecurringTemplateDeactivated"` cho mọi thành viên active còn lại (có tài khoản) để họ chủ
+> động tạo lại mẫu (loại bỏ người đã rời) nếu vẫn muốn dùng tiếp. `IRecurringExpenseRunner.
+> RunDueTemplatesAsync` vẫn trả về đúng số Expense THẬT SỰ được sinh — mẫu bị tắt không tính vào số
+> đếm này. Test: `RunDueTemplatesAsync_TemplateReferencesMemberWhoLeftGroup_
+> DeactivatesTemplateInsteadOfCreatingExpense` (`RecurringExpenseTests`).
+
 Tái dùng logic đã có: `ExpenseCategoryParser` (tách từ `ExpenseService.ParseCategory` cũ thành
 `SplitBill.Application.Common.ExpenseCategoryParser`, dùng chung cho cả `ExpenseService` và
 `RecurringExpenseService` — tránh khai báo trùng luật "null/rỗng mặc định Other, tên sai thì báo lỗi").
