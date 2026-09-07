@@ -29,6 +29,30 @@ public sealed class NotificationServiceTests
         harness.EmailSender.SentEmails.Should().ContainSingle(e => e.ToEmail == "a@example.com" && e.Subject == "Tieu de");
     }
 
+    // ⚠️ Bug thật phát hiện + sửa lúc làm tính năng "Quên mật khẩu" (2026-09-07, xem WebOptions):
+    // LinkUrl gửi vào email trước đây luôn là đường dẫn TƯƠNG ĐỐI — không có nghĩa gì khi mở từ 1 email
+    // client (không có "trang hiện tại" để tính tương đối theo), nên MỌI link "Xem chi tiết" trong MỌI
+    // email thông báo trước đây đều là link hỏng. Test khóa lại: email phải chứa URL TUYỆT ĐỐI (có
+    // scheme+host), trong khi Notification.LinkUrl lưu DB (dùng cho trang /Notifications same-origin)
+    // vẫn giữ nguyên dạng tương đối.
+    [Fact]
+    public async Task NotifyAsync_WithLinkUrl_EmailBodyUsesAbsoluteUrl_ButStoredNotificationKeepsRelativeUrl()
+    {
+        using var harness = TestHarness.Create();
+        var userId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var groupId = Guid.NewGuid();
+
+        await harness.NotificationService.NotifyAsync(
+            [new NotificationRecipient(userId, "a@example.com")],
+            groupId, "ExpenseCreated", "Tieu de", "Noi dung", "/Expenses/Index/abc", CancellationToken.None);
+
+        var sent = harness.EmailSender.SentEmails.Should().ContainSingle().Which;
+        sent.HtmlBody.Should().Contain("http://localhost:5103/Expenses/Index/abc");
+
+        var page = await harness.NotificationService.GetPagedAsync(userId, 1, 20, CancellationToken.None);
+        page.Items[0].LinkUrl.Should().Be("/Expenses/Index/abc"); // DB vẫn tương đối, không đổi
+    }
+
     [Fact]
     public async Task NotifyAsync_RecipientWithNullEmail_WritesInAppOnly_NoEmailSent()
     {

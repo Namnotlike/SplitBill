@@ -10,4 +10,9 @@ public sealed class JwtOptions
     public string SigningKey { get; set; } = string.Empty;
     public int AccessTokenMinutes { get; set; } = 30;
     public int RefreshTokenDays { get; set; } = 14;
+
+    /// <summary>Token đặt lại mật khẩu (CLAUDE.md mục 16, bổ sung 2026-09-07) — ngắn hơn RefreshToken
+    /// nhiều vì đây là "cửa sổ" gửi qua email công khai, chỉ cần đủ thời gian người dùng mở email
+    /// và bấm link, không cần sống lâu như phiên đăng nhập.</summary>
+    public int PasswordResetTokenMinutes { get; set; } = 30;
 }

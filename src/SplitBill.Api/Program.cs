@@ -11,6 +11,7 @@ using SplitBill.Api.BackgroundJobs;
 using SplitBill.Api.Middleware;
 using SplitBill.Application.Abstractions;
 using SplitBill.Application.Auth;
+using SplitBill.Application.Common;
 using SplitBill.Application.Expenses;
 using SplitBill.Application.Export;
 using SplitBill.Application.Groups;
@@ -126,6 +127,7 @@ try
     builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
     builder.Services.AddScoped<IUserRepository, UserRepository>();
     builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+    builder.Services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepository>();
     builder.Services.AddScoped<IGroupRepository, GroupRepository>();
     builder.Services.AddScoped<IExpenseRepository, ExpenseRepository>();
     builder.Services.AddScoped<ISettlementRepository, SettlementRepository>();
@@ -135,6 +137,12 @@ try
     builder.Services.AddScoped<IRecurringExpenseRepository, RecurringExpenseRepository>();
     builder.Services.AddSingleton<IShareTokenGenerator, ShareTokenGenerator>();
     builder.Services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
+
+    // ===== Web base URL (CLAUDE.md mục 16) — dựng link tuyệt đối trong email (đặt lại mật khẩu,
+    // thông báo). Không fail-fast nếu thiếu cấu hình — WebOptions đã có default hợp lý khớp cổng mặc
+    // định của SplitBill.Web (xem mục 10b), khác Jwt:SigningKey (bắt buộc phải tự cấu hình vì là bí
+    // mật, không có default an toàn nào).
+    builder.Services.Configure<WebOptions>(builder.Configuration.GetSection(WebOptions.SectionName));
 
     // ===== Email (CLAUDE.md mục 13.3) =====
     // Chưa cấu hình SMTP (Smtp:Host rỗng) -> dùng ConsoleEmailSender (chỉ log), không fail-fast như

@@ -1,5 +1,9 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using SplitBill.Application.Abstractions;
+using SplitBill.Application.Common;
+using SplitBill.Application.Notifications;
 using SplitBill.Domain.Entities;
 using SplitBill.Domain.Exceptions;
 
@@ -10,20 +14,32 @@ public sealed class AuthService : IAuthService
 {
     private readonly IUserRepository _userRepository;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
+    private readonly IPasswordResetTokenRepository _passwordResetTokenRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
+    private readonly IEmailSender _emailSender;
+    private readonly WebOptions _webOptions;
+    private readonly ILogger<AuthService> _logger;
     private readonly PasswordHasher<User> _passwordHasher = new();
 
     public AuthService(
         IUserRepository userRepository,
         IRefreshTokenRepository refreshTokenRepository,
+        IPasswordResetTokenRepository passwordResetTokenRepository,
         IUnitOfWork unitOfWork,
-        IJwtTokenGenerator jwtTokenGenerator)
+        IJwtTokenGenerator jwtTokenGenerator,
+        IEmailSender emailSender,
+        IOptions<WebOptions> webOptions,
+        ILogger<AuthService> logger)
     {
         _userRepository = userRepository;
         _refreshTokenRepository = refreshTokenRepository;
+        _passwordResetTokenRepository = passwordResetTokenRepository;
         _unitOfWork = unitOfWork;
         _jwtTokenGenerator = jwtTokenGenerator;
+        _emailSender = emailSender;
+        _webOptions = webOptions.Value;
+        _logger = logger;
     }
 
     public async Task<AuthTokens> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken)
@@ -94,6 +110,66 @@ public sealed class AuthService : IAuthService
             existing.RevokedAt = DateTimeOffset.UtcNow;
             await _unitOfWork.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    public async Task ForgotPasswordAsync(string email, CancellationToken cancellationToken)
+    {
+        var user = await _userRepository.GetByEmailAsync(email, cancellationToken);
+        // Guest (PasswordHash null) không đăng nhập được nên cũng không đặt lại mật khẩu được — coi
+        // như "không tìm thấy", vẫn không tiết lộ gì ra ngoài (CLAUDE.md mục 8).
+        if (user?.PasswordHash is null)
+        {
+            return;
+        }
+
+        var (plaintext, hash, expiresAt) = _jwtTokenGenerator.GeneratePasswordResetToken();
+        await _passwordResetTokenRepository.AddAsync(new PasswordResetToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            TokenHash = hash,
+            ExpiresAt = expiresAt,
+            CreatedAt = DateTimeOffset.UtcNow,
+        }, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Gửi email KHÔNG được làm hỏng luồng chính (cùng nguyên tắc NotificationService mục 13.3) —
+        // token đã lưu DB dù email lỗi, người dùng có thể yêu cầu gửi lại.
+        try
+        {
+            var resetLink = $"{_webOptions.BaseUrl.TrimEnd('/')}/Account/ResetPassword?token={Uri.EscapeDataString(plaintext)}";
+            var minutes = expiresAt.Subtract(DateTimeOffset.UtcNow).TotalMinutes;
+            var body = $"<p>Bạn (hoặc ai đó) vừa yêu cầu đặt lại mật khẩu cho tài khoản SplitBill này.</p>"
+                + $"<p><a href=\"{resetLink}\">Đặt lại mật khẩu</a></p>"
+                + $"<p>Link có hiệu lực trong khoảng {Math.Round(minutes)} phút. Nếu không phải bạn yêu cầu, hãy bỏ qua email này.</p>";
+            await _emailSender.SendAsync(user.Email!, "Đặt lại mật khẩu SplitBill", body, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Không gửi được email đặt lại mật khẩu tới {Email}", user.Email);
+        }
+    }
+
+    public async Task ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken)
+    {
+        var hash = _jwtTokenGenerator.HashRefreshToken(request.Token);
+        var token = await _passwordResetTokenRepository.GetByHashAsync(hash, cancellationToken);
+        if (token is null || !token.IsUsable)
+        {
+            throw new DomainException(ErrorCodes.InvalidResetToken, "Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.");
+        }
+
+        var user = await _userRepository.GetByIdAsync(token.UserId, cancellationToken)
+            ?? throw new DomainException(ErrorCodes.InvalidResetToken, "Tài khoản không tồn tại.");
+
+        user.PasswordHash = _passwordHasher.HashPassword(user, request.NewPassword);
+        token.UsedAt = DateTimeOffset.UtcNow; // dùng 1 lần — dù còn hạn cũng không dùng lại được
+
+        // Đổi mật khẩu = đăng xuất mọi phiên khác (phòng mật khẩu cũ đã bị lộ, đây chính là kịch bản
+        // "quên/lộ mật khẩu" nên luôn xử lý bảo thủ).
+        await _refreshTokenRepository.RevokeAllForUserAsync(user.Id, cancellationToken);
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     private async Task<AuthTokens> IssueTokensAsync(User user, CancellationToken cancellationToken)

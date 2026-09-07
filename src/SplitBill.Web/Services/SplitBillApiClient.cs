@@ -37,6 +37,13 @@ public sealed class SplitBillApiClient
     public Task LogoutAsync(string refreshToken, CancellationToken ct) =>
         PostNoContentAsync("auth/logout", new { refreshToken }, ct);
 
+    // CLAUDE.md mục 16 — Quên mật khẩu (bổ sung 2026-09-07).
+    public Task ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken ct) =>
+        PostNoContentAsync("auth/forgot-password", request, ct);
+
+    public Task ResetPasswordAsync(ResetPasswordRequest request, CancellationToken ct) =>
+        PostNoContentAsync("auth/reset-password", request, ct);
+
     // ===== Users =====
     public Task<UserProfileDto> GetMeAsync(CancellationToken ct) => GetAsync<UserProfileDto>("users/me", ct);
 

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using SplitBill.Application.Auth;
+using SplitBill.Application.Common;
 using SplitBill.Application.Expenses;
 using SplitBill.Application.Export;
 using SplitBill.Application.Groups;
@@ -48,6 +49,7 @@ public sealed class TestHarness : IDisposable
         var unitOfWork = new UnitOfWork(dbContext);
         var userRepository = new UserRepository(dbContext);
         var refreshTokenRepository = new RefreshTokenRepository(dbContext);
+        var passwordResetTokenRepository = new PasswordResetTokenRepository(dbContext);
         var groupRepository = new GroupRepository(dbContext);
         var expenseRepository = new ExpenseRepository(dbContext);
         var settlementRepository = new SettlementRepository(dbContext);
@@ -61,8 +63,10 @@ public sealed class TestHarness : IDisposable
             SigningKey = "test-signing-key-at-least-32-characters-long!",
             AccessTokenMinutes = 30,
             RefreshTokenDays = 14,
+            PasswordResetTokenMinutes = 30,
         });
         var jwtTokenGenerator = new JwtTokenGenerator(jwtOptions);
+        var webOptions = Options.Create(new WebOptions { BaseUrl = "http://localhost:5103" });
         var shareTokenGenerator = new ShareTokenGenerator();
         var splitCalculator = new ExpenseSplitCalculator();
         var balanceCalculator = new BalanceCalculator();
@@ -72,9 +76,11 @@ public sealed class TestHarness : IDisposable
         var notificationRepository = new NotificationRepository(dbContext);
         var recurringExpenseRepository = new RecurringExpenseRepository(dbContext);
         EmailSender = new FakeEmailSender();
-        NotificationService = new NotificationService(notificationRepository, unitOfWork, EmailSender, NullLogger<NotificationService>.Instance);
+        NotificationService = new NotificationService(notificationRepository, unitOfWork, EmailSender, NullLogger<NotificationService>.Instance, webOptions);
 
-        AuthService = new AuthService(userRepository, refreshTokenRepository, unitOfWork, jwtTokenGenerator);
+        AuthService = new AuthService(
+            userRepository, refreshTokenRepository, passwordResetTokenRepository, unitOfWork,
+            jwtTokenGenerator, EmailSender, webOptions, NullLogger<AuthService>.Instance);
         UserService = new UserService(userRepository, unitOfWork);
         GroupService = new GroupService(
             groupRepository, userRepository, expenseRepository, settlementRepository,

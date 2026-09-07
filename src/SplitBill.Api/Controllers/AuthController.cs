@@ -16,12 +16,21 @@ public sealed class AuthController : ControllerBase
     private readonly IAuthService _authService;
     private readonly IValidator<RegisterRequest> _registerValidator;
     private readonly IValidator<LoginRequest> _loginValidator;
+    private readonly IValidator<ForgotPasswordRequest> _forgotPasswordValidator;
+    private readonly IValidator<ResetPasswordRequest> _resetPasswordValidator;
 
-    public AuthController(IAuthService authService, IValidator<RegisterRequest> registerValidator, IValidator<LoginRequest> loginValidator)
+    public AuthController(
+        IAuthService authService,
+        IValidator<RegisterRequest> registerValidator,
+        IValidator<LoginRequest> loginValidator,
+        IValidator<ForgotPasswordRequest> forgotPasswordValidator,
+        IValidator<ResetPasswordRequest> resetPasswordValidator)
     {
         _authService = authService;
         _registerValidator = registerValidator;
         _loginValidator = loginValidator;
+        _forgotPasswordValidator = forgotPasswordValidator;
+        _resetPasswordValidator = resetPasswordValidator;
     }
 
     public sealed record RefreshRequest(string RefreshToken);
@@ -53,6 +62,24 @@ public sealed class AuthController : ControllerBase
     public async Task<IActionResult> LogoutAsync(RefreshRequest request, CancellationToken cancellationToken)
     {
         await _authService.LogoutAsync(request.RefreshToken, cancellationToken);
+        return NoContent();
+    }
+
+    // CLAUDE.md mục 16 — Quên mật khẩu (bổ sung 2026-09-07).
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken)
+    {
+        _forgotPasswordValidator.ValidateOrThrowDomainException(request);
+        // Luôn trả 204 dù email có tồn tại hay không — không tiết lộ (CLAUDE.md mục 8).
+        await _authService.ForgotPasswordAsync(request.Email, cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken)
+    {
+        _resetPasswordValidator.ValidateOrThrowDomainException(request);
+        await _authService.ResetPasswordAsync(request, cancellationToken);
         return NoContent();
     }
 }

@@ -42,6 +42,7 @@ Không thêm thư viện NuGet nào ngoài danh sách trên nếu chưa hỏi ng
 **Cấu hình JWT (chốt cụ thể, tránh mỗi lần code lại đoán):**
 - Access token: thời hạn 30 phút, ký HS256, claim tối thiểu `sub` (UserId), `email`.
 - Refresh token: chuỗi random 256-bit, thời hạn 14 ngày, lưu **hash** (SHA-256) trong bảng `RefreshToken` (xem 4.4), không lưu plaintext. Mỗi lần refresh thì thu hồi token cũ, phát token mới (rotation).
+- Password reset token (bổ sung 2026-09-07, xem mục 16): cùng cơ chế random 256-bit + hash SHA-256 (bảng `PasswordResetToken`) như refresh token, nhưng thời hạn ngắn hơn nhiều — mặc định 30 phút — và chỉ dùng được ĐÚNG 1 LẦN (khác refresh token, có thể refresh nhiều lần trước khi hết hạn).
 - Guest (khách vãng lai, `GroupMember.UserId == null`) không đăng nhập được — họ chỉ tồn tại trong phạm vi 1 nhóm và mọi thao tác ghi (tạo expense, ghi settlement...) phải do một `User` đã đăng nhập thực hiện thay mặt. Đây là giới hạn có chủ đích của MVP, xem thêm 4.4.
 
 ---
@@ -581,6 +582,10 @@ POST   /auth/register       Body: { email, password, displayName } → tạo Use
 POST   /auth/login          Body: { email, password } → trả access+refresh token
 POST   /auth/refresh        Body: { refreshToken } → thu hồi token cũ, trả cặp token mới (rotation)
 POST   /auth/logout         Body: { refreshToken } → thu hồi (Revoke) refresh token đó
+POST   /auth/forgot-password Body: { email } → luôn trả 204, không tiết lộ email tồn tại hay không
+                             (mục 16). Nếu khớp tài khoản, gửi email chứa link đặt lại mật khẩu.
+POST   /auth/reset-password Body: { token, newPassword } → đổi mật khẩu bằng token nhận qua email
+                             (mục 16). Sai/hết hạn/đã dùng → 400 INVALID_RESET_TOKEN.
 ```
 
 Sai email/password trả `401` với `errorCode = "INVALID_CREDENTIALS"`, không tiết lộ email có tồn tại hay không.
@@ -1512,3 +1517,76 @@ tiếp qua `document.styleSheets`) và 2 phần tử `.no-print` tồn tại đ�
 
 **Toàn bộ 9 tính năng ở mục 15 đã hoàn thành (2026-09-05)**, theo đúng yêu cầu người dùng "Làm hết các
 chức năng gợi ý trên" sau khi M6 hoàn thành 100%.
+
+---
+
+## 16. Quên mật khẩu — bổ sung 2026-09-07
+
+Sau khi mục 15 hoàn thành, người dùng yêu cầu gợi ý tính năng mới; trong lúc rà soát để gợi ý, phát
+hiện `/auth/*` chỉ có `register/login/refresh/logout` — **chưa từng có luồng "quên mật khẩu"**, một
+thiếu sót thực tế (không phải tính năng "thêm cho vui") vì app đã có sẵn kênh gửi email (MailKit, mục
+13.3) nhưng chưa dùng cho việc này. Người dùng chốt làm mục này trước tiên, trước khi làm tiếp các gợi
+ý còn lại.
+
+### 16.1 Mô hình dữ liệu
+
+```csharp
+PasswordResetToken {
+    Guid Id
+    Guid UserId
+    string TokenHash        // SHA-256 của token plaintext, KHÔNG lưu plaintext — cùng mẫu RefreshToken
+    DateTimeOffset ExpiresAt
+    DateTimeOffset? UsedAt  // token CHỈ DÙNG ĐƯỢC 1 LẦN — khác RefreshToken (refresh được nhiều lần
+                             // trước khi hết hạn), dùng rồi thì dù còn hạn cũng không dùng lại được
+    DateTimeOffset CreatedAt
+}
+```
+
+Không soft-delete, không cần đọc lại qua API (chỉ AuthService tự dùng nội bộ). `JwtOptions` có thêm
+`PasswordResetTokenMinutes` (mặc định 30) — ngắn hơn nhiều so với `RefreshTokenDays` (14 ngày) vì đây
+chỉ là "cửa sổ" để người dùng mở email và bấm link, không phải phiên đăng nhập.
+
+### 16.2 API
+
+```
+POST /api/v1/auth/forgot-password   Body: { email } → luôn trả 204 dù email có tồn tại hay không
+                                     (không tiết lộ — cùng nguyên tắc INVALID_CREDENTIALS ở mục 8).
+                                     Guest (PasswordHash null) cũng coi như "không tìm thấy".
+POST /api/v1/auth/reset-password    Body: { token, newPassword } → đổi mật khẩu. Token sai/hết hạn/
+                                     đã dùng → 400 INVALID_RESET_TOKEN.
+```
+
+Đổi mật khẩu thành công **thu hồi TOÀN BỘ `RefreshToken` hiện có của user** (`IRefreshTokenRepository.
+RevokeAllForUserAsync`) — đăng xuất mọi phiên khác, phòng trường hợp mật khẩu cũ đã bị lộ (đây chính
+là kịch bản "quên/lộ mật khẩu", nên xử lý bảo thủ thay vì chỉ đổi PasswordHash rồi thôi).
+
+### 16.3 Web
+
+`Pages/Account/ForgotPassword.cshtml` (nhập email, POST) và `Pages/Account/ResetPassword.cshtml`
+(`?token=...` từ link email, nhập mật khẩu mới 2 lần). Link "Quên mật khẩu?" thêm vào `Login.cshtml`
+cạnh ô mật khẩu. `ForgotPassword` luôn hiện đúng 1 thông báo chung chung dù email tồn tại hay không
+(kể cả khi API trả lỗi validate) — không được để lộ oracle cho việc dò email tồn tại qua khác biệt
+UI. `ResetPassword` thành công thì mời đăng nhập lại ngay (không tự đăng nhập hộ — người dùng vừa đổi
+mật khẩu, để họ tự gõ lại mật khẩu mới là xác nhận hợp lý).
+
+> ⚠️ **Bug thật phát hiện + sửa cùng lúc làm tính năng này (2026-09-07):** `NotificationService.
+> BuildHtmlBody` (mục 13) từ trước tới nay luôn gửi `LinkUrl` dạng **ĐƯỜNG DẪN TƯƠNG ĐỐI**
+> (vd `/Expenses/Index/{groupId}`) thẳng vào `<a href>` của email. Một URL tương đối không có nghĩa gì
+> khi mở từ 1 email client (không có "trang hiện tại" nào để tính tương đối theo) — nghĩa là **mọi**
+> link "Xem chi tiết" trong **mọi** email thông báo (khoản chi mới, settlement, nhắc nợ...) từ trước
+> tới nay đều là link hỏng khi bấm trực tiếp từ ứng dụng email, chỉ tình cờ chưa bị phát hiện vì chưa
+> có email nào THỰC SỰ cần người dùng bấm link để hoàn tất 1 hành động — "quên mật khẩu" là ca đầu
+> tiên bắt buộc phải có link hoạt động được, nên lỗi lộ ra ngay khi viết test. Đã sửa: thêm
+> `SplitBill.Application.Common.WebOptions` (`Web:BaseUrl` trong appsettings, mặc định
+> `http://localhost:5103` khớp cổng Web — mục 10b), `NotificationService` giờ ghép `BaseUrl` + đường
+> dẫn tương đối thành URL TUYỆT ĐỐI CHỈ khi dựng nội dung email; cột `Notification.LinkUrl` lưu DB
+> (dùng cho trang `/Notifications` same-origin) không đổi, vẫn tương đối. Test:
+> `NotifyAsync_WithLinkUrl_EmailBodyUsesAbsoluteUrl_ButStoredNotificationKeepsRelativeUrl`
+> (`NotificationServiceTests`).
+
+Đã verify sống trên trình duyệt (luồng đầy đủ, không phải chỉ đọc code): đăng ký tài khoản mới → đăng
+xuất → bấm "Quên mật khẩu?" ở trang Login → nhập email → hiện đúng thông báo chung chung "Nếu email
+này có tài khoản..." → lấy link đặt lại mật khẩu từ log `ConsoleEmailSender` (chưa cấu hình SMTP thật)
+→ xác nhận link đúng dạng TUYỆT ĐỐI (`http://localhost:5103/Account/ResetPassword?token=...`, không
+phải đường dẫn tương đối) → mở link, nhập mật khẩu mới 2 lần → hiện đúng "Đổi mật khẩu thành công" →
+đăng nhập lại bằng mật khẩu MỚI thành công, vào thẳng trang Nhóm của tôi.

@@ -29,4 +29,6 @@ public static class ErrorCodes
     // Khoản chi định kỳ (CLAUDE.md mục 15.7, bổ sung 2026-09-05).
     public const string GroupTypeNotRecurring = "GROUP_TYPE_NOT_RECURRING";
     public const string RecurringExpenseNotFound = "RECURRING_EXPENSE_NOT_FOUND";
+    // Quên mật khẩu (CLAUDE.md mục 16, bổ sung 2026-09-07).
+    public const string InvalidResetToken = "INVALID_RESET_TOKEN";
 }

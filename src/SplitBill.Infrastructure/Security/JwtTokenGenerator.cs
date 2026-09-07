@@ -60,4 +60,13 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
         var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(plaintextToken));
         return Convert.ToBase64String(hashBytes);
     }
+
+    public (string PlaintextToken, string Hash, DateTimeOffset ExpiresAt) GeneratePasswordResetToken()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(32);
+        var plaintext = Base64UrlEncoder.Encode(bytes);
+        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(_options.PasswordResetTokenMinutes);
+
+        return (plaintext, HashRefreshToken(plaintext), expiresAt);
+    }
 }
