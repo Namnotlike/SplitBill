@@ -55,6 +55,40 @@
     </div>
 }
 
+@* ===== "Ai đang nợ tôi" xuyên nhóm (CLAUDE.md mục 20) — bổ sung 2026-09-07. Gộp theo TỪNG NGƯỜI
+   (khác widget trên gộp theo từng nhóm). Chỉ hiện counterparty có tài khoản (khách vãng lai không có
+   danh tính ổn định xuyên nhóm). KHÔNG cộng gộp số tiền giữa các nhóm khác tiền tệ — mỗi nhóm 1 dòng
+   riêng trong cùng 1 thẻ người. ===== *@
+@if (User.Identity?.IsAuthenticated == true && Model.CounterpartyBalances.Count > 0)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title mb-3">Ai đang nợ bạn / bạn đang nợ ai</h5>
+            <div class="row g-3">
+                @foreach (var person in Model.CounterpartyBalances)
+                {
+                    <div class="col-md-6">
+                        <div class="sb-balance-card d-block">
+                            <div class="w-100">
+                                <div class="fw-600 mb-1" style="color: var(--sb-ink);">@person.CounterpartyDisplayName</div>
+                                @foreach (var g in person.Groups)
+                                {
+                                    <div class="d-flex justify-content-between small">
+                                        <a asp-page="/Groups/SettlementPlan" asp-route-id="@g.GroupId" class="text-muted text-decoration-none">@g.GroupName</a>
+                                        <span class="@(g.Amount > 0 ? "sb-amount-positive" : "sb-amount-negative")">
+                                            @(g.Amount > 0 ? "Nợ bạn " : "Bạn nợ ")@SupportedCurrencies.Format(Math.Abs(g.Amount), g.Currency)
+                                        </span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
 <div class="row g-4 mt-2">
     <div class="col-md-4">
         <div class="card h-100">

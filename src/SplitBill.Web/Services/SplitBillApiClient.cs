@@ -54,6 +54,10 @@ public sealed class SplitBillApiClient
     public Task<IReadOnlyList<PersonalGroupBalanceDto>> GetMyBalancesOverviewAsync(CancellationToken ct) =>
         GetAsync<IReadOnlyList<PersonalGroupBalanceDto>>("users/me/balances-overview", ct);
 
+    /// <summary>"Ai đang nợ tôi" xuyên nhóm, gộp theo từng người (CLAUDE.md mục 20).</summary>
+    public Task<IReadOnlyList<CounterpartyBalanceDto>> GetMyCounterpartyBalancesAsync(CancellationToken ct) =>
+        GetAsync<IReadOnlyList<CounterpartyBalanceDto>>("users/me/counterparty-balances", ct);
+
     // ===== Groups =====
     public Task<IReadOnlyList<GroupSummaryDto>> GetMyGroupsAsync(CancellationToken ct) =>
         GetAsync<IReadOnlyList<GroupSummaryDto>>("groups", ct);

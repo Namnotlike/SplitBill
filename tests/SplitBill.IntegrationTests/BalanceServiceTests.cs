@@ -207,4 +207,76 @@ public sealed class BalanceServiceTests
 
         overview.Should().BeEmpty();
     }
+
+    // ===== "Ai đang nợ tôi" xuyên nhóm (CLAUDE.md mục 20) — bổ sung 2026-09-07 =====
+
+    [Fact]
+    public async Task GetCounterpartyBalancesAsync_AggregatesSameRegisteredCounterparty_AcrossGroups()
+    {
+        var harness = TestHarness.Create();
+        var namId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var binhId = await harness.RegisterUserAsync("b@example.com", "Binh");
+
+        // Nhom 1 (VND): Nam ung 200k, chia deu voi Binh -> Binh no Nam 100k.
+        var group1 = await harness.GroupService.CreateAsync(namId, new CreateGroupRequest("Du lich A", null, "OneTime", "VND"), CancellationToken.None);
+        await harness.GroupService.AddMemberAsync(namId, group1.Id, new AddMemberRequest(binhId, "Binh"), CancellationToken.None);
+        var group1Members = (await harness.GroupService.GetByIdAsync(namId, group1.Id, CancellationToken.None)).Members;
+        var namInGroup1 = group1Members.Single(m => m.UserId == namId).Id;
+        var binhInGroup1 = group1Members.Single(m => m.UserId == binhId).Id;
+        await harness.ExpenseService.CreateAsync(namId, group1.Id, new CreateExpenseRequest(
+            "An toi", 200_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(namInGroup1, 200_000)],
+            "Equal", new SplitConfigInput(MemberIds: [namInGroup1, binhInGroup1])), CancellationToken.None);
+
+        // Nhom 2 (USD): Binh ung 100, chia deu voi Nam -> Nam no Binh 50.
+        var group2 = await harness.GroupService.CreateAsync(namId, new CreateGroupRequest("Du lich My", null, "OneTime", "USD"), CancellationToken.None);
+        await harness.GroupService.AddMemberAsync(namId, group2.Id, new AddMemberRequest(binhId, "Binh"), CancellationToken.None);
+        var group2Members = (await harness.GroupService.GetByIdAsync(namId, group2.Id, CancellationToken.None)).Members;
+        var namInGroup2 = group2Members.Single(m => m.UserId == namId).Id;
+        var binhInGroup2 = group2Members.Single(m => m.UserId == binhId).Id;
+        await harness.ExpenseService.CreateAsync(namId, group2.Id, new CreateExpenseRequest(
+            "Dinner", 100, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(binhInGroup2, 100)],
+            "Equal", new SplitConfigInput(MemberIds: [namInGroup2, binhInGroup2])), CancellationToken.None);
+
+        var result = await harness.BalanceService.GetCounterpartyBalancesAsync(namId, CancellationToken.None);
+
+        result.Should().ContainSingle(); // chi 1 counterparty (Binh), gop ca 2 nhom
+        var binhEntry = result.Single();
+        binhEntry.CounterpartyUserId.Should().Be(binhId);
+        binhEntry.Groups.Should().ContainSingle(g => g.GroupId == group1.Id && g.Currency == "VND" && g.Amount == 100_000); // Binh no Nam
+        binhEntry.Groups.Should().ContainSingle(g => g.GroupId == group2.Id && g.Currency == "USD" && g.Amount == -50); // Nam no Binh
+    }
+
+    [Fact]
+    public async Task GetCounterpartyBalancesAsync_GuestCounterparty_IsExcluded()
+    {
+        var harness = TestHarness.Create();
+        var namId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(namId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var guest = await harness.GroupService.AddMemberAsync(namId, group.Id, new AddMemberRequest(null, "Khach"), CancellationToken.None);
+        var namMemberId = group.Members[0].Id;
+        await harness.ExpenseService.CreateAsync(namId, group.Id, new CreateExpenseRequest(
+            "An toi", 200_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(namMemberId, 200_000)],
+            "Equal", new SplitConfigInput(MemberIds: [namMemberId, guest.Id])), CancellationToken.None);
+
+        var result = await harness.BalanceService.GetCounterpartyBalancesAsync(namId, CancellationToken.None);
+
+        // Khach vang lai khong co danh tinh on dinh xuyen nhom -> khong xuat hien trong widget nay,
+        // du ho THUC SU dang no Nam 100k o nhom do (van xem duoc binh thuong o settlement-plan cua
+        // dung nhom do).
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetCounterpartyBalancesAsync_UserNotInAnyGroup_ReturnsEmpty()
+    {
+        var harness = TestHarness.Create();
+        var userId = await harness.RegisterUserAsync("solo@example.com", "Solo");
+
+        var result = await harness.BalanceService.GetCounterpartyBalancesAsync(userId, CancellationToken.None);
+
+        result.Should().BeEmpty();
+    }
 }

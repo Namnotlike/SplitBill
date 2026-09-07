@@ -1738,3 +1738,60 @@ cùng mẫu đã dùng ở `SettlementPlan.cshtml.cs`).
 bình luận → hiện đúng "💬 Bình luận (1)" kèm tên tác giả + thời gian + nội dung + nút "Xóa" (vì mình
 là tác giả) → bấm Xóa → quay lại đúng "Chưa có bình luận nào" (soft-delete hoạt động, query filter
 loại bỏ đúng bản ghi đã xóa).
+
+---
+
+## 20. "Ai đang nợ tôi" tổng hợp xuyên nhóm — bổ sung 2026-09-07
+
+Hạng mục 5/8 trong danh sách gợi ý sau mục 16. Khác widget "Tổng quan số dư của bạn" (mục 15.4, gộp
+theo TỪNG NHÓM) — widget này gộp theo **TỪNG NGƯỜI**: "Bình nợ tôi 50k ở nhóm A và nợ tôi 30k ở nhóm
+B" hiển thị chung dưới 1 thẻ "Bình", mỗi nhóm 1 dòng riêng.
+
+### 20.1 Quyết định thiết kế quan trọng
+
+**Chỉ áp dụng cho counterparty có tài khoản (`UserId` khác null).** Khách vãng lai không có danh tính
+ổn định xuyên nhóm — "Bình (khách)" ở nhóm A và "Bình (khách)" ở nhóm B là 2 `GroupMember` độc lập
+hoàn toàn, không có gì đảm bảo là cùng 1 người ngoài đời để gộp lại. Khoản nợ của khách vãng lai vẫn
+xem được bình thường ở `settlement-plan` của đúng nhóm đó, chỉ là không xuất hiện ở widget xuyên nhóm
+này.
+
+**Không suy ra "ai nợ ai" từ Σ net riêng — tái dùng ĐÚNG giao dịch đã có trong settlement-plan của
+từng nhóm** (`BuildSimplifiedPlanAsync`/`BuildDirectPlanAsync`, tùy `Group.SimplifyDebts` — mục 6.2/
+6.5). Lý do: "ai nợ ai" chỉ có nghĩa xác định ở mức giao dịch cụ thể — khi `SimplifyDebts = true`,
+thuật toán gộp nợ có thể route khoản nợ của 1 người qua người khác để giảm số lượt chuyển (mục 6.2),
+nên 2 người có thể không có "quan hệ nợ trực tiếp" nào trong plan dù cả hai đều ở chung 1 nhóm — widget
+này chỉ hiển thị đúng những gì `settlement-plan` ĐÃ quyết định là 1 giao dịch cụ thể giữa họ, không tự
+suy ra một con số khác.
+
+**Không cộng gộp số tiền giữa các nhóm** — mỗi nhóm có thể dùng 1 loại tiền tệ khác nhau (mục 14),
+giữ nguyên danh sách riêng theo nhóm trong cùng 1 thẻ người (`CounterpartyBalanceDto.Groups`).
+
+### 20.2 API
+
+```
+GET /api/v1/users/me/counterparty-balances
+```
+
+Trả `IReadOnlyList<CounterpartyBalanceDto>` — mỗi phần tử là 1 người (`CounterpartyUserId`,
+`CounterpartyDisplayName`) kèm danh sách `Groups` (`GroupId`, `GroupName`, `Currency`, `Amount` —
+dương = họ nợ mình, âm = mình nợ họ). `IBalanceService.GetCounterpartyBalancesAsync` cài đặt bằng
+cách lặp qua mọi nhóm đang active (tái dùng `GetByUserIdAsync`, cùng nguồn dữ liệu với
+`GetMyOverviewAsync` mục 15.4), với mỗi nhóm gọi lại chính 2 hàm private `BuildSimplifiedPlanAsync`/
+`BuildDirectPlanAsync` đã có sẵn cho `/settlement-plan`, lọc ra giao dịch có mình là 1 trong 2 bên rồi
+gộp theo `UserId` của bên còn lại.
+
+### 20.3 Web
+
+Trang chủ (`Pages/Index.cshtml`) thêm 1 thẻ "Ai đang nợ bạn / bạn đang nợ ai" ngay dưới widget tổng
+quan cá nhân (mục 15.4), chỉ hiện khi đã đăng nhập và có ít nhất 1 counterparty. Mỗi người 1 thẻ nhỏ,
+bên trong liệt kê từng nhóm kèm dòng chữ "Nợ bạn X" (dương, `.sb-amount-positive`) hoặc "Bạn nợ X"
+(âm, `.sb-amount-negative`), bấm vào tên nhóm dẫn thẳng tới `/Groups/SettlementPlan` của đúng nhóm đó.
+Lỗi gọi API chỉ ẩn lặng lẽ widget này (cùng nguyên tắc với widget mục 15.4), không chặn phần còn lại
+của trang chủ.
+
+Đã verify sống trên trình duyệt (luồng đầy đủ, 2 tài khoản thật): tạo tài khoản thứ 2 ("BinhTester"),
+tham gia 2 nhóm khác nhau qua link chia sẻ (mục 15.6), tạo 1 khoản chi ở mỗi nhóm theo 2 CHIỀU khác
+nhau (nhóm A: Owner ứng tiền, chiều ngược ở nhóm B: BinhTester ứng tiền) → trang chủ hiện đúng 1 thẻ
+duy nhất "BinhTester" (không tách thành 2 thẻ riêng dù là 2 nhóm khác nhau — xác nhận gộp đúng theo
+người), bên trong đúng 2 dòng theo 2 nhóm với chiều "Nợ bạn"/"Bạn nợ" ngược nhau đúng như đã tạo, mỗi
+dòng đúng tên nhóm + số tiền theo đúng tiền tệ của nhóm đó.

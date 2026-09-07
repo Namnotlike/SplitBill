@@ -80,6 +80,70 @@ public sealed class BalanceService : IBalanceService
         return overview;
     }
 
+    public async Task<IReadOnlyList<CounterpartyBalanceDto>> GetCounterpartyBalancesAsync(Guid callerUserId, CancellationToken cancellationToken)
+    {
+        // Cùng nguồn dữ liệu với GetMyOverviewAsync (mục 15.4) — GetByUserIdAsync đã lọc đúng nhóm
+        // đang active.
+        var groups = await _groupRepository.GetByUserIdAsync(callerUserId, cancellationToken);
+
+        var counterparties = new Dictionary<Guid, (string DisplayName, List<CounterpartyGroupAmountDto> Groups)>();
+
+        foreach (var group in groups)
+        {
+            var callerMember = group.Members.FirstOrDefault(m => m.UserId == callerUserId && m.IsActive);
+            if (callerMember is null)
+            {
+                continue;
+            }
+
+            // Tái dùng ĐÚNG plan đã tính cho /groups/{id}/settlement-plan (tôn trọng SimplifyDebts
+            // của từng nhóm) — không suy ra từ Σ net riêng, vì "ai nợ ai" chỉ có nghĩa xác định ở mức
+            // giao dịch cụ thể (chế độ gộp nợ có thể route qua người khác, xem mục 6.2/6.5).
+            var plan = group.SimplifyDebts
+                ? await BuildSimplifiedPlanAsync(group, cancellationToken)
+                : await BuildDirectPlanAsync(group, cancellationToken);
+
+            foreach (var tx in plan.Transactions)
+            {
+                Guid otherMemberId;
+                long amount;
+                if (tx.FromMemberId == callerMember.Id)
+                {
+                    otherMemberId = tx.ToMemberId;
+                    amount = -tx.Amount; // mình nợ họ
+                }
+                else if (tx.ToMemberId == callerMember.Id)
+                {
+                    otherMemberId = tx.FromMemberId;
+                    amount = tx.Amount; // họ nợ mình
+                }
+                else
+                {
+                    continue; // giao dịch không liên quan tới mình (đã tối ưu route qua người khác)
+                }
+
+                var otherMember = group.Members.FirstOrDefault(m => m.Id == otherMemberId);
+                if (otherMember?.UserId is null)
+                {
+                    continue; // khách vãng lai — không có danh tính ổn định xuyên nhóm để gộp
+                }
+
+                if (!counterparties.TryGetValue(otherMember.UserId.Value, out var entry))
+                {
+                    entry = (otherMember.DisplayName, new List<CounterpartyGroupAmountDto>());
+                    counterparties[otherMember.UserId.Value] = entry;
+                }
+
+                entry.Groups.Add(new CounterpartyGroupAmountDto(group.Id, group.Name, group.Currency, amount));
+            }
+        }
+
+        return counterparties
+            .Select(kv => new CounterpartyBalanceDto(kv.Key, kv.Value.DisplayName, kv.Value.Groups))
+            .OrderBy(c => c.CounterpartyDisplayName, StringComparer.Ordinal)
+            .ToList();
+    }
+
     private async Task<SettlementPlanDto> BuildSimplifiedPlanAsync(Group group, CancellationToken cancellationToken)
     {
         var balances = await ComputeBalancesAsync(group, cancellationToken);

@@ -36,6 +36,14 @@ public sealed class UsersController : ControllerBase
         return Ok(overview);
     }
 
+    /// <summary>"Ai đang nợ tôi / tôi đang nợ ai" gộp theo từng người, xuyên mọi nhóm (CLAUDE.md mục 20).</summary>
+    [HttpGet("me/counterparty-balances")]
+    public async Task<ActionResult<IReadOnlyList<CounterpartyBalanceDto>>> GetMyCounterpartyBalancesAsync(CancellationToken cancellationToken)
+    {
+        var balances = await _balanceService.GetCounterpartyBalancesAsync(User.GetUserId(), cancellationToken);
+        return Ok(balances);
+    }
+
     [HttpPatch("me")]
     public async Task<ActionResult<UserProfileDto>> UpdateMeAsync(UpdateProfileRequest request, CancellationToken cancellationToken)
     {

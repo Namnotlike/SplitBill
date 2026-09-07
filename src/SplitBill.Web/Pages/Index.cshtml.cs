@@ -17,6 +17,9 @@ public class IndexModel : PageModel
     // nhóm nào, hoặc nếu gọi API lỗi (không để lỗi ở widget phụ này chặn cả trang chủ).
     public IReadOnlyList<PersonalGroupBalanceDto> MyOverview { get; set; } = Array.Empty<PersonalGroupBalanceDto>();
 
+    // "Ai đang nợ tôi" xuyên nhóm (CLAUDE.md mục 20) — cùng nguyên tắc chịu lỗi im lặng như trên.
+    public IReadOnlyList<CounterpartyBalanceDto> CounterpartyBalances { get; set; } = Array.Empty<CounterpartyBalanceDto>();
+
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
         if (User.Identity?.IsAuthenticated != true)
@@ -32,6 +35,14 @@ public class IndexModel : PageModel
         {
             // Trang chủ vẫn phải hiển thị được dù widget tổng quan lỗi (vd token vừa hết hạn) —
             // không TempData/redirect, chỉ đơn giản ẩn widget.
+        }
+
+        try
+        {
+            CounterpartyBalances = await _apiClient.GetMyCounterpartyBalancesAsync(cancellationToken);
+        }
+        catch (ApiException)
+        {
         }
     }
 }

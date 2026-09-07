@@ -11,4 +11,8 @@ public interface IBalanceService
     /// 15.4) — dùng cho bảng tổng quan cá nhân ở trang chủ. Không trả tổng gộp vì các nhóm có thể
     /// khác đơn vị tiền tệ (mục 14).</summary>
     Task<IReadOnlyList<PersonalGroupBalanceDto>> GetMyOverviewAsync(Guid callerUserId, CancellationToken cancellationToken);
+
+    /// <summary>"Ai đang nợ tôi / tôi đang nợ ai" gộp theo TỪNG NGƯỜI, xuyên mọi nhóm đang tham gia
+    /// (CLAUDE.md mục 20) — khác <see cref="GetMyOverviewAsync"/> vốn gộp theo từng nhóm.</summary>
+    Task<IReadOnlyList<CounterpartyBalanceDto>> GetCounterpartyBalancesAsync(Guid callerUserId, CancellationToken cancellationToken);
 }
