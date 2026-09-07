@@ -17,6 +17,16 @@ public sealed class CreateGroupRequestValidator : AbstractValidator<CreateGroupR
     }
 }
 
+public sealed class DuplicateGroupRequestValidator : AbstractValidator<DuplicateGroupRequest>
+{
+    public DuplicateGroupRequestValidator()
+    {
+        // Name rỗng/null hợp lệ (GroupService tự đặt "{Tên gốc} (bản sao)") — chỉ giới hạn độ dài khi
+        // người dùng có truyền, khớp CreateGroupRequestValidator.
+        RuleFor(x => x.Name).MaximumLength(200);
+    }
+}
+
 public sealed class AddMemberRequestValidator : AbstractValidator<AddMemberRequest>
 {
     public AddMemberRequestValidator()

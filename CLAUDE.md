@@ -1635,3 +1635,47 @@ thống kê" thay vì canvas trống; thêm 2 khoản chi khác danh mục ("Ăn
 biểu đồ cột hiện đúng 1 cột "09/2026" cao 150.000, biểu đồ tròn hiện đúng 2 phần theo tỉ lệ 2:1 kèm
 icon+nhãn danh mục; bật dark mode (`localStorage['sb-theme']='dark'`) → chữ trục/legend đổi màu sáng
 đọc được trên nền tối, không còn hiện tượng "chữ tối trên nền tối".
+
+---
+
+## 18. Nhân bản nhóm (Duplicate Group) — bổ sung 2026-09-07
+
+Hạng mục 3/8 trong danh sách gợi ý sau mục 16. Dùng cho kịch bản "chuyến đi năm sau với cùng hội bạn"
+mà không phải thêm lại từng người.
+
+`POST /api/v1/groups/{id}/duplicate` — Body: `{ "name": null }` (rỗng/null tự đặt `"{Tên gốc} (bản
+sao)"`). Tạo `Group` **MỚI HOÀN TOÀN**, copy `Name`/`Description`/`Type`/`Currency`/`SimplifyDebts` +
+toàn bộ `GroupMember` đang `IsActive` (kể cả khách vãng lai) từ nhóm nguồn.
+
+**Cố tình KHÔNG copy:** `Expense`, `Settlement`, `AuditLog`, `RecurringExpenseTemplate`, `ShareToken`
+(nhóm mới luôn có `ShareToken` riêng do `IShareTokenGenerator` sinh mới), `IsArchived` (luôn `false`
+dù nhóm nguồn đã lưu trữ). Đây là "nhân bản khung nhóm", không phải "sao lưu toàn bộ lịch sử" — nếu
+copy cả Expense/Settlement thì bất biến `Σ net = 0` của nhóm mới sẽ vô nghĩa (nợ cũ đã settle ở nhóm
+gốc không nên tự động "sống lại" ở nhóm mới).
+
+**Quyền hạn:** người gọi chỉ cần là thành viên **đang active** của nhóm nguồn (không bắt buộc Owner)
+— hành động này không ghi gì vào nhóm nguồn, chỉ đọc danh sách thành viên mà mọi thành viên vốn đã
+xem được qua `GET /groups/{id}`. Người gọi luôn trở thành **Owner** của nhóm mới; mọi thành viên khác
+được copy sang với Role **Member**, kể cả nếu họ là Owner ở nhóm nguồn — đơn giản hóa có chủ đích: nếu
+nhóm nguồn có nhiều Owner, các Owner còn lại không tự động giữ quyền ở bản sao, có thể được cấp lại
+qua `POST /groups/{id}/members/{memberId}/role` như bình thường (mục 4.4).
+
+Web: nút "🧬 Nhân bản nhóm" trên `Groups/Details`, 1-click (không có form nhập tên riêng — đổi tên sau
+ở trang Sửa nhóm nếu muốn), redirect thẳng sang trang Details của nhóm mới kèm thông báo thành công.
+
+> ⚠️ **Bug thật phát hiện lúc verify sống bằng browser automation (2026-09-07):** nút "Nhân bản nhóm"
+> lúc cài đặt đầu tiên có `onsubmit="return confirm('Tạo 1 nhóm mới...')"`. Gọi `form.requestSubmit()`
+> qua CDP (`Runtime.evaluate`) khiến tab **treo cứng hoàn toàn** — dialog `confirm()` là native, chặn
+> toàn bộ vòng lặp sự kiện của tab, đúng y cảnh báo đã biết về việc tránh trigger `alert`/`confirm`/
+> `prompt` qua automation. Không phải lỗi logic nghiệp vụ, nhưng đủ nghiêm trọng để đổi thiết kế: bỏ
+> hẳn `confirm()` — hành động này vốn **không phá hủy gì** (không đụng nhóm nguồn, lỡ tạo thì xóa nhóm
+> mới đi là xong), nên không thực sự cần xác nhận, khớp các nút 1-click khác đã có trên trang (vd "Đổi
+> link mới"). Rút kinh nghiệm chung: `window.confirm()`/`alert()`/`prompt()` không chỉ là vấn đề riêng
+> của việc test tự động — chúng chặn cả JS lẫn mọi tương tác trang, nên chỉ dùng cho hành động THẬT SỰ
+> phá hủy/không hoàn tác được (vd xóa vĩnh viễn), không dùng mặc định cho mọi nút quan trọng.
+
+Đã verify sống trên trình duyệt (luồng đầy đủ): nhóm nguồn có 2 thành viên (Owner + 1 khách vãng lai)
+→ bấm "Nhân bản nhóm" → chuyển thẳng tới nhóm mới "Nhom Thong Ke (bản sao)" kèm banner "✅ Đã nhân bản
+thành nhóm mới..." → đúng 2 thành viên đã copy (Owner giữ nguyên vai trò Owner, khách vẫn là khách) →
+trang Khoản chi của nhóm mới đúng "Chưa có khoản chi nào" (không copy dữ liệu tài chính, đúng thiết
+kế).

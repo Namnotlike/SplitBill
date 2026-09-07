@@ -17,6 +17,9 @@ public sealed record GroupSummaryDto(Guid Id, string Name, string Type, bool IsA
 
 public sealed record CreateGroupRequest(string Name, string? Description, string Type, string? Currency);
 
+/// <summary>Nhân bản nhóm (CLAUDE.md mục 18) — Name rỗng/null thì tự đặt "{Tên gốc} (bản sao)".</summary>
+public sealed record DuplicateGroupRequest(string? Name);
+
 public sealed record UpdateGroupRequest(string? Name, string? Description, bool? SimplifyDebts, bool? IsArchived);
 
 /// <summary>Thêm thành viên: truyền UserId để gắn tài khoản có sẵn, hoặc chỉ DisplayName cho khách vãng lai.</summary>

@@ -461,4 +461,87 @@ public sealed class GroupServiceTests
         page.Items.Should().Contain(l => l.EntityType == "GroupMember" && l.Action == "Restored" && l.Summary == "đã tham gia lại nhóm qua link chia sẻ");
         page.Items.Should().Contain(l => l.EntityType == "GroupMember" && l.Action == "Created" && l.Summary == "đã tham gia nhóm qua link chia sẻ");
     }
+
+    // ===== Nhân bản nhóm (CLAUDE.md mục 18) — bổ sung 2026-09-07 =====
+
+    [Fact]
+    public async Task DuplicateAsync_DefaultName_AppendsBanSaoSuffix()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich Da Lat", null, "OneTime", "USD"), CancellationToken.None);
+
+        var duplicated = await harness.GroupService.DuplicateAsync(ownerId, group.Id, new DuplicateGroupRequest(null), CancellationToken.None);
+
+        duplicated.Id.Should().NotBe(group.Id);
+        duplicated.Name.Should().Be("Du lich Da Lat (bản sao)");
+        duplicated.Currency.Should().Be("USD"); // copy dung tien te nhom goc
+        duplicated.ShareToken.Should().NotBe(group.ShareToken); // nhom moi phai co ShareToken rieng
+    }
+
+    [Fact]
+    public async Task DuplicateAsync_CustomName_UsesProvidedName()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich Da Lat", null, "OneTime", "VND"), CancellationToken.None);
+
+        var duplicated = await harness.GroupService.DuplicateAsync(ownerId, group.Id, new DuplicateGroupRequest("Da Lat lan 2"), CancellationToken.None);
+
+        duplicated.Name.Should().Be("Da Lat lan 2");
+    }
+
+    [Fact]
+    public async Task DuplicateAsync_CopiesActiveMembers_CallerBecomesOwner_OthersBecomeMember()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var memberUserId = await harness.RegisterUserAsync("b@example.com", "Binh");
+        await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(memberUserId, "Binh"), CancellationToken.None);
+        var guest = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(null, "Khach"), CancellationToken.None);
+        // Thanh vien nay se roi nhom truoc khi nhan ban -> KHONG duoc copy sang.
+        var leaverUserId = await harness.RegisterUserAsync("c@example.com", "ChuanBiRoi");
+        var leaver = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(leaverUserId, "ChuanBiRoi"), CancellationToken.None);
+        await harness.GroupService.RemoveMemberAsync(ownerId, group.Id, leaver.Id, CancellationToken.None);
+
+        var duplicated = await harness.GroupService.DuplicateAsync(ownerId, group.Id, new DuplicateGroupRequest(null), CancellationToken.None);
+
+        duplicated.Members.Should().HaveCount(3); // owner + Binh + Khach, KHONG co ChuanBiRoi
+        duplicated.Members.Should().ContainSingle(m => m.DisplayName == "Nam" && m.Role == "Owner");
+        duplicated.Members.Should().ContainSingle(m => m.DisplayName == "Binh" && m.Role == "Member" && m.UserId == memberUserId);
+        duplicated.Members.Should().ContainSingle(m => m.DisplayName == "Khach" && m.Role == "Member" && m.UserId == null);
+        duplicated.Members.Should().NotContain(m => m.DisplayName == "ChuanBiRoi");
+    }
+
+    [Fact]
+    public async Task DuplicateAsync_DoesNotCopyExpenses()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var ownerMemberId = group.Members[0].Id;
+        await harness.ExpenseService.CreateAsync(ownerId, group.Id, new Application.Expenses.CreateExpenseRequest(
+            "An toi", 100_000, 0, DateTimeOffset.UtcNow,
+            [new Application.Expenses.ExpensePayerInput(ownerMemberId, 100_000)],
+            "Equal", new Application.Expenses.SplitConfigInput(MemberIds: [ownerMemberId])), CancellationToken.None);
+
+        var duplicated = await harness.GroupService.DuplicateAsync(ownerId, group.Id, new DuplicateGroupRequest(null), CancellationToken.None);
+
+        var expensesInNewGroup = await harness.ExpenseService.GetPagedAsync(ownerId, duplicated.Id, 1, 20, Application.Expenses.ExpenseFilter.Empty, CancellationToken.None);
+        expensesInNewGroup.TotalCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DuplicateAsync_CallerNotMemberOfSourceGroup_ThrowsMemberNotInGroup()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var strangerId = await harness.RegisterUserAsync("b@example.com", "Binh");
+
+        var act = () => harness.GroupService.DuplicateAsync(strangerId, group.Id, new DuplicateGroupRequest(null), CancellationToken.None);
+
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.MemberNotInGroup);
+    }
 }

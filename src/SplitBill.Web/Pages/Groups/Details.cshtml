@@ -40,6 +40,13 @@
     <a asp-page="/Groups/Details" asp-page-handler="ExportExpenses" asp-route-id="@Model.Group.Id" class="btn btn-outline-secondary">⬇ CSV khoản chi</a>
     <a asp-page="/Groups/Details" asp-page-handler="ExportBalances" asp-route-id="@Model.Group.Id" class="btn btn-outline-secondary">⬇ CSV số dư</a>
     <a asp-page="/Groups/Summary" asp-route-id="@Model.Group.Id" class="btn btn-outline-secondary">📄 Xuất PDF tổng kết</a>
+    @* Không dùng window.confirm() ở đây — chặn hẳn thread JS/CDP tới khi người dùng bấm, từng gây
+       tab "treo" lúc verify tự động (mục 18). Hành động này cũng không phá hủy gì (không đụng nhóm
+       nguồn, tạo lỗi thì xóa nhóm mới đi là xong) nên không thực sự cần xác nhận, khớp các nút 1-click
+       khác trên trang này (vd "Đổi link mới"). *@
+    <form method="post" asp-page-handler="Duplicate" asp-route-id="@Model.Group.Id" class="d-inline">
+        <button type="submit" class="btn btn-outline-secondary" title="Tạo nhóm mới, copy thành viên hiện tại (không copy khoản chi)">🧬 Nhân bản nhóm</button>
+    </form>
 </div>
 
 <div class="row g-4">

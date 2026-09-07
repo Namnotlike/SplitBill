@@ -17,6 +17,7 @@ public sealed class GroupsController : ControllerBase
 
     private readonly IGroupService _groupService;
     private readonly IValidator<CreateGroupRequest> _createGroupValidator;
+    private readonly IValidator<DuplicateGroupRequest> _duplicateGroupValidator;
     private readonly IValidator<AddMemberRequest> _addMemberValidator;
     private readonly IValidator<UpdateMemberRequest> _updateMemberValidator;
     private readonly IValidator<UpdateMemberRoleRequest> _updateMemberRoleValidator;
@@ -24,12 +25,14 @@ public sealed class GroupsController : ControllerBase
     public GroupsController(
         IGroupService groupService,
         IValidator<CreateGroupRequest> createGroupValidator,
+        IValidator<DuplicateGroupRequest> duplicateGroupValidator,
         IValidator<AddMemberRequest> addMemberValidator,
         IValidator<UpdateMemberRequest> updateMemberValidator,
         IValidator<UpdateMemberRoleRequest> updateMemberRoleValidator)
     {
         _groupService = groupService;
         _createGroupValidator = createGroupValidator;
+        _duplicateGroupValidator = duplicateGroupValidator;
         _addMemberValidator = addMemberValidator;
         _updateMemberValidator = updateMemberValidator;
         _updateMemberRoleValidator = updateMemberRoleValidator;
@@ -42,6 +45,15 @@ public sealed class GroupsController : ControllerBase
         var group = await _groupService.CreateAsync(User.GetUserId(), request, cancellationToken);
         // Lưu ý: ASP.NET Core mặc định strip hậu tố "Async" khỏi ActionName (SuppressAsyncSuffixInActionNames
         // = false), nên route đã đăng ký tên là "GetById", không phải "GetByIdAsync" như nameof() trả về.
+        return CreatedAtAction("GetById", new { id = group.Id }, group);
+    }
+
+    // CLAUDE.md mục 18 — Nhân bản nhóm (bổ sung 2026-09-07).
+    [HttpPost("{id:guid}/duplicate")]
+    public async Task<ActionResult<GroupDto>> DuplicateAsync(Guid id, DuplicateGroupRequest request, CancellationToken cancellationToken)
+    {
+        _duplicateGroupValidator.ValidateOrThrowDomainException(request);
+        var group = await _groupService.DuplicateAsync(User.GetUserId(), id, request, cancellationToken);
         return CreatedAtAction("GetById", new { id = group.Id }, group);
     }
 

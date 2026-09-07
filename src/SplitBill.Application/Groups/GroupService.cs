@@ -96,6 +96,76 @@ public sealed class GroupService : IGroupService
         return ToDto(group);
     }
 
+    public async Task<GroupDto> DuplicateAsync(Guid callerUserId, Guid sourceGroupId, DuplicateGroupRequest request, CancellationToken cancellationToken)
+    {
+        var source = await LoadGroupAsync(sourceGroupId, cancellationToken);
+        // Chỉ cần là thành viên nguồn (không bắt buộc Owner) — nhân bản không ghi gì vào nhóm nguồn,
+        // chỉ đọc danh sách thành viên mà bất kỳ thành viên nào cũng xem được sẵn (GetByIdAsync).
+        ResolveCallerMember(source, callerUserId);
+
+        var creator = await _userRepository.GetByIdAsync(callerUserId, cancellationToken)
+            ?? throw new DomainException(ErrorCodes.InvalidCredentials, "Tài khoản không tồn tại.");
+
+        string shareToken;
+        do
+        {
+            shareToken = _shareTokenGenerator.Generate();
+        }
+        while (await _groupRepository.ShareTokenExistsAsync(shareToken, cancellationToken));
+
+        var newGroup = new Group
+        {
+            Id = Guid.NewGuid(),
+            Name = string.IsNullOrWhiteSpace(request.Name) ? $"{source.Name} (bản sao)" : request.Name,
+            Description = source.Description,
+            Type = source.Type,
+            Currency = source.Currency,
+            CreatedByUserId = callerUserId,
+            ShareToken = shareToken,
+            SimplifyDebts = source.SimplifyDebts,
+            // IsArchived mặc định false (không khai báo) — nhóm mới luôn "mới tinh" dù nhóm nguồn đã
+            // lưu trữ.
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+
+        var ownerMember = new GroupMember
+        {
+            Id = Guid.NewGuid(),
+            GroupId = newGroup.Id,
+            UserId = callerUserId,
+            DisplayName = creator.DisplayName,
+            Role = GroupMemberRole.Owner,
+            IsActive = true,
+            JoinedAt = DateTimeOffset.UtcNow,
+        };
+        newGroup.Members.Add(ownerMember);
+
+        // Copy mọi thành viên ĐANG ACTIVE khác của nhóm nguồn (kể cả khách vãng lai — UserId null) —
+        // luôn với Role Member trong nhóm mới, kể cả nếu họ là Owner ở nhóm nguồn. Đây là đơn giản hóa
+        // có chủ đích: chỉ người bấm "Nhân bản" mới chắc chắn thành Owner của nhóm mới; nếu nhóm nguồn
+        // có nhiều Owner, những Owner còn lại không tự động giữ quyền Owner ở bản sao — họ có thể được
+        // cấp lại qua POST /groups/{id}/members/{memberId}/role như bình thường (mục 4.4).
+        foreach (var member in source.Members.Where(m => m.IsActive && m.UserId != callerUserId))
+        {
+            newGroup.Members.Add(new GroupMember
+            {
+                Id = Guid.NewGuid(),
+                GroupId = newGroup.Id,
+                UserId = member.UserId,
+                DisplayName = member.DisplayName,
+                Role = GroupMemberRole.Member,
+                IsActive = true,
+                JoinedAt = DateTimeOffset.UtcNow,
+            });
+        }
+
+        await _groupRepository.AddAsync(newGroup, cancellationToken);
+        await WriteAuditLogAsync(newGroup.Id, "Group", newGroup.Id, "Created", ownerMember.Id, null, ToDto(newGroup), cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return ToDto(newGroup);
+    }
+
     public async Task<IReadOnlyList<GroupSummaryDto>> GetMyGroupsAsync(Guid callerUserId, CancellationToken cancellationToken)
     {
         var groups = await _groupRepository.GetByUserIdAsync(callerUserId, cancellationToken);

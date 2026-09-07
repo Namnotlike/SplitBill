@@ -63,6 +63,10 @@ public sealed class SplitBillApiClient
     public Task<GroupDto> CreateGroupAsync(CreateGroupRequest request, CancellationToken ct) =>
         PostAsync<CreateGroupRequest, GroupDto>("groups", request, ct);
 
+    /// <summary>Nhân bản nhóm (CLAUDE.md mục 18).</summary>
+    public Task<GroupDto> DuplicateGroupAsync(Guid id, DuplicateGroupRequest request, CancellationToken ct) =>
+        PostAsync<DuplicateGroupRequest, GroupDto>($"groups/{id}/duplicate", request, ct);
+
     public Task<GroupDto> UpdateGroupAsync(Guid id, UpdateGroupRequest request, CancellationToken ct) =>
         PatchAsync<UpdateGroupRequest, GroupDto>($"groups/{id}", request, ct);
 

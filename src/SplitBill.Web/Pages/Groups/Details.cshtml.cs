@@ -104,6 +104,24 @@ public class DetailsModel : PageModel
         return File(bytes, "text/csv", $"so-du-{id}.csv");
     }
 
+    // CLAUDE.md mục 18 — Nhân bản nhóm: 1-click, luôn dùng tên tự sinh "{Tên gốc} (bản sao)" (không có
+    // form nhập tên riêng — người dùng đổi tên sau ở trang Sửa nhóm nếu muốn, giữ hành động này đơn
+    // giản đúng tinh thần "1 nút bấm" như RotateShareToken).
+    public async Task<IActionResult> OnPostDuplicateAsync(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var duplicated = await _apiClient.DuplicateGroupAsync(id, new DuplicateGroupRequest(null), cancellationToken);
+            TempData["SuccessMessage"] = $"Đã nhân bản thành nhóm mới \"{duplicated.Name}\".";
+            return RedirectToPage("/Groups/Details", new { id = duplicated.Id });
+        }
+        catch (ApiException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+            return RedirectToPage("/Groups/Details", new { id });
+        }
+    }
+
     public async Task<IActionResult> OnPostRotateShareTokenAsync(Guid id, CancellationToken cancellationToken)
     {
         try

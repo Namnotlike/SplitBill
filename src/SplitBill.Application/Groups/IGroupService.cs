@@ -5,6 +5,13 @@ namespace SplitBill.Application.Groups;
 public interface IGroupService
 {
     Task<GroupDto> CreateAsync(Guid callerUserId, CreateGroupRequest request, CancellationToken cancellationToken);
+
+    /// <summary>Nhân bản nhóm (CLAUDE.md mục 18) — tạo nhóm MỚI copy Name/Description/Type/Currency/
+    /// SimplifyDebts + toàn bộ thành viên đang active (kể cả khách vãng lai) từ nhóm nguồn, KHÔNG copy
+    /// Expense/Settlement/AuditLog/RecurringExpenseTemplate/ShareToken (nhóm mới có ShareToken riêng).
+    /// Caller phải là thành viên đang active của nhóm nguồn (không nhất thiết Owner), và luôn trở
+    /// thành Owner của nhóm mới — mọi thành viên khác được copy sang với Role Member.</summary>
+    Task<GroupDto> DuplicateAsync(Guid callerUserId, Guid sourceGroupId, DuplicateGroupRequest request, CancellationToken cancellationToken);
     Task<IReadOnlyList<GroupSummaryDto>> GetMyGroupsAsync(Guid callerUserId, CancellationToken cancellationToken);
     Task<GroupDto> GetByIdAsync(Guid callerUserId, Guid groupId, CancellationToken cancellationToken);
     Task<GroupDto> UpdateAsync(Guid callerUserId, Guid groupId, UpdateGroupRequest request, CancellationToken cancellationToken);
