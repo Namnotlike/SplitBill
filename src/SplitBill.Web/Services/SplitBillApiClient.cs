@@ -183,6 +183,16 @@ public sealed class SplitBillApiClient
         return new ReceiptImageContentDto(bytes, contentType, fileName);
     }
 
+    // ===== Bình luận khoản chi (CLAUDE.md mục 19) =====
+    public Task<IReadOnlyList<ExpenseCommentDto>> GetExpenseCommentsAsync(Guid expenseId, CancellationToken ct) =>
+        GetAsync<IReadOnlyList<ExpenseCommentDto>>($"expenses/{expenseId}/comments", ct);
+
+    public Task<ExpenseCommentDto> AddExpenseCommentAsync(Guid expenseId, CreateExpenseCommentRequest request, CancellationToken ct) =>
+        PostAsync<CreateExpenseCommentRequest, ExpenseCommentDto>($"expenses/{expenseId}/comments", request, ct);
+
+    public Task DeleteExpenseCommentAsync(Guid commentId, CancellationToken ct) =>
+        DeleteAsync($"expense-comments/{commentId}", ct);
+
     // ===== Balances / Settlement =====
     public Task<IReadOnlyList<MemberBalanceDto>> GetBalancesAsync(Guid groupId, CancellationToken ct) =>
         GetAsync<IReadOnlyList<MemberBalanceDto>>($"groups/{groupId}/balances", ct);

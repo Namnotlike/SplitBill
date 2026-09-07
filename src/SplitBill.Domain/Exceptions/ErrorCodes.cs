@@ -31,4 +31,6 @@ public static class ErrorCodes
     public const string RecurringExpenseNotFound = "RECURRING_EXPENSE_NOT_FOUND";
     // Quên mật khẩu (CLAUDE.md mục 16, bổ sung 2026-09-07).
     public const string InvalidResetToken = "INVALID_RESET_TOKEN";
+    // Bình luận khoản chi (CLAUDE.md mục 19, bổ sung 2026-09-07).
+    public const string ExpenseCommentNotFound = "EXPENSE_COMMENT_NOT_FOUND";
 }

@@ -185,6 +185,45 @@
     </div>
 </div>
 
+@* ===== Bình luận khoản chi (CLAUDE.md mục 19) ===== *@
+<div class="card mt-3">
+    <div class="card-body">
+        <h5 class="card-title mb-3">💬 Bình luận (@Model.Comments.Count)</h5>
+
+        @if (Model.Comments.Count == 0)
+        {
+            <p class="text-muted small mb-3">Chưa có bình luận nào.</p>
+        }
+        else
+        {
+            <ul class="list-unstyled mb-3">
+                @foreach (var comment in Model.Comments)
+                {
+                    <li class="d-flex justify-content-between align-items-start border-bottom py-2">
+                        <div>
+                            <div class="fw-600">@comment.AuthorDisplayName <span class="text-muted small">· @comment.CreatedAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm")</span></div>
+                            <div>@comment.Content</div>
+                        </div>
+                        @if (Model.MyMemberId == comment.AuthorMemberId || Model.IsOwner)
+                        {
+                            <form method="post" asp-page-handler="DeleteComment" asp-route-commentId="@comment.Id" class="ms-2">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Xóa</button>
+                            </form>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+
+        <form method="post" asp-page-handler="AddComment">
+            <div class="input-group">
+                <input type="text" name="NewCommentContent" class="form-control" placeholder="Viết bình luận..." maxlength="2000" required />
+                <button type="submit" class="btn btn-outline-primary">Gửi</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 @section Scripts {
     <script>
         function updateSplitColumns() {

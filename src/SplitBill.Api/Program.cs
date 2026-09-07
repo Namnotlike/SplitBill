@@ -135,6 +135,7 @@ try
     builder.Services.AddScoped<IReceiptImageRepository, ReceiptImageRepository>();
     builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
     builder.Services.AddScoped<IRecurringExpenseRepository, RecurringExpenseRepository>();
+    builder.Services.AddScoped<IExpenseCommentRepository, ExpenseCommentRepository>();
     builder.Services.AddSingleton<IShareTokenGenerator, ShareTokenGenerator>();
     builder.Services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
 
@@ -175,6 +176,7 @@ try
     builder.Services.AddScoped<IExportService, ExportService>();
     builder.Services.AddScoped<INotificationService, NotificationService>();
     builder.Services.AddScoped<IRecurringExpenseService, RecurringExpenseService>();
+    builder.Services.AddScoped<IExpenseCommentService, ExpenseCommentService>();
     builder.Services.AddScoped<IRecurringExpenseRunner, RecurringExpenseRunner>();
     builder.Services.AddScoped<IDebtReminderRunner, DebtReminderRunner>();
 

@@ -33,6 +33,18 @@ public class EditModel : PageModel
     /// <summary>Khác null nếu khoản chi đã có ảnh hóa đơn — trang dùng để quyết định hiện thumbnail.</summary>
     public string? ReceiptImageUrl { get; set; }
 
+    // ===== Bình luận khoản chi (CLAUDE.md mục 19) =====
+    public IReadOnlyList<ExpenseCommentDto> Comments { get; set; } = Array.Empty<ExpenseCommentDto>();
+
+    /// <summary>GroupMemberId của người đang xem trong nhóm này — dùng để quyết định hiện nút "Xóa"
+    /// (chỉ tác giả bình luận hoặc Owner mới xóa được, khớp quyền phía API).</summary>
+    public Guid? MyMemberId { get; set; }
+
+    public bool IsOwner { get; set; }
+
+    [BindProperty]
+    public string NewCommentContent { get; set; } = string.Empty;
+
     public sealed class ExpenseInput
     {
         [Required]
@@ -71,6 +83,7 @@ public class EditModel : PageModel
             Group = await _apiClient.GetGroupAsync(expense.GroupId, cancellationToken);
             Input = MapToInput(expense, Group);
             ReceiptImageUrl = expense.ReceiptImageUrl;
+            await LoadCommentContextAsync(cancellationToken);
             return Page();
         }
         catch (ApiException ex)
@@ -87,6 +100,7 @@ public class EditModel : PageModel
 
         if (!ModelState.IsValid)
         {
+            await LoadCommentContextAsync(cancellationToken);
             return Page();
         }
 
@@ -98,6 +112,7 @@ public class EditModel : PageModel
         if (payers.Count == 0)
         {
             ErrorMessage = "Cần ít nhất 1 người ứng tiền (Amount > 0).";
+            await LoadCommentContextAsync(cancellationToken);
             return Page();
         }
 
@@ -105,6 +120,7 @@ public class EditModel : PageModel
         if (configError is not null)
         {
             ErrorMessage = configError;
+            await LoadCommentContextAsync(cancellationToken);
             return Page();
         }
 
@@ -128,8 +144,51 @@ public class EditModel : PageModel
             ErrorMessage = ex.StatusCode == 409
                 ? "Khoản chi đã bị người khác sửa trước đó. Vui lòng tải lại trang và thử lại."
                 : ex.Message;
+            await LoadCommentContextAsync(cancellationToken);
             return Page();
         }
+    }
+
+    // CLAUDE.md mục 19 — Bình luận khoản chi.
+    public async Task<IActionResult> OnPostAddCommentAsync(CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(NewCommentContent))
+        {
+            try
+            {
+                await _apiClient.AddExpenseCommentAsync(ExpenseId, new CreateExpenseCommentRequest(NewCommentContent), cancellationToken);
+            }
+            catch (ApiException ex)
+            {
+                TempData["ErrorMessage"] = ex.Message;
+            }
+        }
+
+        return RedirectToPage(new { expenseId = ExpenseId });
+    }
+
+    public async Task<IActionResult> OnPostDeleteCommentAsync(Guid commentId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _apiClient.DeleteExpenseCommentAsync(commentId, cancellationToken);
+        }
+        catch (ApiException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
+        return RedirectToPage(new { expenseId = ExpenseId });
+    }
+
+    private async Task LoadCommentContextAsync(CancellationToken cancellationToken)
+    {
+        Comments = await _apiClient.GetExpenseCommentsAsync(ExpenseId, cancellationToken);
+
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var myMember = Group.Members.FirstOrDefault(m => m.UserId?.ToString() == userId);
+        MyMemberId = myMember?.Id;
+        IsOwner = myMember?.Role == "Owner";
     }
 
     public async Task<IActionResult> OnPostUploadReceiptAsync(IFormFile? receiptFile, CancellationToken cancellationToken)

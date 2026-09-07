@@ -27,7 +27,11 @@ public sealed class EditModelTests
     {
         var handler = new FakeHttpMessageHandler(req =>
         {
-            object body = req.RequestUri!.AbsolutePath.Contains("/groups/")
+            // EditModel.OnGetAsync (từ 2026-09-07) còn gọi thêm GET .../comments để nạp bình luận
+            // (CLAUDE.md mục 19) — trả mảng rỗng, không liên quan tới các test SplitConfigJson ở đây.
+            object body = req.RequestUri!.AbsolutePath.Contains("/comments")
+                ? Array.Empty<object>()
+                : req.RequestUri!.AbsolutePath.Contains("/groups/")
                 ? new
                 {
                     id = GroupId,

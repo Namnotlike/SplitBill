@@ -1679,3 +1679,62 @@ Web: nút "🧬 Nhân bản nhóm" trên `Groups/Details`, 1-click (không có f
 thành nhóm mới..." → đúng 2 thành viên đã copy (Owner giữ nguyên vai trò Owner, khách vẫn là khách) →
 trang Khoản chi của nhóm mới đúng "Chưa có khoản chi nào" (không copy dữ liệu tài chính, đúng thiết
 kế).
+
+---
+
+## 19. Bình luận trên khoản chi — bổ sung 2026-09-07
+
+Hạng mục 4/8 trong danh sách gợi ý sau mục 16. Thành viên thắc mắc/giải thích ngay dưới 1 `Expense`
+(vd "sao khoản này tính cả phần của tao?") mà không cần rời trang.
+
+### 19.1 Mô hình dữ liệu
+
+```csharp
+ExpenseComment {
+    Guid Id
+    Guid ExpenseId
+    Guid AuthorMemberId        // GroupMemberId của người viết — LUÔN là chính caller đã đăng nhập,
+                                // không cho viết hộ người khác (cùng nguyên tắc guest ở mục 4.4)
+    string Content             // tối đa 2000 ký tự
+    bool IsDeleted              // soft-delete, có HasQueryFilter — không phải dữ liệu tài chính
+                                // (mục 1) nhưng vẫn theo quy ước soft-delete chung của app cho nhất
+                                // quán + giữ được lịch sử nếu cần tra cứu sau này
+    DateTimeOffset CreatedAt
+}
+```
+
+Không có `UpdatedAt`/sửa bình luận — cố tình chỉ Create + Delete để giữ tính năng nhỏ gọn (MVP).
+
+### 19.2 API
+
+```
+GET    /api/v1/expenses/{expenseId}/comments   Toàn bộ bình luận, sort CreatedAt tăng dần (không
+                                                phân trang — số bình luận trên 1 khoản chi luôn nhỏ)
+POST   /api/v1/expenses/{expenseId}/comments    Body: { content }
+DELETE /api/v1/expense-comments/{commentId}
+```
+
+**Quyền hạn:** mọi thành viên đang active của nhóm đều bình luận được. Xóa thì **chỉ tác giả bình
+luận hoặc Owner** của nhóm mới xóa được (403 `INSUFFICIENT_ROLE` nếu không đủ quyền) — khớp mẫu "đổi
+tên người khác chỉ Owner" ở mục 4.4.
+
+**Cố tình KHÔNG thêm sự kiện thông báo mới** cho bình luận — mục 13 đã chốt đúng 4 sự kiện kích hoạt
+thông báo ("không hơn, không tự ý thêm sự kiện khác ngoài danh sách này"); bình luận không nằm trong
+danh sách đó nên không trigger `NotificationService`.
+
+`ExpenseCommentService` (namespace `SplitBill.Application.Expenses`) là service riêng, tách khỏi
+`ExpenseService` đã lớn sẵn — tự có `LoadExpenseAsync`/`LoadGroupAsync`/`ResolveCallerMember` riêng
+(chấp nhận trùng lặp nhỏ giữa các service, cùng mẫu `NotificationService`/`RecurringExpenseService`
+đã áp dụng từ trước, thay vì kéo thêm 1 base class dùng chung).
+
+### 19.3 Web
+
+Phần "💬 Bình luận" nằm ở cuối trang `Expenses/Edit.cshtml` (không có trang "chi tiết khoản chi" riêng
+— Edit là nơi tự nhiên nhất để xem/tương tác với 1 khoản chi cụ thể). Nút "Xóa" chỉ hiện với tác giả
+hoặc Owner (`EditModel.MyMemberId`/`IsOwner`, tự suy từ claim `NameIdentifier` khớp `Group.Members`,
+cùng mẫu đã dùng ở `SettlementPlan.cshtml.cs`).
+
+Đã verify sống trên trình duyệt: mở khoản chi có 0 bình luận → đúng "Chưa có bình luận nào" → gửi 1
+bình luận → hiện đúng "💬 Bình luận (1)" kèm tên tác giả + thời gian + nội dung + nút "Xóa" (vì mình
+là tác giả) → bấm Xóa → quay lại đúng "Chưa có bình luận nào" (soft-delete hoạt động, query filter
+loại bỏ đúng bản ghi đã xóa).
