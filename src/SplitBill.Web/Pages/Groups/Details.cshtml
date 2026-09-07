@@ -32,6 +32,7 @@
     <a asp-page="/Groups/Balances" asp-route-id="@Model.Group.Id" class="btn btn-outline-primary">⚖️ Số dư</a>
     <a asp-page="/Groups/SettlementPlan" asp-route-id="@Model.Group.Id" class="btn btn-outline-primary">🔀 Kế hoạch thanh toán</a>
     <a asp-page="/Groups/Timeline" asp-route-id="@Model.Group.Id" class="btn btn-outline-primary">🕒 Hoạt động</a>
+    <a asp-page="/Groups/Statistics" asp-route-id="@Model.Group.Id" class="btn btn-outline-primary">📊 Thống kê</a>
     @if (Model.Group.Type == "Recurring")
     {
         <a asp-page="/Groups/RecurringExpenses" asp-route-groupId="@Model.Group.Id" class="btn btn-outline-primary">🔁 Khoản chi định kỳ</a>

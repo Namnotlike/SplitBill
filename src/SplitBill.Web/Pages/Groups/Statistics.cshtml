@@ -1,0 +1,148 @@
+@page "{id:guid}"
+@using System.Text.Json
+@model SplitBill.Web.Pages.Groups.StatisticsModel
+@{
+    ViewData["Title"] = "Thống kê";
+    Layout = "_Layout";
+
+    // Dữ liệu cho Chart.js — serialize thẳng ở đây, không cần API riêng (client chỉ vẽ lại đúng dữ
+    // liệu Model đã tính sẵn, giống cách SettlementPlan.cshtml truyền vietQr cho qrcodejs).
+    var monthLabels = JsonSerializer.Serialize(Model.MonthlyTotals.Select(m => m.MonthLabel));
+    var monthValues = JsonSerializer.Serialize(Model.MonthlyTotals.Select(m => m.Total));
+    var categoryLabels = JsonSerializer.Serialize(Model.CategoryTotals.Select(c => $"{c.Icon} {c.Label}"));
+    var categoryValues = JsonSerializer.Serialize(Model.CategoryTotals.Select(c => c.Total));
+    var categoryColorMap = new Dictionary<string, string>
+    {
+        ["Other"] = "#94a3b8",
+        ["Food"] = "#f97316",
+        ["Transport"] = "#0ea5e9",
+        ["Accommodation"] = "#8b5cf6",
+        ["Entertainment"] = "#ec4899",
+        ["Shopping"] = "#22c55e",
+    };
+    var categoryColors = JsonSerializer.Serialize(Model.CategoryTotals.Select(c => categoryColorMap.GetValueOrDefault(c.Category, "#94a3b8")));
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <a asp-page="/Groups/Details" asp-route-id="@Model.Group.Id" class="text-muted small d-block mb-1">← Về nhóm</a>
+        <h1 class="h3 mb-0">📊 Thống kê — @Model.Group.Name</h1>
+    </div>
+    <a asp-page="/Groups/Summary" asp-route-id="@Model.Group.Id" class="btn btn-outline-secondary btn-sm">🖨️ Xem trang tổng kết / In PDF</a>
+</div>
+
+@if (Model.Expenses.Count == 0)
+{
+    <div class="card">
+        <div class="card-body text-center text-muted py-5">
+            Chưa có khoản chi nào trong nhóm này để thống kê.
+        </div>
+    </div>
+}
+else
+{
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card h-100 text-center">
+                <div class="card-body">
+                    <div class="text-muted small">Tổng chi tiêu</div>
+                    <div class="fs-4 fw-700">@SupportedCurrencies.Format(Model.Expenses.Sum(e => e.TotalAmount), Model.Group.Currency)</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 text-center">
+                <div class="card-body">
+                    <div class="text-muted small">Số khoản chi</div>
+                    <div class="fs-4 fw-700">@Model.Expenses.Count</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 text-center">
+                <div class="card-body">
+                    <div class="text-muted small">Số tháng có phát sinh</div>
+                    <div class="fs-4 fw-700">@Model.MonthlyTotals.Count</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Chi tiêu theo thời gian</h5>
+                    <canvas id="monthlyChart" height="260" aria-label="Biểu đồ chi tiêu theo tháng" role="img"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Chi tiêu theo danh mục</h5>
+                    <canvas id="categoryChart" height="260" aria-label="Biểu đồ chi tiêu theo danh mục" role="img"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    @if (Model.Expenses.Count > 0)
+    {
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+        <script>
+            (function () {
+                // Đọc màu theo đúng theme hiện tại (site.css --sb-* — CLAUDE.md mục 15.1 dark mode) để
+                // biểu đồ không bị "chữ đen trên nền đen" khi ở dark mode.
+                var style = getComputedStyle(document.documentElement);
+                var inkColor = style.getPropertyValue('--sb-ink').trim() || '#1a1a2e';
+                var mutedColor = style.getPropertyValue('--sb-muted').trim() || '#6b7280';
+                var borderColor = style.getPropertyValue('--sb-border').trim() || '#e7e8f1';
+                var brandColor = style.getPropertyValue('--sb-brand').trim() || '#6d5ef7';
+
+                Chart.defaults.color = mutedColor;
+                Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+
+                new Chart(document.getElementById('monthlyChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: @Html.Raw(monthLabels),
+                        datasets: [{
+                            label: 'Tổng chi tiêu',
+                            data: @Html.Raw(monthValues),
+                            backgroundColor: brandColor,
+                            borderRadius: 6,
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { grid: { color: borderColor }, ticks: { color: mutedColor } },
+                            y: { grid: { color: borderColor }, ticks: { color: mutedColor }, beginAtZero: true },
+                        },
+                    },
+                });
+
+                new Chart(document.getElementById('categoryChart'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: @Html.Raw(categoryLabels),
+                        datasets: [{
+                            data: @Html.Raw(categoryValues),
+                            backgroundColor: @Html.Raw(categoryColors),
+                            borderColor: style.getPropertyValue('--sb-card').trim() || '#ffffff',
+                            borderWidth: 2,
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { position: 'bottom', labels: { color: inkColor } } },
+                    },
+                });
+            })();
+        </script>
+    }
+}

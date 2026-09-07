@@ -1590,3 +1590,48 @@ này có tài khoản..." → lấy link đặt lại mật khẩu từ log `Con
 → xác nhận link đúng dạng TUYỆT ĐỐI (`http://localhost:5103/Account/ResetPassword?token=...`, không
 phải đường dẫn tương đối) → mở link, nhập mật khẩu mới 2 lần → hiện đúng "Đổi mật khẩu thành công" →
 đăng nhập lại bằng mật khẩu MỚI thành công, vào thẳng trang Nhóm của tôi.
+
+---
+
+## 17. Thống kê chi tiêu theo thời gian (biểu đồ) — bổ sung 2026-09-07
+
+Hạng mục 2/8 trong danh sách gợi ý sau mục 16. Trang mới `Groups/Statistics.cshtml` — biểu đồ cột
+"Chi tiêu theo thời gian" (tổng `TotalAmount` theo từng tháng, nhãn `MM/yyyy`) và biểu đồ tròn "Chi
+tiêu theo danh mục" (tái dùng `ExpenseCategoryOptions`, mục 15.3), truy cập từ nút "📊 Thống kê" trên
+`Groups/Details`.
+
+**Không thêm API endpoint riêng** — `StatisticsModel.OnGetAsync` tái dùng đúng mẫu gộp-toàn-bộ-trang
+đã có ở `SummaryModel` (mục 15.9, PDF tổng kết): gọi `GET /groups/{id}/expenses` lặp qua mọi trang
+(API giới hạn tối đa 100/trang) rồi tự tính `GroupBy` theo tháng/danh mục ở tầng Web (C#), không cần
+service/endpoint mới. Cả 2 trang cố tình dùng cùng quy ước "chỉ tính `TotalAmount`, không cộng
+`ExtraFeeAmount`" cho breakdown theo danh mục, để không lệch số nếu người dùng đối chiếu 2 trang.
+
+**Vẽ biểu đồ bằng Chart.js qua CDN** (`cdnjs.cloudflare.com`, cùng mẫu `qrcodejs` đã dùng ở
+`SettlementPlan.cshtml` — mục 2 chỉ giới hạn NuGet phía backend, không áp dụng cho thư viện JS phía
+client). Màu chữ/trục/viền đọc trực tiếp từ CSS custom properties `--sb-*` (`getComputedStyle` lúc
+render) để biểu đồ tự thích ứng dark mode (mục 15.1) mà không cần vẽ lại — đã verify sống cả 2 theme.
+
+> ⚠️ **Bug thật phát hiện lúc verify sống (2026-09-07):** version `4.4.4` của Chart.js dùng lúc viết
+> code đầu tiên **không tồn tại trên cdnjs** (`GET .../Chart.js/4.4.4/chart.umd.min.js` trả về 404,
+> body 548 byte là trang lỗi JSON của cdnjs, không phải file JS) — script tag "load" thành công về mặt
+> HTML (không báo lỗi console vì trình duyệt coi 404 với `Content-Type` bất kỳ vẫn là response hợp lệ
+> cho thẻ `<script>`, chỉ đơn giản không định nghĩa `window.Chart`) nên 2 canvas hiện trống trơn mà
+> KHÔNG có lỗi nào trong console — trông như bug JS logic chứ không phải sai version. Chẩn đoán bằng
+> `fetch()` trực tiếp từng version ứng viên từ console trang đang mở, tìm ra `4.4.1` mới là bản có
+> thật (200, ~200KB). Đã sửa lại đúng version. **Bài học quy trình:** không đoán số version thư viện
+> CDN từ trí nhớ rồi tin luôn — nếu không verify sống được ngay, ít nhất phải tự `fetch()`/`curl` xác
+> nhận URL trả về 200 trước khi tin tưởng đưa vào code, vì lỗi này hoàn toàn im lặng (không exception,
+> không log) và chỉ lộ ra khi nhìn trực tiếp vào trang render.
+>
+> Riêng dự án này cũng **không có Razor runtime compilation** (`Microsoft.AspNetCore.Mvc.Razor.
+> RuntimeCompilation` chưa được cài — khác với static assets, vốn phục vụ trực tiếp từ đĩa khi
+> `ASPNETCORE_ENVIRONMENT=Development`, xem mục 10b) — sửa file `.cshtml` khi server `SplitBill.Web`
+> đang chạy **không** tự áp dụng, phải dừng và `dotnet run` lại mới thấy thay đổi. Từng nhầm tưởng
+> fix không có tác dụng vì reload trang vẫn thấy version cũ.
+
+Đã verify sống trên trình duyệt: nhóm 0 khoản chi → đúng "Chưa có khoản chi nào trong nhóm này để
+thống kê" thay vì canvas trống; thêm 2 khoản chi khác danh mục ("Ăn uống" 100.000đ, "Di chuyển"
+50.000đ, cùng tháng) → 3 thẻ số liệu đúng (Tổng 150.000đ, Số khoản chi 2, Số tháng có phát sinh 1),
+biểu đồ cột hiện đúng 1 cột "09/2026" cao 150.000, biểu đồ tròn hiện đúng 2 phần theo tỉ lệ 2:1 kèm
+icon+nhãn danh mục; bật dark mode (`localStorage['sb-theme']='dark'`) → chữ trục/legend đổi màu sáng
+đọc được trên nền tối, không còn hiện tượng "chữ tối trên nền tối".
