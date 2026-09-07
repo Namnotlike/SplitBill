@@ -72,6 +72,24 @@ public sealed class RecurringExpenseTests
         (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.MemberNotInGroup);
     }
 
+    // Bảo mật/nghiệp vụ (security-review 2026-09-07) — xem ghi chú tương tự ở ExpenseServiceTests.
+    // Template không có API Update (chỉ Create/Deactivate) nên không cần khái niệm "tham chiếu cũ được
+    // miễn trừ" — mọi payer/split lúc TẠO mẫu đều phải đang active.
+    [Fact]
+    public async Task CreateAsync_MemberLeftGroup_ThrowsMemberNotActive()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupRecurringGroupAsync();
+        await harness.GroupService.RemoveMemberAsync(ownerId, group.Id, guestMemberId, CancellationToken.None); // net = 0, rời được
+
+        var act = () => harness.RecurringExpenseService.CreateAsync(ownerId, group.Id, new CreateRecurringExpenseRequest(
+            "Tien nha", 1_000_000, 0,
+            [new ExpensePayerInput(ownerMemberId, 1_000_000)],
+            "Equal", new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId]),
+            "Monthly", DateTimeOffset.UtcNow), CancellationToken.None);
+
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.MemberNotActive);
+    }
+
     [Fact]
     public async Task GetByGroupIdAsync_ReturnsCreatedTemplates()
     {

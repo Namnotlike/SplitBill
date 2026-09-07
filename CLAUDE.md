@@ -337,6 +337,29 @@ Cách này giữ được sự tự do cho người dùng mà không phá vỡ b
 - `Settlement.FromMemberId != ToMemberId`.
 - Không cho phép `Σ payers.Amount == 0`.
 
+> ⚠️ **Lỗ hổng bảo mật/nghiệp vụ phát hiện + sửa qua `security-review` (2026-09-07):** "phải thuộc
+> `GroupId`" ở trên (`ValidateMembersBelongToGroup`) trước đây chỉ kiểm tra thành viên còn tồn tại
+> trong `group.Members`, **không lọc `GroupMember.IsActive`** — một thành viên đã rời nhóm (chỉ rời
+> được khi `net == 0` tại thời điểm rời) vẫn có thể bị gán làm payer/split MỚI qua `POST/PUT
+> /expenses` hoặc `POST /groups/{id}/recurring-expenses` nếu ai đó biết `GroupMemberId` cũ của họ —
+> tái tạo đúng lỗ hổng "nợ ma" đã sửa cho Recurring Expense Runner (mục 15.7) nhưng qua đường thủ
+> công. Người đã rời nhóm không còn xem được `/groups/{id}/balances` (yêu cầu caller đang active) nên
+> không có cách nào biết/tranh chấp.
+>
+> **Đã sửa** bằng `ValidateMembersAreActive` (thêm cạnh `ValidateMembersBelongToGroup` trong cả
+> `ExpenseService` và `RecurringExpenseService` — 2 bản riêng, không dùng chung vì 2 class độc lập):
+> mọi payer/split phải là thành viên đang active, ném `403 MEMBER_NOT_ACTIVE` nếu không. **Ngoại lệ
+> quan trọng cho `PUT /expenses/{id}`:** chỉ áp luật này cho tham chiếu **MỚI** — một `GroupMemberId`
+> đã có mặt trong `Payers`/`Splits` GỐC của chính khoản chi đó (trước khi sửa) được miễn trừ, vì `PUT`
+> luôn gửi lại TOÀN BỘ `Payers`/`Splits` (không phải patch từng phần); nếu áp luật cho cả tham chiếu
+> cũ, mọi khoản chi lịch sử có 1 người tham gia đã rời nhóm sau đó sẽ **vĩnh viễn không sửa được nữa**
+> dù chỉ đổi `Title`/`Note` — một hồi quy nghiêm trọng hơn cả lỗ hổng đang sửa. `RecurringExpenseTemplate`
+> không có API Update (chỉ Create/Deactivate) nên không cần khái niệm "tham chiếu cũ được miễn trừ".
+> Test: `CreateAsync_MemberLeftGroup_ThrowsMemberNotActive`,
+> `UpdateAsync_AddsNewReferenceToMemberWhoLeftGroup_ThrowsMemberNotActive`,
+> `UpdateAsync_KeepsExistingReferenceToMemberWhoLeftGroup_Succeeds` (`ExpenseServiceTests`);
+> `CreateAsync_MemberLeftGroup_ThrowsMemberNotActive` (`RecurringExpenseTests`).
+
 ---
 
 ## 6. Thuật toán tối ưu lượt chuyển tiền
@@ -1391,8 +1414,9 @@ bị xử lý lại ngay ở lượt quét kế tiếp).
 > `IsActive` trong nhóm hay không** — khác với đường tạo Expense tương tác (`ExpenseService`,
 > `RecurringExpenseService.CreateAsync`) vốn validate qua `ValidateMembersBelongToGroup` (dù validate
 > đó cũng chỉ kiểm tra "còn tồn tại trong `group.Members`", không lọc `IsActive` — một lỗ hổng rộng
-> hơn, đã ghi nhận nhưng cố tình CHƯA sửa ở đây vì đó là quyết định thiết kế khác, ngoài phạm vi lần
-> sửa này). Một thành viên chỉ rời được nhóm khi `net == 0` **tại thời điểm rời**
+> hơn, lúc phát hiện đã cố tình CHƯA sửa ngay vì là quyết định thiết kế khác, ngoài phạm vi lần sửa
+> này; **đã sửa riêng ngay sau đó cùng ngày — xem mục 5.4**). Một thành viên chỉ rời được nhóm khi
+> `net == 0` **tại thời điểm rời**
 > (`GroupService.RemoveMemberAsync`), nhưng không có gì ngăn 1 mẫu định kỳ tiếp tục gán tiền cho họ ở
 > lần chạy sau đó — và sau khi rời, họ không còn xem được `/groups/{id}/balances` (yêu cầu caller đang
 > active) nên hoàn toàn không biết/không tranh chấp được khoản nợ "ma" này.

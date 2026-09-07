@@ -62,6 +62,80 @@ public sealed class ExpenseServiceTests
         (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.MemberNotInGroup);
     }
 
+    // ⚠️ Bảo mật/nghiệp vụ (security-review 2026-09-07): ValidateMembersBelongToGroup chỉ kiểm tra
+    // "còn tồn tại trong nhóm", không lọc IsActive — một thành viên đã rời nhóm vẫn có thể bị gán làm
+    // payer/split MỚI nếu ai đó biết GroupMemberId cũ của họ, tái tạo đúng lỗ hổng "nợ ma" đã sửa cho
+    // Recurring Expense Runner (mục 15.7) nhưng qua đường tạo/sửa Expense thủ công. 4 test dưới đây
+    // khóa lại hành vi đã sửa: chặn tham chiếu MỚI tới thành viên không active, nhưng KHÔNG chặn giữ
+    // nguyên tham chiếu CŨ khi sửa khoản chi lịch sử (nếu không, mọi khoản chi có người tham gia đã
+    // rời nhóm sau đó sẽ vĩnh viễn không sửa được nữa dù chỉ đổi Title).
+    [Fact]
+    public async Task CreateAsync_MemberLeftGroup_ThrowsMemberNotActive()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        await harness.GroupService.RemoveMemberAsync(ownerId, group.Id, guestMemberId, CancellationToken.None); // net = 0, rời được
+
+        var act = () => harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "An toi", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 100_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId])), CancellationToken.None);
+
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.MemberNotActive);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_AddsNewReferenceToMemberWhoLeftGroup_ThrowsMemberNotActive()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        var created = await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "An toi", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 100_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId])), CancellationToken.None); // chỉ owner, chưa dính guest
+        await harness.GroupService.RemoveMemberAsync(ownerId, group.Id, guestMemberId, CancellationToken.None); // net = 0, rời được
+
+        // Sửa lại để THÊM guest (đã rời nhóm) vào splits — tham chiếu MỚI, phải bị chặn.
+        var act = () => harness.ExpenseService.UpdateAsync(ownerId, created.Data.Id, new UpdateExpenseRequest(
+            "An toi 2", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 100_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId]),
+            RowVersion: created.Data.RowVersion), CancellationToken.None);
+
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.MemberNotActive);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_KeepsExistingReferenceToMemberWhoLeftGroup_Succeeds()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        // 2 khoản chi đối xứng để net của guest = 0 dù vẫn có mặt trong lịch sử: A guest nợ owner
+        // 50k, B owner nợ guest 50k -> guest net = -50000 + 50000 = 0, đủ điều kiện rời nhóm.
+        var expenseA = await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "Khoan A", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 100_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId])), CancellationToken.None);
+        await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "Khoan B", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(guestMemberId, 100_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId])), CancellationToken.None);
+        await harness.GroupService.RemoveMemberAsync(ownerId, group.Id, guestMemberId, CancellationToken.None); // net = 0, rời được
+
+        // Sửa Khoản A: chỉ đổi Title, GIỮ NGUYÊN payers/splits gốc (đã có guest từ trước) -> phải cho
+        // qua, không được vì guest hiện đã rời nhóm mà chặn luôn cả việc sửa khoản chi lịch sử.
+        var updated = await harness.ExpenseService.UpdateAsync(ownerId, expenseA.Data.Id, new UpdateExpenseRequest(
+            "Khoan A (da sua)", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 100_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId]),
+            RowVersion: expenseA.Data.RowVersion), CancellationToken.None);
+
+        updated.Data.Title.Should().Be("Khoan A (da sua)");
+    }
+
     [Fact]
     public async Task CreateAsync_DuplicatePayer_ThrowsDuplicateMemberId()
     {

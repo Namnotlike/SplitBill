@@ -73,6 +73,9 @@ public sealed class ExpenseService : IExpenseService
         var (splitMode, splits, warnings) = ComputeSplits(group, Guid.NewGuid(), request.TotalAmount, request.ExtraFeeAmount, request.SplitMode, request.SplitConfig);
 
         ValidatePayers(group, request.Payers);
+        // Khoản chi MỚI hoàn toàn -> không có tham chiếu "cũ" nào được miễn trừ, mọi payer/split phải
+        // là thành viên đang active (xem ghi chú ValidateMembersAreActive).
+        ValidateMembersAreActive(group, request.Payers.Select(p => p.MemberId).Concat(splits.Select(s => s.MemberId)), new HashSet<Guid>());
 
         var expense = new Expense
         {
@@ -137,9 +140,17 @@ public sealed class ExpenseService : IExpenseService
         }
 
         var before = ToDto(expense);
+        // Thành viên đã có mặt trong Payers/Splits GỐC (trước lần sửa này) được MIỄN TRỪ khỏi yêu cầu
+        // "còn active" — sửa 1 khoản chi lịch sử (vd chỉ đổi Title) không được vô tình chặn lại chỉ vì
+        // 1 người liên quan đã rời nhóm sau đó. Yêu cầu "còn active" chỉ áp cho tham chiếu MỚI được
+        // thêm vào (security-review 2026-09-07, xem CLAUDE.md mục 5.4).
+        var alreadyInvolvedMemberIds = expense.Payers.Select(p => p.GroupMemberId)
+            .Concat(expense.Splits.Select(s => s.GroupMemberId))
+            .ToHashSet();
 
         var (splitMode, splits, warnings) = ComputeSplits(group, expense.Id, request.TotalAmount, request.ExtraFeeAmount, request.SplitMode, request.SplitConfig);
         ValidatePayers(group, request.Payers);
+        ValidateMembersAreActive(group, request.Payers.Select(p => p.MemberId).Concat(splits.Select(s => s.MemberId)), alreadyInvolvedMemberIds);
 
         expense.Title = request.Title;
         expense.TotalAmount = request.TotalAmount;
@@ -311,6 +322,32 @@ public sealed class ExpenseService : IExpenseService
             if (!groupMemberIds.Contains(memberId))
             {
                 throw new DomainException(ErrorCodes.MemberNotInGroup, $"GroupMemberId {memberId} không thuộc nhóm này.");
+            }
+        }
+    }
+
+    // ⚠️ Bảo mật/nghiệp vụ (phát hiện qua security-review 2026-09-07): `ValidateMembersBelongToGroup`
+    // ở trên chỉ kiểm tra "còn tồn tại trong group.Members", KHÔNG lọc `IsActive` — một thành viên đã
+    // rời nhóm (chỉ rời được khi net == 0 tại thời điểm rời) vẫn có thể bị gán làm payer/split MỚI qua
+    // API nếu ai đó biết GroupMemberId cũ của họ, âm thầm tạo lại đúng lỗ hổng "nợ ma" đã sửa cho
+    // Recurring Expense Runner (CLAUDE.md mục 15.7) nhưng qua đường tạo/sửa Expense thủ công. Người đã
+    // rời nhóm không còn xem được `/groups/{id}/balances` (yêu cầu caller đang active) nên không có
+    // cách nào biết/tranh chấp.
+    //
+    // Chặn bằng cách yêu cầu mọi payer/split phải active — NHƯNG chỉ với tham chiếu MỚI
+    // (`alreadyInvolvedMemberIds` không chứa memberId đó). Lý do phải phân biệt "mới" và "cũ": Update
+    // luôn gửi lại TOÀN BỘ Payers/Splits (không phải patch từng phần) — nếu áp luật "phải active" cho
+    // mọi memberId kể cả những người vốn đã có mặt trong khoản chi từ trước, thì bất kỳ khoản chi lịch
+    // sử nào có 1 người tham gia đã rời nhóm sau đó sẽ VĨNH VIỄN không sửa được nữa (kể cả chỉ đổi
+    // Title/Note), một hồi quy nghiêm trọng hơn cả lỗ hổng đang sửa.
+    private static void ValidateMembersAreActive(Group group, IEnumerable<Guid> memberIds, IReadOnlySet<Guid> alreadyInvolvedMemberIds)
+    {
+        var activeMemberIds = group.Members.Where(m => m.IsActive).Select(m => m.Id).ToHashSet();
+        foreach (var memberId in memberIds.Distinct())
+        {
+            if (!activeMemberIds.Contains(memberId) && !alreadyInvolvedMemberIds.Contains(memberId))
+            {
+                throw new DomainException(ErrorCodes.MemberNotActive, $"Thành viên {memberId} đã rời nhóm, không thể gán thêm khoản chi mới cho họ.");
             }
         }
     }

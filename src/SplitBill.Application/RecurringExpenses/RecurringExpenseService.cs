@@ -59,6 +59,11 @@ public sealed class RecurringExpenseService : IRecurringExpenseService
         var previewInput = new ExpenseSplitInput(Guid.NewGuid(), request.TotalAmount, request.ExtraFeeAmount, splitMode, BuildSplitConfig(request.SplitConfig));
         var previewResult = _splitCalculator.Calculate(previewInput);
         ValidateMembersBelongToGroup(group, previewResult.Splits.Select(s => s.MemberId));
+        // Mẫu MỚI hoàn toàn -> không có tham chiếu "cũ" nào được miễn trừ (khác Expense.UpdateAsync —
+        // template không có API Update, chỉ Create/Deactivate, nên không cần khái niệm "đã liên quan
+        // từ trước"). Mọi payer/split phải là thành viên đang active tại thời điểm tạo mẫu
+        // (security-review 2026-09-07, xem CLAUDE.md mục 5.4 và 15.7).
+        ValidateMembersAreActive(group, request.Payers.Select(p => p.MemberId).Concat(previewResult.Splits.Select(s => s.MemberId)), new HashSet<Guid>());
 
         var template = new RecurringExpenseTemplate
         {
@@ -130,6 +135,20 @@ public sealed class RecurringExpenseService : IRecurringExpenseService
             if (!groupMemberIds.Contains(memberId))
             {
                 throw new DomainException(ErrorCodes.MemberNotInGroup, $"GroupMemberId {memberId} không thuộc nhóm này.");
+            }
+        }
+    }
+
+    // Xem ghi chú đầy đủ ở ExpenseService.ValidateMembersAreActive (cùng lý do, không tái dùng trực
+    // tiếp vì đây là class riêng, không phụ thuộc lẫn nhau).
+    private static void ValidateMembersAreActive(Group group, IEnumerable<Guid> memberIds, IReadOnlySet<Guid> alreadyInvolvedMemberIds)
+    {
+        var activeMemberIds = group.Members.Where(m => m.IsActive).Select(m => m.Id).ToHashSet();
+        foreach (var memberId in memberIds.Distinct())
+        {
+            if (!activeMemberIds.Contains(memberId) && !alreadyInvolvedMemberIds.Contains(memberId))
+            {
+                throw new DomainException(ErrorCodes.MemberNotActive, $"Thành viên {memberId} đã rời nhóm, không thể tạo mẫu khoản chi định kỳ cho họ.");
             }
         }
     }

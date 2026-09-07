@@ -9,6 +9,10 @@ public static class ErrorCodes
     public const string ConcurrencyConflict = "CONCURRENCY_CONFLICT";
     public const string SplitTotalMismatch = "SPLIT_TOTAL_MISMATCH";
     public const string MemberNotInGroup = "MEMBER_NOT_IN_GROUP";
+    // Gán payer/split cho 1 thành viên đã rời nhóm (IsActive = false) — CHỈ chặn khi đây là tham
+    // chiếu MỚI (thành viên đó không có mặt trong Payers/Splits gốc trước khi sửa); giữ nguyên tham
+    // chiếu cũ khi sửa khoản chi lịch sử vẫn được phép (security-review 2026-09-07, xem CLAUDE.md mục 5.4).
+    public const string MemberNotActive = "MEMBER_NOT_ACTIVE";
     public const string DuplicateMemberId = "DUPLICATE_MEMBER_ID";
     public const string LastOwnerCannotBeRemoved = "LAST_OWNER_CANNOT_BE_REMOVED";
     public const string SettlementSameMember = "SETTLEMENT_SAME_MEMBER";
