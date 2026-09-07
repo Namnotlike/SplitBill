@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Extensions.Logging;
 using SplitBill.Application.Abstractions;
 using SplitBill.Application.Expenses;
@@ -117,10 +118,25 @@ public sealed class NotificationService : INotificationService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
-    private static string BuildHtmlBody(string title, string message, string? linkUrl) =>
-        linkUrl is null
-            ? $"<p>{message}</p>"
-            : $"<p>{message}</p><p><a href=\"{linkUrl}\">Xem chi tiết</a></p>";
+    // ⚠️ Bảo mật (phát hiện qua security-review 2026-09-07): `message`/`title` chứa dữ liệu
+    // người dùng tự đặt (DisplayName, Expense.Title...) không giới hạn ký tự. Email được gửi dạng
+    // text/html (SmtpEmailSender), nên PHẢI HtmlEncode trước khi ghép chuỗi — nếu không, một thành
+    // viên ác ý có thể chèn thẻ <a>/<img> giả mạo vào email thông báo gửi từ địa chỉ hợp lệ của app,
+    // dùng để phishing các thành viên khác (họ vốn tin tưởng email này). `linkUrl` luôn do chính
+    // service nội bộ tự dựng (dạng "/Expenses/Index/{groupId}"), không phải input người dùng, nhưng
+    // vẫn ràng buộc phải là đường dẫn tương đối bắt đầu bằng "/" làm phòng vệ theo chiều sâu — không
+    // bao giờ tin tưởng render thẳng một URL tuyệt đối vào href của email.
+    private static string BuildHtmlBody(string title, string message, string? linkUrl)
+    {
+        var safeMessage = WebUtility.HtmlEncode(message);
+        var safeLinkUrl = linkUrl is not null && linkUrl.StartsWith('/') && !linkUrl.StartsWith("//", StringComparison.Ordinal)
+            ? WebUtility.HtmlEncode(linkUrl)
+            : null;
+
+        return safeLinkUrl is null
+            ? $"<p>{safeMessage}</p>"
+            : $"<p>{safeMessage}</p><p><a href=\"{safeLinkUrl}\">Xem chi tiết</a></p>";
+    }
 
     private static NotificationDto ToDto(Notification n) =>
         new(n.Id, n.GroupId, n.Type, n.Title, n.Message, n.LinkUrl, n.IsRead, n.CreatedAt);

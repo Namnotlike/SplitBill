@@ -93,6 +93,44 @@ public sealed class NotificationServiceTests
         (await harness.NotificationService.GetUnreadCountAsync(otherId, CancellationToken.None)).Should().Be(1);
     }
 
+    // ⚠️ Bảo mật (security-review 2026-09-07): message/title là dữ liệu người dùng tự đặt (DisplayName,
+    // Expense.Title...) không giới hạn ký tự, trong khi email gửi dạng text/html — nếu không encode,
+    // một thành viên ác ý có thể chèn thẻ <a>/<img> giả mạo vào email thông báo hợp lệ của app để
+    // phishing thành viên khác. Test khẳng định BuildHtmlBody (private, chỉ verify được gián tiếp qua
+    // HtmlBody đã gửi) luôn HtmlEncode message, và chỉ chấp nhận linkUrl dạng đường dẫn tương đối.
+    [Fact]
+    public async Task NotifyAsync_MessageContainsHtml_EmailBodyIsHtmlEncoded()
+    {
+        using var harness = TestHarness.Create();
+        var userId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var groupId = Guid.NewGuid();
+        const string malicious = "<a href=\"http://attacker.example/login\">Đăng nhập lại</a>";
+
+        await harness.NotificationService.NotifyAsync(
+            [new NotificationRecipient(userId, "a@example.com")],
+            groupId, "ExpenseCreated", "Tieu de", malicious, "/link", CancellationToken.None);
+
+        var sent = harness.EmailSender.SentEmails.Single();
+        sent.HtmlBody.Should().NotContain("<a href=\"http://attacker.example/login\">");
+        sent.HtmlBody.Should().Contain("&lt;a href=&quot;http://attacker.example/login&quot;&gt;");
+    }
+
+    [Fact]
+    public async Task NotifyAsync_LinkUrlIsAbsolute_DroppedFromEmailBody()
+    {
+        using var harness = TestHarness.Create();
+        var userId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var groupId = Guid.NewGuid();
+
+        await harness.NotificationService.NotifyAsync(
+            [new NotificationRecipient(userId, "a@example.com")],
+            groupId, "ExpenseCreated", "Tieu de", "Noi dung", "http://attacker.example/phish", CancellationToken.None);
+
+        var sent = harness.EmailSender.SentEmails.Single();
+        sent.HtmlBody.Should().NotContain("attacker.example");
+        sent.HtmlBody.Should().NotContain("<a href");
+    }
+
     [Fact]
     public async Task GetPagedAsync_OrdersNewestFirst()
     {

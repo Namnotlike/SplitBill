@@ -1060,6 +1060,21 @@ danh sách người nhận + nội dung, tự ghi DB + gọi `IEmailSender` — 
 `_unitOfWork.SaveChangesAsync` của thao tác chính đã thành công, không gộp chung 1 transaction với dữ
 liệu tài chính — thông báo là hệ quả phụ, không phải một phần bất biến `Σ net = 0`).
 
+> ⚠️ **Lỗ hổng bảo mật phát hiện + sửa qua `security-review` (2026-09-07):** `NotificationService.
+> BuildHtmlBody` ghép `message` (và trước đây cả `linkUrl`) thẳng vào chuỗi HTML mà **không
+> HtmlEncode**, trong khi `SmtpEmailSender` gửi body dưới dạng `TextPart("html")` — mail client render
+> thật, không hiển thị dạng chữ thô. `message` luôn mang theo dữ liệu người dùng tự đặt không giới hạn
+> ký tự (`GroupMember.DisplayName`, `Expense.Title`...), nên một thành viên ác ý có thể đặt tên/tiêu đề
+> chứa thẻ `<a>`/`<img>` giả mạo; khi trigger 1 trong 4 sự kiện thông báo (mục 13), mọi thành viên khác
+> nhận được email chứa markup độc hại đó **gửi từ đúng địa chỉ SMTP hợp lệ của app** — dễ lừa hơn hẳn
+> phishing thông thường vì người nhận vốn tin tưởng kênh này. Đã sửa: `BuildHtmlBody` giờ
+> `WebUtility.HtmlEncode(message)` trước khi ghép, và chỉ chấp nhận `linkUrl` dạng đường dẫn tương đối
+> bắt đầu bằng `/` (không phải `//`) làm phòng vệ theo chiều sâu — dù trên thực tế `linkUrl` luôn do
+> chính service nội bộ tự dựng (`"/Expenses/Index/{groupId}"`), không phải input người dùng trực tiếp.
+> `title` không cần encode vì chỉ dùng làm `Subject` (MimeKit tự xử lý header, không render HTML).
+> Test hồi quy: `NotifyAsync_MessageContainsHtml_EmailBodyIsHtmlEncoded`,
+> `NotifyAsync_LinkUrlIsAbsolute_DroppedFromEmailBody` (`NotificationServiceTests`).
+
 ---
 
 ## 14. Đa tiền tệ — bổ sung 2026-09-05, M6 (hạng mục cuối cùng)
