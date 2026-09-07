@@ -1963,3 +1963,92 @@ Details` hiện đúng "(guest)" (đúng bug đã sửa ở 22.2), `Expenses/Ind
 toàn bộ nhãn tiếng Anh, không còn chuỗi `LocalizedHtmlString` nào lộ ra; đổi lại `culture=vi` → mọi
 nhãn trở về đúng tiếng Việt gốc. `dotnet test`: 233/233 pass (không đổi so với trước tính năng này, vì
 Razor rendering không nằm trong phạm vi test tự động hiện có — xem giới hạn đã nêu ở mục 10b).
+
+## 23. PWA (cài đặt thành ứng dụng, dùng ngoại tuyến giới hạn) — bổ sung 2026-09-07
+
+Hạng mục 8/8 (cuối cùng) trong danh sách gợi ý sau mục 16 — `SplitBill.Web` giờ thỏa điều kiện
+installability chuẩn của Chrome/Edge: có Web App Manifest hợp lệ + Service Worker đã đăng ký có xử lý
+`fetch` + icon tối thiểu 192×192 và 512×512.
+
+### 23.1 Nguyên tắc bắt buộc: không bao giờ cache dữ liệu tài chính
+
+Đây là ràng buộc quan trọng nhất của tính năng này, xuất phát trực tiếp từ nguyên tắc "Không bao giờ
+lưu số dư vào DB" ở mục 1 — số dư/khoản chi luôn phải tính lại từ nguồn mới nhất, **kể cả ở tầng
+trình duyệt**. Nếu Service Worker cache HTML của `Groups/Balances`/`Expenses/Index`/`SettlementPlan`,
+người dùng mở lại app lúc mất mạng (hoặc mạng chập chờn) có thể thấy số dư/khoản chi CŨ mà tưởng là
+mới — nguy hiểm hơn nhiều so với việc không mở được trang, vì sai số tiền có thể dẫn tới quyết định
+chuyển khoản sai. Vì vậy `wwwroot/service-worker.js` áp dụng đúng 1 nguyên tắc: **chỉ cache asset
+tĩnh không đổi theo dữ liệu** (`/css/`, `/js/`, `/lib/`, `/icons/` — cache-first, an toàn vì tên file
+tự đổi theo `asp-append-version`/fingerprint khi nội dung đổi). **Mọi request khác — toàn bộ trang
+HTML, mọi API call, mọi ảnh hóa đơn — luôn network-only**, không có nhánh nào trong `fetch` handler
+phục vụ lại từ cache. Request không phải `GET` (form POST tạo/sửa/xóa khoản chi, settlement...)
+không bị can thiệp — dòng đầu tiên trong `fetch` handler return sớm nếu `method !== 'GET'`.
+
+Khi mất mạng hoàn toàn (không tải được trang nào), fallback duy nhất là `offline.html` — 1 trang tĩnh
+độc lập, không có style/script phụ thuộc mạng (inline CSS, không gọi Google Fonts/Bootstrap CDN), chỉ
+báo trung lập "Bạn đang ngoại tuyến" kèm nút "Thử lại" (`location.reload()`) — **không hiển thị bất kỳ
+số liệu cũ nào**. `offline.html` được precache lúc `install` cùng với `site.css`/`site.js`, nên luôn
+sẵn sàng phục vụ kể cả lần đầu cài đặt app rồi mất mạng ngay sau đó.
+
+### 23.2 Web App Manifest
+
+`wwwroot/manifest.webmanifest` — `display: "standalone"` (mở như app riêng, không thanh địa chỉ),
+`theme_color`/`background_color` khớp `--sb-brand`/`--sb-brand-light` (site.css, mục 10b) để màn hình
+splash lúc mở app không bị lệch tông. 3 icon: `icon-192.png`, `icon-512.png` (`purpose: "any"`) và
+`icon-maskable-512.png` (`purpose: "maskable"`, riêng — theo đúng khuyến nghị của Chrome, không dùng
+`"any maskable"` gộp chung vì maskable cần vùng an toàn ở giữa mà icon "any" thì không).
+
+> ⚠️ **Icon là hình vuông bo góc màu thương hiệu đơn sắc, KHÔNG có logo/chữ** — dự án không có sẵn
+> công cụ thiết kế hay thư viện xử lý ảnh nào được phép dùng (mục 2 "không thêm NuGet ngoài danh sách
+> nếu chưa hỏi người dùng", và máy dev không có Node/ImageMagick/Pillow cài sẵn). Sinh bằng 1 script
+> Python độc lập dùng thuần thư viện chuẩn (`zlib`+`struct`, tự ghi byte PNG thủ công, không phụ thuộc
+> `Pillow`) — không phải một phần của solution .NET, chỉ chạy 1 lần để xuất file PNG tĩnh, script không
+> được lưu lại trong repo. Đây là icon placeholder chức năng (đủ để cài app, hiển thị đúng trên
+> homescreen/taskbar), không phải sản phẩm thiết kế cuối cùng — nếu cần bộ nhận diện thật, cần thay 3
+> file PNG này bằng thiết kế do designer cung cấp, không cần đổi gì khác (manifest tham chiếu đúng tên
+> file cố định).
+
+`_Layout.cshtml` liên kết `<link rel="manifest">` + `<meta name="theme-color">` +
+`<link rel="apple-touch-icon">` (Safari/iOS không đọc Web App Manifest, cần thẻ riêng này để "Thêm vào
+màn hình chính" có icon đúng thay vì chụp ảnh chụp màn hình trang).
+
+### 23.3 Đăng ký Service Worker
+
+`wwwroot/js/site.js` (cuối file) — đăng ký sau sự kiện `load` (không cạnh tranh băng thông với tải
+trang lần đầu), bọc `.catch()` im lặng vì đây là tính năng bổ trợ (cài app/dùng ngoại tuyến giới hạn),
+lỗi đăng ký (trình duyệt cũ, chạy qua HTTP không phải localhost...) không được phép làm gián đoạn luồng
+chính. `service-worker.js` đặt ở gốc `wwwroot/` (scope mặc định `"/"`, bao trọn toàn site) — không đặt
+trong `wwwroot/js/` vì scope của Service Worker mặc định chỉ bao thư mục chứa nó trở xuống.
+
+### 23.4 Giới hạn đã biết
+
+- Không có "background sync" hay "push notification" qua Service Worker — nằm ngoài phạm vi 8 tính
+  năng gợi ý ban đầu, không tự ý thêm (mục 12 "không tự ý thêm tính năng ngoài phạm vi milestone").
+- Không tăng version `CACHE_NAME` (`splitbill-static-v1`) tự động theo build — nếu sau này đổi chiến
+  lược cache (thêm/bớt asset tĩnh cần precache), phải tự đổi hậu tố `v1` → `v2` thủ công để Service
+  Worker cũ bị `activate` dọn cache theo đúng logic đã viết (`caches.keys()` xóa mọi cache khác
+  `CACHE_NAME` hiện tại).
+
+**Đã test thật kịch bản mất mạng** (không phải suy luận từ code): tải trang chủ bình thường (Service
+Worker `activate`, precache `offline.html` + asset tĩnh) → tắt hẳn tiến trình `dotnet run` của
+`SplitBill.Web` (mô phỏng đúng lỗi "target actively refused connection" mà trình duyệt gặp khi mất
+mạng — `fetch(request)` trong Service Worker reject giống hệt cả 2 trường hợp) → tải lại trang → trình
+duyệt hiện đúng `offline.html` ("Bạn đang ngoại tuyến", tiêu đề tab "Ngoại tuyến - SplitBill"), không
+phải trang lỗi mặc định của Chrome. Khởi động lại `SplitBill.Web` → tải lại trang → về đúng trang chủ
+bình thường với dữ liệu số dư mới nhất (không phải bản cache cũ).
+
+> Phát hiện phụ ngoài phạm vi PWA lúc test: khi tạm dừng `SplitBill.Api` (không phải `SplitBill.Web`)
+> để chạy `dotnet test`, tải lại trang chủ ra lỗi 500 chưa được xử lý (`HttpRequestException`/
+> `SocketException` từ `SplitBillApiClient.GetMyBalancesOverviewAsync` không được catch — khối
+> `try/catch` ở `Index.cshtml.cs` chỉ bắt `ApiException`, tức lỗi HTTP có response, không bắt được lỗi
+> tầng kết nối khi chính `SplitBill.Api` không chạy). Đây là lỗ hổng có sẵn từ mục 15.4 (2026-09-05,
+> trước tính năng PWA này), không liên quan tới Service Worker — nêu ra để ghi nhận, CHƯA sửa trong
+> commit này vì ngoài phạm vi hạng mục 8/8, cần người dùng xác nhận trước khi đụng vào.
+
+Đã verify sống trên trình duyệt: `manifest.webmanifest` trả đúng `Content-Type: application/manifest+json`,
+`service-worker.js` trả `Content-Type: text/javascript`, cả 3 icon trả `200`/`image/png`; sau khi tải
+trang chủ, `navigator.serviceWorker.getRegistrations()` xác nhận đã đăng ký & `activated` đúng scope
+`"/"`; `caches.open('splitbill-static-v1').keys()` xác nhận đúng danh sách asset tĩnh + `offline.html`
+đã được precache, không có trang HTML động (Balances/Expenses/...) nào lọt vào cache. `dotnet build`:
+0 warning, 0 error. `dotnet test`: 233/233 pass (không đổi — tính năng này thuần phía trình duyệt,
+không có logic C# nào để unit test).

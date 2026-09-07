@@ -1,0 +1,18 @@
+{
+  "name": "SplitBill — Chia tiền nhóm",
+  "short_name": "SplitBill",
+  "description": "Ứng dụng chia tiền cho nhóm bạn trong các cuộc chơi có phát sinh chi phí.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#efecff",
+  "theme_color": "#6d5ef7",
+  "lang": "vi",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

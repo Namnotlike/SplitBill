@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ngoại tuyến - SplitBill</title>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #efecff;
+            color: #1c1c2b;
+            font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            text-align: center;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+        .card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 32px 28px;
+            max-width: 380px;
+            box-shadow: 0 8px 24px rgba(0,0,0,.08);
+        }
+        .icon { font-size: 48px; margin-bottom: 12px; }
+        h1 { font-size: 20px; margin: 0 0 8px; }
+        p { color: #555; margin: 0 0 20px; line-height: 1.5; }
+        button {
+            background: #6d5ef7;
+            color: #fff;
+            border: none;
+            border-radius: 999px;
+            padding: 10px 24px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="icon">📡</div>
+        <h1>Bạn đang ngoại tuyến</h1>
+        <p>
+            Không có kết nối mạng nên không tải được trang này. Số dư và khoản chi luôn cần dữ liệu
+            mới nhất từ máy chủ nên SplitBill không hiển thị số liệu cũ khi ngoại tuyến — vui lòng
+            kết nối lại mạng rồi thử lại.
+        </p>
+        <button onclick="location.reload()">Thử lại</button>
+    </div>
+</body>
+</html>

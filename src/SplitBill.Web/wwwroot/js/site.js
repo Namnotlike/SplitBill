@@ -35,3 +35,16 @@
         syncIcon();
     });
 })();
+
+// ===== PWA: đăng ký service worker (CLAUDE.md mục 23, bổ sung 2026-09-07) =====
+// Chỉ đăng ký khi trình duyệt hỗ trợ (an toàn — feature-detect, không throw ở trình duyệt cũ).
+// Đăng ký sau "load" để không cạnh tranh băng thông/CPU với việc tải trang lần đầu.
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/service-worker.js').catch(function () {
+            // Đăng ký thất bại (vd chạy qua http không phải localhost, hoặc trình duyệt chặn) — bỏ qua
+            // lặng lẽ, đây chỉ là tính năng bổ trợ (cài ứng dụng/offline fallback), không phải lõi
+            // nghiệp vụ, không được làm gián đoạn trải nghiệm chính nếu thất bại.
+        });
+    });
+}

@@ -20,6 +20,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    @* ===== PWA (CLAUDE.md mục 23, bổ sung 2026-09-07) ===== *@
+    <link rel="manifest" href="~/manifest.webmanifest" />
+    <meta name="theme-color" content="#6d5ef7" />
+    <link rel="icon" type="image/png" sizes="192x192" href="~/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="~/icons/icon-192.png" />
     <script>
         // Đặt theme TRƯỚC khi body render để tránh FOUC (nháy sáng rồi mới chuyển tối) — xem
         // CLAUDE.md mục 15 (Dark mode). Đọc localStorage, fallback prefers-color-scheme của hệ điều
