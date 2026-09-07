@@ -1,4 +1,11 @@
 ﻿@using SplitBill.Web
 @using SplitBill.Application.Common
+@using Microsoft.AspNetCore.Mvc.Localization
 @namespace SplitBill.Web.Pages
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@* Đa ngôn ngữ (CLAUDE.md mục 22) — IViewLocalizer tự khớp file .resx theo đúng đường dẫn trang đang
+   render (vd Pages/Account/Login.cshtml -> Resources/Pages/Account/Login.en.resx), sẵn có cho MỌI
+   trang mà không cần @@inject lại từng nơi. _Layout.cshtml dùng IStringLocalizer<SharedResource>
+   riêng (không phải Localizer này) vì navbar/footer là nội dung DÙNG CHUNG, không thuộc về 1 trang cụ
+   thể nào. *@
+@inject IViewLocalizer Localizer

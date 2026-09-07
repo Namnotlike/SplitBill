@@ -4,10 +4,10 @@
     ViewData["Title"] = "Khoản chi";
 }
 
-<a asp-page="/Groups/Details" asp-route-id="@Model.GroupId" class="text-muted small">← Về nhóm</a>
+<a asp-page="/Groups/Details" asp-route-id="@Model.GroupId" class="text-muted small">← @Localizer["Về nhóm"]</a>
 <div class="d-flex justify-content-between align-items-center mt-1 mb-4 flex-wrap gap-2">
-    <h1 class="mb-0">Khoản chi — @Model.Group.Name</h1>
-    <a asp-page="/Expenses/Create" asp-route-groupId="@Model.GroupId" class="btn btn-primary">+ Thêm khoản chi</a>
+    <h1 class="mb-0">@Localizer["Khoản chi"] — @Model.Group.Name</h1>
+    <a asp-page="/Expenses/Create" asp-route-groupId="@Model.GroupId" class="btn btn-primary">@Localizer["+ Thêm khoản chi"]</a>
 </div>
 
 @if (TempData["ErrorMessage"] is string err)
@@ -27,13 +27,13 @@
         <form method="get" class="row g-3 align-items-end">
             <input type="hidden" name="groupId" value="@Model.GroupId" />
             <div class="col-md-3">
-                <label class="form-label">Tiêu đề</label>
-                <input type="text" name="Title" value="@Model.Title" class="form-control" placeholder="Tìm theo tên khoản chi..." />
+                <label class="form-label">@Localizer["Tiêu đề"]</label>
+                <input type="text" name="Title" value="@Model.Title" class="form-control" placeholder="@Localizer["Tìm theo tên khoản chi..."]" />
             </div>
             <div class="col-md-2">
-                <label class="form-label">Người ứng tiền</label>
+                <label class="form-label">@Localizer["Người ứng tiền"]</label>
                 <select name="PayerMemberId" class="form-select">
-                    <option value="">Tất cả</option>
+                    <option value="">@Localizer["Tất cả"]</option>
                     @foreach (var member in Model.Group.Members)
                     {
                         <option value="@member.Id" selected="@(Model.PayerMemberId == member.Id)">@member.DisplayName</option>
@@ -41,9 +41,9 @@
                 </select>
             </div>
             <div class="col-md-2">
-                <label class="form-label">Danh mục</label>
+                <label class="form-label">@Localizer["Danh mục"]</label>
                 <select name="Category" class="form-select">
-                    <option value="">Tất cả</option>
+                    <option value="">@Localizer["Tất cả"]</option>
                     @foreach (var category in ExpenseCategoryOptions.All)
                     {
                         <option value="@category.Value" selected="@(Model.Category == category.Value)">@category.Icon @category.Label</option>
@@ -51,28 +51,28 @@
                 </select>
             </div>
             <div class="col-md-2">
-                <label class="form-label">Từ ngày</label>
+                <label class="form-label">@Localizer["Từ ngày"]</label>
                 <input type="date" name="FromDate" value="@Model.FromDate?.ToString("yyyy-MM-dd")" class="form-control" />
             </div>
             <div class="col-md-2">
-                <label class="form-label">Đến ngày</label>
+                <label class="form-label">@Localizer["Đến ngày"]</label>
                 <input type="date" name="ToDate" value="@Model.ToDate?.ToString("yyyy-MM-dd")" class="form-control" />
             </div>
             <div class="col-md-1">
-                <label class="form-label">Từ (@Model.Group.Currency)</label>
+                <label class="form-label">@Localizer["Từ"] (@Model.Group.Currency)</label>
                 <input type="number" name="MinAmount" value="@Model.MinAmount" class="form-control" min="0" />
             </div>
             <div class="col-md-1">
-                <label class="form-label">Đến (@Model.Group.Currency)</label>
+                <label class="form-label">@Localizer["Đến"] (@Model.Group.Currency)</label>
                 <input type="number" name="MaxAmount" value="@Model.MaxAmount" class="form-control" min="0" />
             </div>
             <div class="col-md-1 d-flex gap-2">
-                <button type="submit" class="btn btn-primary flex-fill">Lọc</button>
+                <button type="submit" class="btn btn-primary flex-fill">@Localizer["Lọc"]</button>
             </div>
             @if (Model.HasActiveFilter)
             {
                 <div class="col-12">
-                    <a asp-page="/Expenses/Index" asp-route-groupId="@Model.GroupId" class="small text-muted">✕ Xóa bộ lọc</a>
+                    <a asp-page="/Expenses/Index" asp-route-groupId="@Model.GroupId" class="small text-muted">✕ @Localizer["Xóa bộ lọc"]</a>
                 </div>
             }
         </form>
@@ -85,7 +85,7 @@
         <div class="card-body text-center py-5">
             <div class="fs-1 mb-2">🧾</div>
             <p class="text-muted mb-0">
-                @(Model.HasActiveFilter ? "Không có khoản chi nào khớp bộ lọc." : "Chưa có khoản chi nào.")
+                @(Model.HasActiveFilter ? Localizer["Không có khoản chi nào khớp bộ lọc."] : Localizer["Chưa có khoản chi nào."])
             </p>
         </div>
     </div>
@@ -97,12 +97,12 @@ else
             <table class="table mb-0">
                 <thead>
                     <tr>
-                        <th class="ps-4">Ngày</th>
-                        <th>Tiêu đề</th>
-                        <th>Danh mục</th>
-                        <th>Tổng tiền</th>
-                        <th>Ai ứng</th>
-                        <th>Chia theo</th>
+                        <th class="ps-4">@Localizer["Ngày"]</th>
+                        <th>@Localizer["Tiêu đề"]</th>
+                        <th>@Localizer["Danh mục"]</th>
+                        <th>@Localizer["Tổng tiền"]</th>
+                        <th>@Localizer["Ai ứng"]</th>
+                        <th>@Localizer["Chia theo"]</th>
                         <th class="pe-4"></th>
                     </tr>
                 </thead>
@@ -117,9 +117,9 @@ else
                             <td>@string.Join(", ", expense.Payers.Select(p => Model.MemberName(p.MemberId)))</td>
                             <td><span class="badge" style="background: var(--sb-brand-light); color: var(--sb-brand-dark);">@expense.SplitMode</span></td>
                             <td class="pe-4 text-end">
-                                <a asp-page="/Expenses/Edit" asp-route-expenseId="@expense.Id" class="btn btn-sm btn-outline-secondary">Sửa</a>
+                                <a asp-page="/Expenses/Edit" asp-route-expenseId="@expense.Id" class="btn btn-sm btn-outline-secondary">@Localizer["Sửa"]</a>
                                 <form method="post" asp-page-handler="Delete" asp-route-expenseId="@expense.Id" asp-route-groupId="@Model.GroupId" class="d-inline">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">Xóa</button>
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">@Localizer["Xóa"]</button>
                                 </form>
                             </td>
                         </tr>
@@ -132,18 +132,18 @@ else
     {
         var totalPages = (int)Math.Ceiling(Model.Expenses.TotalCount / (double)Model.Expenses.PageSize);
         <div class="d-flex justify-content-between align-items-center mt-3">
-        <p class="text-muted small mb-0">Trang @Model.Expenses.Page/@Math.Max(totalPages, 1) — tổng @Model.Expenses.TotalCount khoản chi.</p>
+        <p class="text-muted small mb-0">@Localizer["Trang {0}/{1} — tổng {2} khoản chi.", Model.Expenses.Page, Math.Max(totalPages, 1), Model.Expenses.TotalCount]</p>
         <div class="d-flex gap-2">
             <a class="btn btn-sm btn-outline-secondary @(Model.Expenses.Page <= 1 ? "disabled" : "")"
                asp-page="/Expenses/Index" asp-route-groupId="@Model.GroupId"
                asp-route-Page="@(Model.Expenses.Page - 1)" asp-route-Title="@Model.Title" asp-route-PayerMemberId="@Model.PayerMemberId"
                asp-route-FromDate="@Model.FromDate?.ToString("yyyy-MM-dd")" asp-route-ToDate="@Model.ToDate?.ToString("yyyy-MM-dd")"
-               asp-route-MinAmount="@Model.MinAmount" asp-route-MaxAmount="@Model.MaxAmount" asp-route-Category="@Model.Category">‹ Trước</a>
+               asp-route-MinAmount="@Model.MinAmount" asp-route-MaxAmount="@Model.MaxAmount" asp-route-Category="@Model.Category">‹ @Localizer["Trước"]</a>
             <a class="btn btn-sm btn-outline-secondary @(Model.Expenses.Page >= totalPages ? "disabled" : "")"
                asp-page="/Expenses/Index" asp-route-groupId="@Model.GroupId"
                asp-route-Page="@(Model.Expenses.Page + 1)" asp-route-Title="@Model.Title" asp-route-PayerMemberId="@Model.PayerMemberId"
                asp-route-FromDate="@Model.FromDate?.ToString("yyyy-MM-dd")" asp-route-ToDate="@Model.ToDate?.ToString("yyyy-MM-dd")"
-               asp-route-MinAmount="@Model.MinAmount" asp-route-MaxAmount="@Model.MaxAmount" asp-route-Category="@Model.Category">Sau ›</a>
+               asp-route-MinAmount="@Model.MinAmount" asp-route-MaxAmount="@Model.MaxAmount" asp-route-Category="@Model.Category">@Localizer["Sau"] ›</a>
         </div>
         </div>
     }

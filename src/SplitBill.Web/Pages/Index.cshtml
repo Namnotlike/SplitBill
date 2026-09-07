@@ -9,20 +9,19 @@
          style="width: 88px; height: 88px; background: var(--sb-brand-light); font-size: 2.5rem;">
         💰
     </div>
-    <h1 class="display-5 fw-800 mb-3">Chia tiền nhóm, khỏi cần tính nhẩm</h1>
+    <h1 class="display-5 fw-800 mb-3">@Localizer["Chia tiền nhóm, khỏi cần tính nhẩm"]</h1>
     <p class="lead text-muted mx-auto mb-4" style="max-width: 560px;">
-        Ai ứng bao nhiêu, ai chịu bao nhiêu, cuối cùng ai chuyển cho ai — SplitBill tự tính hết,
-        kèm mã VietQR quét phát chuyển luôn.
+        @Localizer["Ai ứng bao nhiêu, ai chịu bao nhiêu, cuối cùng ai chuyển cho ai — SplitBill tự tính hết, kèm mã VietQR quét phát chuyển luôn."]
     </p>
 
     @if (User.Identity?.IsAuthenticated == true)
     {
-        <a asp-page="/Groups/Index" class="btn btn-primary btn-lg px-4">Xem nhóm của tôi</a>
+        <a asp-page="/Groups/Index" class="btn btn-primary btn-lg px-4">@Localizer["Xem nhóm của tôi"]</a>
     }
     else
     {
-        <a asp-page="/Account/Register" class="btn btn-primary btn-lg px-4 me-2">Bắt đầu miễn phí</a>
-        <a asp-page="/Account/Login" class="btn btn-outline-secondary btn-lg px-4">Đăng nhập</a>
+        <a asp-page="/Account/Register" class="btn btn-primary btn-lg px-4 me-2">@Localizer["Bắt đầu miễn phí"]</a>
+        <a asp-page="/Account/Login" class="btn btn-outline-secondary btn-lg px-4">@Localizer["Đăng nhập"]</a>
     }
 </div>
 
@@ -32,7 +31,7 @@
 {
     <div class="card mb-4">
         <div class="card-body">
-            <h5 class="card-title mb-3">Tổng quan số dư của bạn</h5>
+            <h5 class="card-title mb-3">@Localizer["Tổng quan số dư của bạn"]</h5>
             <div class="row g-3">
                 @foreach (var item in Model.MyOverview.OrderByDescending(o => o.Net))
                 {
@@ -41,7 +40,7 @@
                             <div>
                                 <div class="fw-600" style="color: var(--sb-ink);">@item.GroupName</div>
                                 <div class="small text-muted">
-                                    @(item.Net > 0 ? "Được nhận" : item.Net < 0 ? "Còn nợ" : "Đã cân bằng")
+                                    @(item.Net > 0 ? Localizer["Được nhận"] : item.Net < 0 ? Localizer["Còn nợ"] : Localizer["Đã cân bằng"])
                                 </div>
                             </div>
                             <div class="@(item.Net > 0 ? "sb-amount-positive" : item.Net < 0 ? "sb-amount-negative" : "fw-700")">
@@ -63,7 +62,7 @@
 {
     <div class="card mb-4">
         <div class="card-body">
-            <h5 class="card-title mb-3">Ai đang nợ bạn / bạn đang nợ ai</h5>
+            <h5 class="card-title mb-3">@Localizer["Ai đang nợ bạn / bạn đang nợ ai"]</h5>
             <div class="row g-3">
                 @foreach (var person in Model.CounterpartyBalances)
                 {
@@ -76,7 +75,7 @@
                                     <div class="d-flex justify-content-between small">
                                         <a asp-page="/Groups/SettlementPlan" asp-route-id="@g.GroupId" class="text-muted text-decoration-none">@g.GroupName</a>
                                         <span class="@(g.Amount > 0 ? "sb-amount-positive" : "sb-amount-negative")">
-                                            @(g.Amount > 0 ? "Nợ bạn " : "Bạn nợ ")@SupportedCurrencies.Format(Math.Abs(g.Amount), g.Currency)
+                                            @(g.Amount > 0 ? Localizer["Nợ bạn "] : Localizer["Bạn nợ "])@SupportedCurrencies.Format(Math.Abs(g.Amount), g.Currency)
                                         </span>
                                     </div>
                                 }
@@ -94,8 +93,8 @@
         <div class="card h-100">
             <div class="card-body">
                 <div class="fs-2 mb-2">🧾</div>
-                <h5 class="card-title">Nhiều cách chia</h5>
-                <p class="text-muted mb-0">Chia đều, theo phần, theo %, nhập tay, hoặc theo từng món ăn — làm tròn luôn công bằng.</p>
+                <h5 class="card-title">@Localizer["Nhiều cách chia"]</h5>
+                <p class="text-muted mb-0">@Localizer["Chia đều, theo phần, theo %, nhập tay, hoặc theo từng món ăn — làm tròn luôn công bằng."]</p>
             </div>
         </div>
     </div>
@@ -103,8 +102,8 @@
         <div class="card h-100">
             <div class="card-body">
                 <div class="fs-2 mb-2">🔀</div>
-                <h5 class="card-title">Gộp nợ tối ưu</h5>
-                <p class="text-muted mb-0">Thuật toán tự tìm số lượt chuyển khoản ít nhất, không ai phải chuyển vòng vo qua người khác.</p>
+                <h5 class="card-title">@Localizer["Gộp nợ tối ưu"]</h5>
+                <p class="text-muted mb-0">@Localizer["Thuật toán tự tìm số lượt chuyển khoản ít nhất, không ai phải chuyển vòng vo qua người khác."]</p>
             </div>
         </div>
     </div>
@@ -112,8 +111,8 @@
         <div class="card h-100">
             <div class="card-body">
                 <div class="fs-2 mb-2">📱</div>
-                <h5 class="card-title">Quét QR chuyển ngay</h5>
-                <p class="text-muted mb-0">Mỗi khoản cần chuyển đều kèm mã VietQR — mở app ngân hàng quét là xong, khỏi gõ số tài khoản.</p>
+                <h5 class="card-title">@Localizer["Quét QR chuyển ngay"]</h5>
+                <p class="text-muted mb-0">@Localizer["Mỗi khoản cần chuyển đều kèm mã VietQR — mở app ngân hàng quét là xong, khỏi gõ số tài khoản."]</p>
             </div>
         </div>
     </div>

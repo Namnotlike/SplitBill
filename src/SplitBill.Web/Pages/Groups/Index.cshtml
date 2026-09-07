@@ -4,8 +4,8 @@
     ViewData["Title"] = "Nhóm của tôi";
 }
 
-<h1>Nhóm của tôi</h1>
-<p class="text-muted mb-4">Chọn 1 nhóm để xem chi tiết, hoặc tạo nhóm mới ở bên phải.</p>
+<h1>@Localizer["Nhóm của tôi"]</h1>
+<p class="text-muted mb-4">@Localizer["Chọn 1 nhóm để xem chi tiết, hoặc tạo nhóm mới ở bên phải."]</p>
 
 @if (Model.ErrorMessage is not null)
 {
@@ -19,7 +19,7 @@
             <div class="card">
                 <div class="card-body text-center py-5">
                     <div class="fs-1 mb-2">🗂️</div>
-                    <p class="text-muted mb-0">Chưa có nhóm nào. Tạo nhóm đầu tiên ở bên phải 👉</p>
+                    <p class="text-muted mb-0">@Localizer["Chưa có nhóm nào. Tạo nhóm đầu tiên ở bên phải 👉"]</p>
                 </div>
             </div>
         }
@@ -35,11 +35,11 @@
                                     <h5 class="card-title mb-0 text-body">@group.Name</h5>
                                     @if (group.IsArchived)
                                     {
-                                        <span class="badge bg-secondary">Lưu trữ</span>
+                                        <span class="badge bg-secondary">@Localizer["Lưu trữ"]</span>
                                     }
                                 </div>
                                 <span class="badge" style="background: var(--sb-brand-light); color: var(--sb-brand-dark);">
-                                    @(group.Type == "OneTime" ? "Một lần" : "Dùng lại nhiều lần")
+                                    @(group.Type == "OneTime" ? Localizer["Một lần"] : Localizer["Dùng lại nhiều lần"])
                                 </span>
                                 <span class="badge bg-secondary">@group.Currency</span>
                             </div>
@@ -53,34 +53,34 @@
     <div class="col-lg-5">
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title">+ Tạo nhóm mới</h5>
+                <h5 class="card-title">@Localizer["+ Tạo nhóm mới"]</h5>
                 <form method="post" asp-page-handler="Create">
                     <div class="mb-3">
-                        <label asp-for="NewGroup.Name" class="form-label">Tên nhóm</label>
+                        <label asp-for="NewGroup.Name" class="form-label">@Localizer["Tên nhóm"]</label>
                         <input asp-for="NewGroup.Name" class="form-control" placeholder="VD: Du lịch Đà Lạt" />
                         <span asp-validation-for="NewGroup.Name" class="text-danger"></span>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="NewGroup.Description" class="form-label">Mô tả (tùy chọn)</label>
+                        <label asp-for="NewGroup.Description" class="form-label">@Localizer["Mô tả (tùy chọn)"]</label>
                         <input asp-for="NewGroup.Description" class="form-control" />
                     </div>
                     <div class="mb-3">
-                        <label asp-for="NewGroup.Type" class="form-label">Loại nhóm</label>
+                        <label asp-for="NewGroup.Type" class="form-label">@Localizer["Loại nhóm"]</label>
                         <select asp-for="NewGroup.Type" class="form-select">
-                            <option value="OneTime">Một lần (cuộc chơi)</option>
-                            <option value="Recurring">Dùng lại nhiều lần</option>
+                            <option value="OneTime">@Localizer["Một lần (cuộc chơi)"]</option>
+                            <option value="Recurring">@Localizer["Dùng lại nhiều lần"]</option>
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label asp-for="NewGroup.Currency" class="form-label">Tiền tệ</label>
+                        <label asp-for="NewGroup.Currency" class="form-label">@Localizer["Tiền tệ"]</label>
                         <select asp-for="NewGroup.Currency" class="form-select">
                             <option value="VND">VND (đ)</option>
                             <option value="USD">USD ($)</option>
                             <option value="EUR">EUR (€)</option>
                         </select>
-                        <span class="text-muted small">Không đổi được sau khi đã tạo nhóm.</span>
+                        <span class="text-muted small">@Localizer["Không đổi được sau khi đã tạo nhóm."]</span>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100">Tạo nhóm</button>
+                    <button type="submit" class="btn btn-primary w-100">@Localizer["Tạo nhóm"]</button>
                 </form>
             </div>
         </div>

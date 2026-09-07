@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="Chia tiền nhóm, khỏi cần tính nhẩm" xml:space="preserve">
+    <value>Split bills with friends, skip the mental math</value>
+  </data>
+  <data name="Ai ứng bao nhiêu, ai chịu bao nhiêu, cuối cùng ai chuyển cho ai — SplitBill tự tính hết, kèm mã VietQR quét phát chuyển luôn." xml:space="preserve">
+    <value>Who paid what, who owes what, and who should pay whom — SplitBill works it all out, with a VietQR code ready to scan and pay.</value>
+  </data>
+  <data name="Xem nhóm của tôi" xml:space="preserve">
+    <value>View my groups</value>
+  </data>
+  <data name="Bắt đầu miễn phí" xml:space="preserve">
+    <value>Get started free</value>
+  </data>
+  <data name="Đăng nhập" xml:space="preserve">
+    <value>Log in</value>
+  </data>
+  <data name="Tổng quan số dư của bạn" xml:space="preserve">
+    <value>Your balance overview</value>
+  </data>
+  <data name="Được nhận" xml:space="preserve">
+    <value>You're owed</value>
+  </data>
+  <data name="Còn nợ" xml:space="preserve">
+    <value>You owe</value>
+  </data>
+  <data name="Đã cân bằng" xml:space="preserve">
+    <value>Settled up</value>
+  </data>
+  <data name="Ai đang nợ bạn / bạn đang nợ ai" xml:space="preserve">
+    <value>Who owes you / who you owe</value>
+  </data>
+  <data name="Nợ bạn " xml:space="preserve">
+    <value>Owes you </value>
+  </data>
+  <data name="Bạn nợ " xml:space="preserve">
+    <value>You owe </value>
+  </data>
+  <data name="Nhiều cách chia" xml:space="preserve">
+    <value>Many ways to split</value>
+  </data>
+  <data name="Chia đều, theo phần, theo %, nhập tay, hoặc theo từng món ăn — làm tròn luôn công bằng." xml:space="preserve">
+    <value>Split evenly, by shares, by percentage, exact amounts, or item-by-item — always rounded fairly.</value>
+  </data>
+  <data name="Gộp nợ tối ưu" xml:space="preserve">
+    <value>Optimal debt simplification</value>
+  </data>
+  <data name="Thuật toán tự tìm số lượt chuyển khoản ít nhất, không ai phải chuyển vòng vo qua người khác." xml:space="preserve">
+    <value>The algorithm finds the fewest transfers needed — no one pays through a middleman.</value>
+  </data>
+  <data name="Quét QR chuyển ngay" xml:space="preserve">
+    <value>Scan and pay instantly</value>
+  </data>
+  <data name="Mỗi khoản cần chuyển đều kèm mã VietQR — mở app ngân hàng quét là xong, khỏi gõ số tài khoản." xml:space="preserve">
+    <value>Every payment comes with a VietQR code — open your banking app, scan, and you're done, no need to type an account number.</value>
+  </data>
+</root>

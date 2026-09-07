@@ -6,8 +6,8 @@
 
 <div class="card sb-auth-card">
     <div class="card-body p-4">
-        <h1 class="h3 text-center mb-1">Tạo tài khoản 🎉</h1>
-        <p class="text-muted text-center mb-4">Miễn phí, chỉ mất 30 giây</p>
+        <h1 class="h3 text-center mb-1">@Localizer["Tạo tài khoản 🎉"]</h1>
+        <p class="text-muted text-center mb-4">@Localizer["Miễn phí, chỉ mất 30 giây"]</p>
 
         <form method="post">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
@@ -16,24 +16,24 @@
                 <div class="alert alert-danger">@Model.ErrorMessage</div>
             }
             <div class="mb-3">
-                <label asp-for="Input.DisplayName" class="form-label">Tên hiển thị</label>
+                <label asp-for="Input.DisplayName" class="form-label">@Localizer["Tên hiển thị"]</label>
                 <input asp-for="Input.DisplayName" class="form-control" autofocus />
                 <span asp-validation-for="Input.DisplayName" class="text-danger"></span>
             </div>
             <div class="mb-3">
-                <label asp-for="Input.Email" class="form-label">Email</label>
+                <label asp-for="Input.Email" class="form-label">@Localizer["Email"]</label>
                 <input asp-for="Input.Email" class="form-control" />
                 <span asp-validation-for="Input.Email" class="text-danger"></span>
             </div>
             <div class="mb-3">
-                <label asp-for="Input.Password" class="form-label">Mật khẩu</label>
+                <label asp-for="Input.Password" class="form-label">@Localizer["Mật khẩu"]</label>
                 <input asp-for="Input.Password" type="password" class="form-control" />
                 <span asp-validation-for="Input.Password" class="text-danger"></span>
-                <div class="form-text">Tối thiểu 8 ký tự.</div>
+                <div class="form-text">@Localizer["Tối thiểu 8 ký tự."]</div>
             </div>
-            <button type="submit" class="btn btn-primary w-100 mb-3">Đăng ký</button>
+            <button type="submit" class="btn btn-primary w-100 mb-3">@Localizer["Đăng ký"]</button>
             <p class="text-center text-muted mb-0">
-                Đã có tài khoản? <a asp-page="/Account/Login" asp-route-returnUrl="@Model.ReturnUrl">Đăng nhập</a>
+                @Localizer["Đã có tài khoản?"] <a asp-page="/Account/Login" asp-route-returnUrl="@Model.ReturnUrl">@Localizer["Đăng nhập"]</a>
             </p>
         </form>
     </div>

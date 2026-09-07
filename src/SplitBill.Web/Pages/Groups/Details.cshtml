@@ -8,7 +8,7 @@
 
 <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
     <div>
-        <a asp-page="/Groups/Index" class="text-muted small">← Nhóm của tôi</a>
+        <a asp-page="/Groups/Index" class="text-muted small">← @Localizer["Nhóm của tôi"]</a>
         <h1 class="mt-1 mb-0">@Model.Group.Name</h1>
         @if (!string.IsNullOrEmpty(Model.Group.Description))
         {
@@ -28,24 +28,24 @@
 }
 
 <div class="d-flex flex-wrap gap-2 mb-4">
-    <a asp-page="/Expenses/Index" asp-route-groupId="@Model.Group.Id" class="btn btn-primary">🧾 Khoản chi</a>
-    <a asp-page="/Groups/Balances" asp-route-id="@Model.Group.Id" class="btn btn-outline-primary">⚖️ Số dư</a>
-    <a asp-page="/Groups/SettlementPlan" asp-route-id="@Model.Group.Id" class="btn btn-outline-primary">🔀 Kế hoạch thanh toán</a>
-    <a asp-page="/Groups/Timeline" asp-route-id="@Model.Group.Id" class="btn btn-outline-primary">🕒 Hoạt động</a>
-    <a asp-page="/Groups/Statistics" asp-route-id="@Model.Group.Id" class="btn btn-outline-primary">📊 Thống kê</a>
+    <a asp-page="/Expenses/Index" asp-route-groupId="@Model.Group.Id" class="btn btn-primary">🧾 @Localizer["Khoản chi"]</a>
+    <a asp-page="/Groups/Balances" asp-route-id="@Model.Group.Id" class="btn btn-outline-primary">⚖️ @Localizer["Số dư"]</a>
+    <a asp-page="/Groups/SettlementPlan" asp-route-id="@Model.Group.Id" class="btn btn-outline-primary">🔀 @Localizer["Kế hoạch thanh toán"]</a>
+    <a asp-page="/Groups/Timeline" asp-route-id="@Model.Group.Id" class="btn btn-outline-primary">🕒 @Localizer["Hoạt động"]</a>
+    <a asp-page="/Groups/Statistics" asp-route-id="@Model.Group.Id" class="btn btn-outline-primary">📊 @Localizer["Thống kê"]</a>
     @if (Model.Group.Type == "Recurring")
     {
-        <a asp-page="/Groups/RecurringExpenses" asp-route-groupId="@Model.Group.Id" class="btn btn-outline-primary">🔁 Khoản chi định kỳ</a>
+        <a asp-page="/Groups/RecurringExpenses" asp-route-groupId="@Model.Group.Id" class="btn btn-outline-primary">🔁 @Localizer["Khoản chi định kỳ"]</a>
     }
-    <a asp-page="/Groups/Details" asp-page-handler="ExportExpenses" asp-route-id="@Model.Group.Id" class="btn btn-outline-secondary">⬇ CSV khoản chi</a>
-    <a asp-page="/Groups/Details" asp-page-handler="ExportBalances" asp-route-id="@Model.Group.Id" class="btn btn-outline-secondary">⬇ CSV số dư</a>
-    <a asp-page="/Groups/Summary" asp-route-id="@Model.Group.Id" class="btn btn-outline-secondary">📄 Xuất PDF tổng kết</a>
+    <a asp-page="/Groups/Details" asp-page-handler="ExportExpenses" asp-route-id="@Model.Group.Id" class="btn btn-outline-secondary">⬇ @Localizer["CSV khoản chi"]</a>
+    <a asp-page="/Groups/Details" asp-page-handler="ExportBalances" asp-route-id="@Model.Group.Id" class="btn btn-outline-secondary">⬇ @Localizer["CSV số dư"]</a>
+    <a asp-page="/Groups/Summary" asp-route-id="@Model.Group.Id" class="btn btn-outline-secondary">📄 @Localizer["Xuất PDF tổng kết"]</a>
     @* Không dùng window.confirm() ở đây — chặn hẳn thread JS/CDP tới khi người dùng bấm, từng gây
        tab "treo" lúc verify tự động (mục 18). Hành động này cũng không phá hủy gì (không đụng nhóm
        nguồn, tạo lỗi thì xóa nhóm mới đi là xong) nên không thực sự cần xác nhận, khớp các nút 1-click
        khác trên trang này (vd "Đổi link mới"). *@
     <form method="post" asp-page-handler="Duplicate" asp-route-id="@Model.Group.Id" class="d-inline">
-        <button type="submit" class="btn btn-outline-secondary" title="Tạo nhóm mới, copy thành viên hiện tại (không copy khoản chi)">🧬 Nhân bản nhóm</button>
+        <button type="submit" class="btn btn-outline-secondary" title="@Localizer["Tạo nhóm mới, copy thành viên hiện tại (không copy khoản chi)"]">🧬 @Localizer["Nhân bản nhóm"]</button>
     </form>
 </div>
 
@@ -53,16 +53,27 @@
     <div class="col-lg-7">
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title mb-3">Thành viên (@Model.Group.Members.Count)</h5>
+                <h5 class="card-title mb-3">@Localizer["Thành viên"] (@Model.Group.Members.Count)</h5>
                 <table class="table table-sm align-middle mb-4">
                     <thead>
-                        <tr><th>Tên</th><th>Vai trò</th><th></th></tr>
+                        <tr><th>@Localizer["Tên"]</th><th>@Localizer["Vai trò"]</th><th></th></tr>
                     </thead>
                     <tbody>
                         @foreach (var member in Model.Group.Members)
                         {
                             <tr>
-                                <td>@member.DisplayName @(member.UserId is null ? " (khách)" : "")</td>
+                                <td>
+                                    @member.DisplayName
+                                    @* Không nối chuỗi (+) với IViewLocalizer — Localizer[] trả về
+                                       LocalizedHtmlString, .ToString() KHÔNG trả đúng giá trị đã dịch
+                                       (trả về tên type thay vì nội dung) khi ép qua string+object. Phải
+                                       xuất riêng bằng @@ Razor thay vì string.Concat/+ — phát hiện qua
+                                       verify sống (CLAUDE.md mục 22). *@
+                                    @if (member.UserId is null)
+                                    {
+                                        @: @Localizer["(khách)"]
+                                    }
+                                </td>
                                 <td>
                                     @if (member.Role == "Owner")
                                     {
@@ -75,7 +86,7 @@
                                 </td>
                                 <td class="text-end">
                                     <form method="post" asp-page-handler="RemoveMember" asp-route-id="@Model.Group.Id" asp-route-memberId="@member.Id" class="d-inline">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">Rời/Xóa</button>
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">@Localizer["Rời/Xóa"]</button>
                                     </form>
                                 </td>
                             </tr>
@@ -85,11 +96,11 @@
 
                 <form method="post" asp-page-handler="AddMember" asp-route-id="@Model.Group.Id" class="row g-2 align-items-end">
                     <div class="col-auto flex-grow-1">
-                        <label asp-for="NewMember.DisplayName" class="form-label">Thêm thành viên (khách vãng lai)</label>
-                        <input asp-for="NewMember.DisplayName" class="form-control" placeholder="Tên hiển thị" />
+                        <label asp-for="NewMember.DisplayName" class="form-label">@Localizer["Thêm thành viên (khách vãng lai)"]</label>
+                        <input asp-for="NewMember.DisplayName" class="form-control" placeholder="@Localizer["Tên hiển thị"]" />
                     </div>
                     <div class="col-auto">
-                        <button type="submit" class="btn btn-secondary">+ Thêm</button>
+                        <button type="submit" class="btn btn-secondary">@Localizer["+ Thêm"]</button>
                     </div>
                 </form>
             </div>
@@ -99,25 +110,25 @@
     <div class="col-lg-5">
         <div class="card mb-3">
             <div class="card-body">
-                <h5 class="card-title">🔗 Link chia sẻ</h5>
-                <p class="text-muted small">Ai có link này đều xem được nhóm (không cần đăng nhập).</p>
+                <h5 class="card-title">🔗 @Localizer["Link chia sẻ"]</h5>
+                <p class="text-muted small">@Localizer["Ai có link này đều xem được nhóm (không cần đăng nhập)."]</p>
                 <input type="text" class="form-control mb-2" readonly value="@Url.Page("/Public/Group", null, new { shareToken = Model.Group.ShareToken }, Request.Scheme)" />
                 <form method="post" asp-page-handler="RotateShareToken" asp-route-id="@Model.Group.Id">
-                    <button type="submit" class="btn btn-sm btn-outline-secondary">Đổi link mới</button>
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">@Localizer["Đổi link mới"]</button>
                 </form>
             </div>
         </div>
 
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title">⚙️ Cài đặt</h5>
+                <h5 class="card-title">⚙️ @Localizer["Cài đặt"]</h5>
                 <form method="post" asp-page-handler="ToggleSimplify" asp-route-id="@Model.Group.Id" asp-route-simplifyDebts="@Model.Group.SimplifyDebts">
                     <div class="form-check form-switch mb-2">
                         <input class="form-check-input" type="checkbox" checked="@Model.Group.SimplifyDebts" disabled />
-                        <label class="form-check-label">Gộp nợ tối ưu (SimplifyDebts)</label>
+                        <label class="form-check-label">@Localizer["Gộp nợ tối ưu (SimplifyDebts)"]</label>
                     </div>
                     <button type="submit" class="btn btn-sm btn-outline-secondary">
-                        @(Model.Group.SimplifyDebts ? "Tắt gộp nợ" : "Bật gộp nợ")
+                        @(Model.Group.SimplifyDebts ? Localizer["Tắt gộp nợ"] : Localizer["Bật gộp nợ"])
                     </button>
                 </form>
             </div>

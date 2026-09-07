@@ -1,5 +1,15 @@
+@using Microsoft.Extensions.Localization
+@inject IStringLocalizer<SplitBill.Web.SharedResource> SharedLocalizer
+@{
+    // CLAUDE.md mục 22 — Đa ngôn ngữ. CultureInfo.CurrentUICulture đã được UseRequestLocalization
+    // (Program.cs) đặt đúng theo cookie trước khi Razor render, không cần tự đọc cookie lại ở đây.
+    var currentCulture = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+    var otherCulture = currentCulture == "vi" ? "en" : "vi";
+    var otherCultureLabel = otherCulture == "vi" ? "🇻🇳 Tiếng Việt" : "🇬🇧 English";
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+}
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="@currentCulture">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -41,13 +51,17 @@
                         @if (User.Identity?.IsAuthenticated == true)
                         {
                             <li class="nav-item">
-                                <a class="nav-link" asp-area="" asp-page="/Groups/Index">Nhóm của tôi</a>
+                                <a class="nav-link" asp-area="" asp-page="/Groups/Index">@SharedLocalizer["Nhóm của tôi"]</a>
                             </li>
                         }
                     </ul>
                     <ul class="navbar-nav align-items-sm-center">
                         <li class="nav-item">
-                            <button type="button" id="sb-theme-toggle" class="btn btn-link nav-link" title="Đổi giao diện sáng/tối" aria-label="Đổi giao diện sáng/tối">
+                            <a class="nav-link" asp-page="/SetLanguage" asp-route-culture="@otherCulture" asp-route-returnUrl="@returnUrl"
+                               title="@SharedLocalizer["Đổi ngôn ngữ"]">@otherCultureLabel</a>
+                        </li>
+                        <li class="nav-item">
+                            <button type="button" id="sb-theme-toggle" class="btn btn-link nav-link" title="@SharedLocalizer["Đổi giao diện sáng/tối"]" aria-label="@SharedLocalizer["Đổi giao diện sáng/tối"]">
                                 <span id="sb-theme-icon">🌙</span>
                             </button>
                         </li>
@@ -61,17 +75,17 @@
                             </li>
                             <li class="nav-item">
                                 <form asp-page="/Account/Logout" method="post" class="d-inline">
-                                    <button type="submit" class="btn btn-link nav-link">Đăng xuất</button>
+                                    <button type="submit" class="btn btn-link nav-link">@SharedLocalizer["Đăng xuất"]</button>
                                 </form>
                             </li>
                         }
                         else
                         {
                             <li class="nav-item">
-                                <a class="nav-link" asp-page="/Account/Login">Đăng nhập</a>
+                                <a class="nav-link" asp-page="/Account/Login">@SharedLocalizer["Đăng nhập"]</a>
                             </li>
                             <li class="nav-item">
-                                <a asp-page="/Account/Register" class="btn btn-primary btn-sm ms-sm-2">Đăng ký</a>
+                                <a asp-page="/Account/Register" class="btn btn-primary btn-sm ms-sm-2">@SharedLocalizer["Đăng ký"]</a>
                             </li>
                         }
                     </ul>
@@ -87,7 +101,7 @@
 
     <footer class="footer">
         <div class="container">
-            © 2026 SplitBill — chia tiền minh bạch, không lăn tăn.
+            @SharedLocalizer["© 2026 SplitBill — chia tiền minh bạch, không lăn tăn."]
         </div>
     </footer>
 

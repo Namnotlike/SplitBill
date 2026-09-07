@@ -1863,3 +1863,103 @@ viên) → hiện đúng trong danh sách preset → bấm áp dụng ở lần 
 lưu) → đúng 2 checkbox tự tick lại, người thứ 3 vẫn bỏ trống → tạo hẳn 1 khoản chi dùng preset này,
 lưu thành công với đúng cách chia đã áp dụng → xóa preset → danh sách preset rỗng trở lại (xác nhận
 qua cả giao diện lẫn log Api có đúng 1 lệnh `DELETE .../split-presets/{id}` trả `204`).
+
+## 22. Đa ngôn ngữ (i18n) — bổ sung 2026-09-07
+
+Hạng mục 7/8 trong danh sách gợi ý sau mục 16. Chỉ áp dụng cho **`SplitBill.Web`** (giao diện) — API
+(`SplitBill.Api`) không đổi gì, mọi `errorCode` vẫn là hằng số tiếng Anh như từ đầu dự án (mục 8),
+message tiếng Việt trả về từ API vẫn giữ nguyên (không có khái niệm "API trả lời theo ngôn ngữ client")
+— việc dịch chỉ xảy ra ở tầng hiển thị Razor Pages.
+
+### 22.1 Cơ chế: `IStringLocalizer`/`IViewLocalizer` + "tiếng Việt làm resource key"
+
+Dùng thẳng cơ chế localization có sẵn của ASP.NET Core, không viết bộ dịch riêng:
+
+- **Không tạo `Resources/*.vi.resx`** — chuỗi tiếng Việt hardcode ngay trong `.cshtml` (vd
+  `@Localizer["Khoản chi"]`) đóng vai trò VỪA LÀ nội dung hiển thị mặc định VỪA LÀ resource key. Khi
+  không tìm thấy bản dịch cho culture hiện tại (bao gồm cả culture mặc định `vi`), `IStringLocalizer`
+  tự fallback về đúng chuỗi key truyền vào — tức là hiển thị nguyên văn tiếng Việt. Nhờ vậy không cần
+  duy trì file `.vi.resx` song song (vốn sẽ trùng lặp 100% nội dung `.cshtml`, chỉ tổ khó đồng bộ khi
+  sửa văn án), chỉ cần viết `Resources/**/*.en.resx` cho tiếng Anh.
+- Mỗi trang `.cshtml` có file resource riêng, đường dẫn mirror y hệt cây thư mục `Pages/` (quy ước
+  chuẩn của ASP.NET Core, tự động — không cấu hình gì thêm): `Pages/Index.cshtml` ↔
+  `Resources/Pages/Index.en.resx`, `Pages/Account/Login.cshtml` ↔
+  `Resources/Pages/Account/Login.en.resx`, v.v. Text dùng chung nhiều trang (navbar, footer, nút đổi
+  ngôn ngữ) nằm ở `SharedResource.cs` (class marker rỗng) ↔ `Resources/SharedResource.en.resx`, tiêm
+  qua `IStringLocalizer<SplitBill.Web.SharedResource>` trong `_Layout.cshtml`.
+- `Program.cs` đăng ký `builder.Services.AddLocalization(o => o.ResourcesPath = "Resources")` +
+  `AddRazorPages().AddViewLocalization()`, cấu hình `RequestLocalizationOptions` với 2 culture hỗ trợ
+  (`vi` mặc định, `en`). **Cố tình CHỈ đăng ký `RequestCultureProviders = [new
+  CookieRequestCultureProvider()]`** — KHÔNG dùng danh sách provider mặc định của framework
+  (`QueryString` → `Cookie` → `AcceptLanguageHeader`). Nghĩa là query string `?culture=en` trên URL
+  KHÔNG có tác dụng đổi ngôn ngữ (đã tự kiểm chứng: mở lại đúng 1 trang đang ở cookie `en` với
+  `?culture=vi` trên URL, trang vẫn hiện tiếng Anh — vì query string không nằm trong danh sách provider
+  nào cả, không phải do thứ tự ưu tiên). Đường dẫn duy nhất để đổi ngôn ngữ là qua `/SetLanguage` (dưới
+  đây), ghi cookie rồi mới có hiệu lực. Quyết định có chủ đích: 1 cookie provider duy nhất là đủ cho
+  nhu cầu "người dùng bấm nút đổi ngôn ngữ, giữ nguyên tới lần sau" — không cần query string (dễ bị
+  chia sẻ nhầm link kèm `?culture=` không mong muốn) hay Accept-Language header (trình duyệt tự đoán,
+  khó kiểm soát/test). `app.UseRequestLocalization()` đặt sau `UseHttpsRedirection()`, trước
+  `UseRouting()`.
+- Đổi ngôn ngữ: `Pages/SetLanguage.cshtml.cs` — `GET /SetLanguage?culture=en&returnUrl=...` ghi cookie
+  `CookieRequestCultureProvider.DefaultCookieName` (hạn 1 năm) rồi redirect về `returnUrl` (validate
+  bằng `Url.IsLocalUrl`, không redirect mù ra domain ngoài). Nút bấm đổi ngôn ngữ nằm trên navbar
+  (`_Layout.cshtml`), tự truyền `returnUrl` là URL trang hiện tại để không bị "giật" về trang chủ mỗi
+  lần đổi ngôn ngữ.
+
+### 22.2 `IStringLocalizer<T>` khác `IViewLocalizer` — bẫy nối chuỗi
+
+`_ViewImports.cshtml` tiêm sẵn `IViewLocalizer Localizer` (dùng trực tiếp trong mọi `.cshtml`, không
+cần khai báo lại từng trang) — đây là kiểu chuẩn để dịch text trong Razor View. Điểm khác biệt quan
+trọng so với `IStringLocalizer<T>` (dùng ở `SharedResource`/service thuần): `IViewLocalizer[...]` trả
+về `LocalizedHtmlString` (cho phép chứa HTML), trong khi `IStringLocalizer<T>[...]` trả về
+`LocalizedString` thuần (an toàn nối chuỗi `+` vì nó implicit-convert đúng qua `.ToString()`).
+
+> ⚠️ **Bug thật phát hiện qua verify sống (không phải qua test — kiến trúc test hiện tại của
+> `SplitBill.Web.Tests` không render Razor View thật, xem mục 10b)**: `Groups/Details.cshtml` ban đầu
+> viết nhãn khách vãng lai bằng `member.UserId is null ? " " + Localizer["(khách)"] : ""` (nối chuỗi
+> `string` với kết quả `Localizer[...]`). Vì `Localizer` ở đây là `IViewLocalizer` (trả
+> `LocalizedHtmlString`), phép `+` giữa `string` và `LocalizedHtmlString` không gọi override
+> `ToString()` mà rơi về `object.ToString()` mặc định của CLR — hiển thị sống trên trình duyệt ra
+> đúng nguyên văn `Microsoft.AspNetCore.Mvc.Localization.LocalizedHtmlString` thay vì "(khách)"/
+> "(guest)". Đã sửa bằng cách bỏ hẳn nối chuỗi, xuất riêng qua khối Razor gốc:
+> ```csharp
+> @if (member.UserId is null)
+> {
+>     @: @Localizer["(khách)"]
+> }
+> ```
+> Đã grep toàn bộ `src/SplitBill.Web/Pages` tìm mẫu `+ Localizer[`/`Localizer[...] +` để xác nhận đây
+> là chỗ DUY NHẤT mắc lỗi này. Đã cross-check: dùng `Localizer[...]` trong ngữ cảnh thuộc tính HTML
+> (`title="@Localizer[...]"`, `placeholder="@Localizer[...]"`, có ở `Create.cshtml`/`Expenses/Index.cshtml`/
+> `Groups/Details.cshtml`) KHÔNG bị lỗi này — verify bằng `element.getAttribute(...)` đọc đúng bản dịch
+> — vì Razor tự xử lý việc ghi giá trị thuộc tính đúng cách, chỉ riêng phép `+` tường minh trong code
+> block là con đường duy nhất dẫn tới bug. **Rút kinh nghiệm cho code sau này: không bao giờ nối chuỗi
+> `+` với kết quả `IViewLocalizer` trong `.cshtml` — luôn xuất trực tiếp bằng `@Localizer[...]` (Razor
+> tự render đúng), tách các đoạn văn bản bằng `@if`/nhiều thẻ `@:` nếu cần ghép động, không dùng
+> `string.Concat` hay `+`.**
+
+### 22.3 Phạm vi đã dịch (trung thực, không phóng đại)
+
+**Đã dịch nội dung trang** (kiểm chứng qua build sạch + verify sống cả 2 culture `vi`/`en`): navbar/
+footer (`_Layout.cshtml`), `Index.cshtml` (trang chủ), `Account/Login.cshtml`, `Account/Register.cshtml`,
+`Groups/Index.cshtml`, `Groups/Details.cshtml`, `Expenses/Index.cshtml`, `Expenses/Create.cshtml`. Riêng
+`ViewData["Title"]` (tiêu đề tab trình duyệt) của các trang này vẫn hardcode tiếng Việt, chưa qua
+`Localizer` — chỉ nội dung thân trang được dịch, không phải "đầy đủ" theo đúng nghĩa đen.
+
+**Cố tình CHƯA dịch** (giới hạn phạm vi, không phải thiếu sót — để tránh phình việc dịch toàn bộ ~30
+trang Razor Pages của dự án trong 1 lần, ưu tiên đúng luồng lõi "xem nhóm → xem/thêm khoản chi" trước):
+mọi trang còn lại (`Expenses/Edit`, `Groups/Balances`, `Groups/SettlementPlan`, `Groups/Timeline`,
+`Groups/Statistics`, `Groups/RecurringExpenses`, `Groups/Summary`, `Notifications/Index`,
+`Public/Group`, `Account/Profile`...) vẫn hiển thị tiếng Việt hardcode dù đổi sang `en` — không dùng
+`Localizer[]` nên không có cơ chế fallback nào áp dụng, chỉ đơn thuần chưa được đụng tới. Nội dung do
+người dùng tự nhập (tên nhóm, tên khoản chi, ghi chú, tên thành viên...) không bao giờ dịch, kể cả
+trên các trang đã dịch — chỉ nhãn/label cố định của giao diện mới thuộc phạm vi tính năng này.
+`ExpenseCategoryOptions`/`SupportedCurrencies` (nhãn danh mục, tên tiền tệ) cũng chưa được đưa vào hệ
+thống resource — dropdown "Danh mục" trên `Expenses/Index`/`Create` vẫn hiện nhãn tiếng Việt
+("📦 Khác", "🍜 Ăn uống"...) dù trang đã ở chế độ `en`.
+
+Đã verify sống trên trình duyệt (cả 2 chiều): đổi ngôn ngữ qua `/SetLanguage?culture=en` → `Groups/
+Details` hiện đúng "(guest)" (đúng bug đã sửa ở 22.2), `Expenses/Index` và `Expenses/Create` hiện đúng
+toàn bộ nhãn tiếng Anh, không còn chuỗi `LocalizedHtmlString` nào lộ ra; đổi lại `culture=vi` → mọi
+nhãn trở về đúng tiếng Việt gốc. `dotnet test`: 233/233 pass (không đổi so với trước tính năng này, vì
+Razor rendering không nằm trong phạm vi test tự động hiện có — xem giới hạn đã nêu ở mục 10b).

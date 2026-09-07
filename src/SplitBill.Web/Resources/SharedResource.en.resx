@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="Nhóm của tôi" xml:space="preserve">
+    <value>My groups</value>
+  </data>
+  <data name="Đổi ngôn ngữ" xml:space="preserve">
+    <value>Change language</value>
+  </data>
+  <data name="Đổi giao diện sáng/tối" xml:space="preserve">
+    <value>Toggle light/dark mode</value>
+  </data>
+  <data name="Đăng xuất" xml:space="preserve">
+    <value>Log out</value>
+  </data>
+  <data name="Đăng nhập" xml:space="preserve">
+    <value>Log in</value>
+  </data>
+  <data name="Đăng ký" xml:space="preserve">
+    <value>Sign up</value>
+  </data>
+  <data name="© 2026 SplitBill — chia tiền minh bạch, không lăn tăn." xml:space="preserve">
+    <value>© 2026 SplitBill — split bills, not friendships.</value>
+  </data>
+</root>

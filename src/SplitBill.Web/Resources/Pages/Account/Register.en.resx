@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="Tạo tài khoản 🎉" xml:space="preserve">
+    <value>Create an account 🎉</value>
+  </data>
+  <data name="Miễn phí, chỉ mất 30 giây" xml:space="preserve">
+    <value>Free, takes just 30 seconds</value>
+  </data>
+  <data name="Tên hiển thị" xml:space="preserve">
+    <value>Display name</value>
+  </data>
+  <data name="Email" xml:space="preserve">
+    <value>Email</value>
+  </data>
+  <data name="Mật khẩu" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="Tối thiểu 8 ký tự." xml:space="preserve">
+    <value>At least 8 characters.</value>
+  </data>
+  <data name="Đăng ký" xml:space="preserve">
+    <value>Sign up</value>
+  </data>
+  <data name="Đã có tài khoản?" xml:space="preserve">
+    <value>Already have an account?</value>
+  </data>
+  <data name="Đăng nhập" xml:space="preserve">
+    <value>Log in</value>
+  </data>
+</root>

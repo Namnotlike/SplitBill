@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="Nhóm của tôi" xml:space="preserve">
+    <value>My groups</value>
+  </data>
+  <data name="Chọn 1 nhóm để xem chi tiết, hoặc tạo nhóm mới ở bên phải." xml:space="preserve">
+    <value>Select a group to see details, or create a new one on the right.</value>
+  </data>
+  <data name="Chưa có nhóm nào. Tạo nhóm đầu tiên ở bên phải 👉" xml:space="preserve">
+    <value>No groups yet. Create your first one on the right 👉</value>
+  </data>
+  <data name="Lưu trữ" xml:space="preserve">
+    <value>Archived</value>
+  </data>
+  <data name="Một lần" xml:space="preserve">
+    <value>One-time</value>
+  </data>
+  <data name="Dùng lại nhiều lần" xml:space="preserve">
+    <value>Recurring</value>
+  </data>
+  <data name="+ Tạo nhóm mới" xml:space="preserve">
+    <value>+ Create new group</value>
+  </data>
+  <data name="Tên nhóm" xml:space="preserve">
+    <value>Group name</value>
+  </data>
+  <data name="Mô tả (tùy chọn)" xml:space="preserve">
+    <value>Description (optional)</value>
+  </data>
+  <data name="Loại nhóm" xml:space="preserve">
+    <value>Group type</value>
+  </data>
+  <data name="Một lần (cuộc chơi)" xml:space="preserve">
+    <value>One-time (an event)</value>
+  </data>
+  <data name="Tiền tệ" xml:space="preserve">
+    <value>Currency</value>
+  </data>
+  <data name="Không đổi được sau khi đã tạo nhóm." xml:space="preserve">
+    <value>Cannot be changed after the group is created.</value>
+  </data>
+  <data name="Tạo nhóm" xml:space="preserve">
+    <value>Create group</value>
+  </data>
+</root>

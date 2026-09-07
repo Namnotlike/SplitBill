@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="Về nhóm" xml:space="preserve">
+    <value>Back to group</value>
+  </data>
+  <data name="Khoản chi" xml:space="preserve">
+    <value>Expenses</value>
+  </data>
+  <data name="+ Thêm khoản chi" xml:space="preserve">
+    <value>+ Add expense</value>
+  </data>
+  <data name="Tiêu đề" xml:space="preserve">
+    <value>Title</value>
+  </data>
+  <data name="Tìm theo tên khoản chi..." xml:space="preserve">
+    <value>Search by expense title...</value>
+  </data>
+  <data name="Người ứng tiền" xml:space="preserve">
+    <value>Paid by</value>
+  </data>
+  <data name="Tất cả" xml:space="preserve">
+    <value>All</value>
+  </data>
+  <data name="Danh mục" xml:space="preserve">
+    <value>Category</value>
+  </data>
+  <data name="Từ ngày" xml:space="preserve">
+    <value>From date</value>
+  </data>
+  <data name="Đến ngày" xml:space="preserve">
+    <value>To date</value>
+  </data>
+  <data name="Từ" xml:space="preserve">
+    <value>Min</value>
+  </data>
+  <data name="Đến" xml:space="preserve">
+    <value>Max</value>
+  </data>
+  <data name="Lọc" xml:space="preserve">
+    <value>Filter</value>
+  </data>
+  <data name="Xóa bộ lọc" xml:space="preserve">
+    <value>Clear filter</value>
+  </data>
+  <data name="Không có khoản chi nào khớp bộ lọc." xml:space="preserve">
+    <value>No expenses match this filter.</value>
+  </data>
+  <data name="Chưa có khoản chi nào." xml:space="preserve">
+    <value>No expenses yet.</value>
+  </data>
+  <data name="Ngày" xml:space="preserve">
+    <value>Date</value>
+  </data>
+  <data name="Tổng tiền" xml:space="preserve">
+    <value>Total</value>
+  </data>
+  <data name="Ai ứng" xml:space="preserve">
+    <value>Paid by</value>
+  </data>
+  <data name="Chia theo" xml:space="preserve">
+    <value>Split mode</value>
+  </data>
+  <data name="Sửa" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="Xóa" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="Trang {0}/{1} — tổng {2} khoản chi." xml:space="preserve">
+    <value>Page {0}/{1} — {2} expenses total.</value>
+  </data>
+  <data name="Trước" xml:space="preserve">
+    <value>Previous</value>
+  </data>
+  <data name="Sau" xml:space="preserve">
+    <value>Next</value>
+  </data>
+</root>

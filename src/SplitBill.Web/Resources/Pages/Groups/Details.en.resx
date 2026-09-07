@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="Nhóm của tôi" xml:space="preserve">
+    <value>My groups</value>
+  </data>
+  <data name="Khoản chi" xml:space="preserve">
+    <value>Expenses</value>
+  </data>
+  <data name="Số dư" xml:space="preserve">
+    <value>Balances</value>
+  </data>
+  <data name="Kế hoạch thanh toán" xml:space="preserve">
+    <value>Settlement plan</value>
+  </data>
+  <data name="Hoạt động" xml:space="preserve">
+    <value>Activity</value>
+  </data>
+  <data name="Thống kê" xml:space="preserve">
+    <value>Statistics</value>
+  </data>
+  <data name="Khoản chi định kỳ" xml:space="preserve">
+    <value>Recurring expenses</value>
+  </data>
+  <data name="CSV khoản chi" xml:space="preserve">
+    <value>Expenses CSV</value>
+  </data>
+  <data name="CSV số dư" xml:space="preserve">
+    <value>Balances CSV</value>
+  </data>
+  <data name="Xuất PDF tổng kết" xml:space="preserve">
+    <value>Export summary PDF</value>
+  </data>
+  <data name="Tạo nhóm mới, copy thành viên hiện tại (không copy khoản chi)" xml:space="preserve">
+    <value>Create a new group, copying current members (expenses are not copied)</value>
+  </data>
+  <data name="Nhân bản nhóm" xml:space="preserve">
+    <value>Duplicate group</value>
+  </data>
+  <data name="Thành viên" xml:space="preserve">
+    <value>Members</value>
+  </data>
+  <data name="Tên" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Vai trò" xml:space="preserve">
+    <value>Role</value>
+  </data>
+  <data name="(khách)" xml:space="preserve">
+    <value>(guest)</value>
+  </data>
+  <data name="Rời/Xóa" xml:space="preserve">
+    <value>Leave/Remove</value>
+  </data>
+  <data name="Thêm thành viên (khách vãng lai)" xml:space="preserve">
+    <value>Add member (guest)</value>
+  </data>
+  <data name="Tên hiển thị" xml:space="preserve">
+    <value>Display name</value>
+  </data>
+  <data name="+ Thêm" xml:space="preserve">
+    <value>+ Add</value>
+  </data>
+  <data name="Link chia sẻ" xml:space="preserve">
+    <value>Share link</value>
+  </data>
+  <data name="Ai có link này đều xem được nhóm (không cần đăng nhập)." xml:space="preserve">
+    <value>Anyone with this link can view the group (no login required).</value>
+  </data>
+  <data name="Đổi link mới" xml:space="preserve">
+    <value>Generate new link</value>
+  </data>
+  <data name="Cài đặt" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="Gộp nợ tối ưu (SimplifyDebts)" xml:space="preserve">
+    <value>Simplify debts (SimplifyDebts)</value>
+  </data>
+  <data name="Tắt gộp nợ" xml:space="preserve">
+    <value>Turn off simplification</value>
+  </data>
+  <data name="Bật gộp nợ" xml:space="preserve">
+    <value>Turn on simplification</value>
+  </data>
+</root>
