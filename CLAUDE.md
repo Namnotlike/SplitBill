@@ -1026,11 +1026,11 @@ POST /api/v1/notifications/read-all       Đánh dấu tất cả đã đọc
 
 - Thư viện: **MailKit** (bổ sung vào danh sách NuGet được phép ở mục 2 — quyết định người dùng
   2026-09-05, thay vì `System.Net.Mail` đã bị Microsoft khuyến cáo không dùng cho code mới).
-  > ⚠️ Ghi nhận rủi ro đã biết: bản mới nhất lúc thêm (4.14.0) vẫn bị NuGet cảnh báo NU1902
+  > ⚠️ Ghi nhận rủi ro đã biết (2026-09-05): bản lúc thêm (4.14.0) bị NuGet cảnh báo NU1902
   > (moderate severity, GHSA-9j88-vvj5-vhgr) — đã thử các version 4.9.0/4.13.0/4.14.0, cảnh báo vẫn còn
-  > (chưa có bản vá tại thời điểm này). Chỉ dùng tính năng gửi SMTP cơ bản (không dùng S/MIME hay các
-  > tính năng liên quan tới lỗ hổng), rủi ro thực tế thấp cho use-case này, nhưng cần theo dõi và nâng
-  > cấp `MailKit` lên bản vá ngay khi có.
+  > tại thời điểm đó (chưa có bản vá). **Đã nâng cấp lên 4.17.0 ngày 2026-09-07** — verify bằng
+  > `dotnet list package --vulnerable --include-transitive` (không còn cảnh báo nào) và
+  > `dotnet build` (0 warning liên quan NU1902). Vẫn giữ nguyên chỉ dùng tính năng gửi SMTP cơ bản.
 - `IEmailSender.SendAsync(toEmail, subject, htmlBody, cancellationToken)` — interface thuần trong
   `SplitBill.Application`, 2 cài đặt ở `SplitBill.Infrastructure`:
   - `SmtpEmailSender` (MailKit thật) — dùng khi `Smtp:Host` có cấu hình.

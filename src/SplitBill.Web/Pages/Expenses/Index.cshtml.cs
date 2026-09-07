@@ -23,8 +23,11 @@ public class IndexModel : PageModel
     // ===== Tìm kiếm/lọc khoản chi (CLAUDE.md mục 15.2) — bổ sung 2026-09-05. Mọi field đều
     // SupportsGet=true để form lọc dùng method="get": kết quả có thể bookmark/chia sẻ link, và nút
     // "Trang sau/trước" chỉ cần render lại đúng các asp-route-* hiện có, không cần giữ state riêng. =====
-    [BindProperty(SupportsGet = true)]
-    public int Page { get; set; } = 1;
+    // Đặt tên property là "PageNumber" (không phải "Page") để không che khuất method
+    // PageModel.Page() có sẵn — dùng Name="Page" để giữ nguyên key query string cũ (không phá
+    // link filter đã bookmark/chia sẻ trước đây).
+    [BindProperty(SupportsGet = true, Name = "Page")]
+    public int PageNumber { get; set; } = 1;
 
     [BindProperty(SupportsGet = true)]
     public string? Title { get; set; }
@@ -68,7 +71,7 @@ public class IndexModel : PageModel
             var toDate = ToDate is { } to ? ToLocalEndOfDay(to) : (DateTimeOffset?)null;
             var filter = new ExpenseFilter(Title, PayerMemberId, fromDate, toDate, MinAmount, MaxAmount, Category);
 
-            Expenses = await _apiClient.GetExpensesAsync(GroupId, Page <= 0 ? 1 : Page, PageSize, filter, cancellationToken);
+            Expenses = await _apiClient.GetExpensesAsync(GroupId, PageNumber <= 0 ? 1 : PageNumber, PageSize, filter, cancellationToken);
             return Page();
         }
         catch (ApiException ex)
