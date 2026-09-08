@@ -97,6 +97,15 @@ xem chi tiết ở [`docker-compose.yml`](./docker-compose.yml). Mặc định m
 JWT signing key trong Docker được đặt qua biến môi trường `Jwt__SigningKey` trong `docker-compose.yml`
 — **đổi giá trị đó trước khi dùng ngoài máy cá nhân**, giá trị mẫu chỉ để chạy thử nhanh.
 
+## CI
+
+`.github/workflows/ci.yml` chạy `dotnet build` + `dotnet test` (cấu hình Release) trên mỗi
+push/pull request nhắm tới `main`/`master`. `SplitBill.IntegrationTests` dùng EF Core InMemory (không
+phải SQL Server thật) nên chạy được thẳng trên runner GitHub-hosted, không cần service container nào.
+Workflow đã được viết và các bước build/test đã verify chạy đúng cục bộ với đúng flag Release y hệt
+CI dùng — nhưng repo này hiện **chưa có remote GitHub** nên chưa tự kích hoạt/verify được thật trên
+GitHub Actions; sẽ chạy ngay khi bạn `git push` lên một repo GitHub.
+
 ## Tài khoản & dữ liệu mẫu
 
 Không có seed data sẵn — đăng ký tài khoản qua `/Account/Register`, tạo nhóm, rồi thêm thành viên
