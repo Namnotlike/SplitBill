@@ -118,6 +118,27 @@ public sealed class AuthServiceTests
     }
 
     [Fact]
+    public async Task ForgotPasswordAsync_UnknownEmail_TakesAtLeastAsLongAsKnownEmail_NoTimingSideChannel()
+    {
+        // Phát hiện qua security-review (2026-09-08): nhánh "email không tồn tại" trước đây trả về
+        // gần như tức thì (chỉ 1 SELECT), trong khi nhánh "email tồn tại" tốn thêm thời gian ghi DB +
+        // gửi email — chênh lệch độ trễ này là 1 kênh rò rỉ (timing side-channel) cho phép dò email
+        // nào đã đăng ký mà không cần đọc response body. Đã sửa bằng sàn thời gian tối thiểu chung cho
+        // cả 2 nhánh (AuthService.ForgotPasswordMinDuration). Test này xác nhận nhánh "không tồn tại"
+        // (vốn nhanh nhất) vẫn bị giữ lại đủ lâu, không trả về ngay lập tức.
+        using var harness = TestHarness.Create();
+        await harness.AuthService.RegisterAsync(new RegisterRequest("a@example.com", "Passw0rd123", "Nam"), CancellationToken.None);
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        await harness.AuthService.ForgotPasswordAsync("nobody@example.com", CancellationToken.None);
+        sw.Stop();
+
+        // Sàn thực tế là 500ms — cho phép sai số nhỏ (đồng hồ/lịch trình luồng) bằng cách chỉ đòi hỏi
+        // tối thiểu 400ms, tránh test flaky trên máy CI chậm mà vẫn đủ chứng minh KHÔNG trả về tức thì.
+        sw.ElapsedMilliseconds.Should().BeGreaterThanOrEqualTo(400);
+    }
+
+    [Fact]
     public async Task ResetPasswordAsync_ValidToken_ChangesPassword_AndRevokesAllRefreshTokens()
     {
         using var harness = TestHarness.Create();

@@ -1560,6 +1560,25 @@ POST /api/v1/auth/reset-password    Body: { token, newPassword } → đổi mậ
 RevokeAllForUserAsync`) — đăng xuất mọi phiên khác, phòng trường hợp mật khẩu cũ đã bị lộ (đây chính
 là kịch bản "quên/lộ mật khẩu", nên xử lý bảo thủ thay vì chỉ đổi PasswordHash rồi thôi).
 
+> ⚠️ **Lỗ hổng bảo mật phát hiện + sửa qua `security-review` (2026-09-08):** dù response body của
+> `POST /auth/forgot-password` luôn giống hệt nhau (204 rỗng) bất kể email có tồn tại hay không —
+> đúng như mục đích "không tiết lộ" nêu trên — 2 nhánh xử lý lại tốn thời gian rất khác nhau: nhánh
+> "không tồn tại/khách vãng lai" trả về gần như tức thì (1 câu SELECT), còn nhánh "tồn tại" phải ghi
+> `PasswordResetToken` vào DB rồi gửi email — với `SmtpEmailSender` (mục 13.3) là cả 1 phiên SMTP thật
+> qua mạng (connect + STARTTLS + auth + gửi), có thể mất hàng trăm mili-giây tới vài giây. Chênh lệch
+> **độ trễ response** này là một kênh rò rỉ độc lập với nội dung response — kẻ tấn công đo thời gian
+> phản hồi (không cần đọc response) vẫn dò được email nào đã đăng ký, phá vỡ đúng mục tiêu bảo mật đã
+> nêu ở đầu mục 16.2. Đã sửa bằng cách áp **sàn thời gian tối thiểu chung** (500ms,
+> `AuthService.ForgotPasswordMinDuration`) cho cả 2 nhánh — `Task.WhenAll(work, Task.Delay(500ms))`:
+> nhánh nhanh luôn "chờ thêm" cho đủ sàn, nhánh chậm (đã gửi email) hiếm khi bị ảnh hưởng vì thường đã
+> tốn hơn sàn này. Cân nhắc nhưng KHÔNG chọn phương án chuyển việc gửi email sang fire-and-forget (dù
+> cũng loại bỏ được phụ thuộc thời gian) — vì `CancellationToken` của request có thể bị hủy ngay sau
+> khi response trả về, làm email không gửi được nếu tách khỏi luồng chính mà không tự quản lý DI scope
+> mới, phức tạp hơn hẳn so với lợi ích. Đây không phải giải pháp tuyệt đối (email gửi chậm bất thường
+> vẫn có thể lộ), nhưng đưa case điển hình về gần như không phân biệt được — mức giảm thiểu thực tế cho
+> lớp lỗi này. Test: `ForgotPasswordAsync_UnknownEmail_TakesAtLeastAsLongAsKnownEmail_NoTimingSideChannel`
+> (`AuthServiceTests`).
+
 ### 16.3 Web
 
 `Pages/Account/ForgotPassword.cshtml` (nhập email, POST) và `Pages/Account/ResetPassword.cshtml`

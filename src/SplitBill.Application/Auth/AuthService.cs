@@ -112,7 +112,29 @@ public sealed class AuthService : IAuthService
         }
     }
 
+    // Sàn thời gian tối thiểu cho ForgotPasswordAsync — chặn timing side-channel dò email tồn tại
+    // (xem ghi chú chi tiết bên dưới).
+    private static readonly TimeSpan ForgotPasswordMinDuration = TimeSpan.FromMilliseconds(500);
+
     public async Task ForgotPasswordAsync(string email, CancellationToken cancellationToken)
+    {
+        // Endpoint này luôn trả 204 và không tiết lộ gì qua NỘI DUNG response dù email có tồn tại hay
+        // không (CLAUDE.md mục 8/16) — nhưng nhánh "email tồn tại" (ghi PasswordResetToken vào DB +
+        // gửi email, với SmtpEmailSender là cả 1 phiên SMTP thật qua mạng) chậm hơn hẳn nhánh "không
+        // tồn tại/khách vãng lai" (chỉ 1 câu SELECT rồi trả về ngay) — tạo ra kênh rò rỉ qua ĐỘ TRỄ
+        // response, phát hiện qua security-review (2026-09-08). Áp sàn thời gian tối thiểu CHUNG cho
+        // cả 2 nhánh bằng Task.WhenAll với Task.Delay: nhánh nhanh luôn "chờ thêm" cho đủ sàn, nhánh
+        // chậm hiếm khi bị ảnh hưởng vì thường đã tốn hơn sàn này. Không loại bỏ tuyệt đối kênh rò rỉ
+        // (email gửi chậm bất thường vẫn có thể lộ), nhưng đưa case điển hình về gần như không phân
+        // biệt được — mức giảm thiểu thực tế/phổ biến cho lớp lỗi này, không cần đổi luồng gửi email
+        // sang fire-and-forget (vốn kéo theo rủi ro CancellationToken của request bị hủy giữa chừng
+        // làm email không gửi được, và phải tự quản lý DI scope mới).
+        var work = ForgotPasswordCoreAsync(email, cancellationToken);
+        var minDuration = Task.Delay(ForgotPasswordMinDuration, cancellationToken);
+        await Task.WhenAll(work, minDuration);
+    }
+
+    private async Task ForgotPasswordCoreAsync(string email, CancellationToken cancellationToken)
     {
         var user = await _userRepository.GetByEmailAsync(email, cancellationToken);
         // Guest (PasswordHash null) không đăng nhập được nên cũng không đặt lại mật khẩu được — coi
