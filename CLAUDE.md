@@ -2214,7 +2214,7 @@ test. `SplitBill.Api/Program.cs` đã có sẵn `public partial class Program;` 
 
 ### 24.5 Nội dung test đã viết
 
-Cố tình viết ít nhưng SÂU (2 file, 3 test) — mỗi test là 1 luồng dài (nhiều bước liên tiếp), không phải
+Cố tình viết ít nhưng SÂU (3 file, 4 test) — mỗi test là 1 luồng dài (nhiều bước liên tiếp), không phải
 nhiều test atomic rời rạc, vì chi phí khởi động 2 Kestrel host + 1 trình duyệt là cố định 1 lần cho cả
 `[Collection("E2E")]` (dùng chung `E2EFixture` qua `ICollectionFixture`), còn chi phí drive từng bước
 qua trình duyệt thật (fill form, click, chờ điều hướng) là chi phí thật trên MỖI test — gộp thành luồng
@@ -2229,10 +2229,22 @@ dài tận dụng tối đa 1 lần setup mà vẫn phủ được nhiều bư�
   Kế hoạch thanh toán đúng 1 giao dịch "Guest Friend chuyển cho Owner Tester" 50.000đ — đúng bài toán
   cốt lõi của cả dự án (mục 1) đi qua toàn bộ pipeline thật, không chỉ qua thuật toán thuần (mục 7) hay
   service in-process (`SplitBill.IntegrationTests`).
+- `SettlementFlowTests` (bổ sung ngay sau, cùng ngày 2026-09-08) — lấp đúng khoảng trống
+  `GroupExpenseFlowTests` để lại: test đó dừng ở việc XEM kế hoạch thanh toán, không thực sự ghi
+  nhận/xác nhận giao dịch nào. Dùng **2 tài khoản thật** (không phải 1 tài khoản + 1 khách vãng lai như
+  test trước) vì Ghi nhận/Xác nhận settlement đòi hỏi mỗi bên tự thao tác từ đúng phiên đăng nhập của
+  mình (`SettlementPlanModel.MyMemberId` so khớp `NameIdentifier` claim — khách vãng lai không đăng
+  nhập được, mục 2 "Guest... không đăng nhập được"). Vì form "Thêm thành viên" trên Web CHỈ hỗ trợ
+  khách vãng lai (mục 13.4), người thứ 2 phải **tham gia qua link chia sẻ** (mục 15.6) — nhân tiện test
+  này cũng là bài kiểm tra E2E đầu tiên cho luồng đó. Đi hết vòng đời `Settlement`: Payer tự ghi nhận
+  "Tôi đã chuyển khoản này" (Pending) → Owner tự "Xác nhận" (Confirmed) → xác nhận số dư CẢ HAI bên đều
+  về đúng "Đã cân bằng" và trang Kế hoạch thanh toán không còn giao dịch nào — đúng bất biến
+  `Σ net = 0` sau khi 1 `Settlement` thật được Confirmed (mục 6.1), verify bằng trình duyệt thật thay
+  vì chỉ bằng unit test cho công thức.
 
-DB dùng chung `[Collection("E2E")]` (1 `ApiTestFactory`/instance InMemory DB cho cả 3 test) nhưng mỗi
-test tự đăng ký 1 email `Guid.NewGuid()` riêng và tự mở 1 `IBrowserContext` riêng (cookie cô lập từng
-test) — không có state rò rỉ giữa các test dù chạy tuần tự trên cùng DB.
+DB dùng chung `[Collection("E2E")]` (1 `ApiTestFactory`/instance InMemory DB cho cả 4 test) nhưng mỗi
+test tự đăng ký (các) email `Guid.NewGuid()` riêng và tự mở (các) `IBrowserContext` riêng (cookie cô
+lập từng test/từng user) — không có state rò rỉ giữa các test dù chạy tuần tự trên cùng DB.
 
 ### 24.6 CI
 
@@ -2250,11 +2262,12 @@ tắc CI hiện có (mục "CI" trong README.md).
 > remote GitHub) — chỉ verify được cục bộ trên Windows (nơi không cần `--with-deps` vì Chromium tải sẵn
 > mọi thứ cần trong gói cho Windows).
 
-Đã verify sống (thật sự chạy qua trình duyệt Chromium headless, không phải chỉ review code): cả 3 test
+Đã verify sống (thật sự chạy qua trình duyệt Chromium headless, không phải chỉ review code): cả 4 test
 pass cục bộ, kèm log HTTP request/response đầy đủ xác nhận từng bước (POST `/auth/register` → 200, GET
-`/users/me`/`/groups`/`/notifications/unread-count` → 200, POST `.../expenses` → 201, GET
+`/users/me`/`/groups`/`/notifications/unread-count` → 200, POST `.../expenses` → 201, POST
+`.../settlements` → tạo Pending, POST `.../confirm` → Confirmed, GET
 `.../balances`/`.../settlement-plan` → 200 — không có bước nào bị mock/giả lập). `dotnet build
 SplitBill.sln --configuration Release`: 0 warning, 0 error. `dotnet test SplitBill.sln --configuration
-Release`: **239/239 pass** (69 UnitTests + 25 Web.Tests + 142 IntegrationTests + 3 E2ETests mới —
+Release`: **240/240 pass** (69 UnitTests + 25 Web.Tests + 142 IntegrationTests + 4 E2ETests —
 không có test cũ nào bị ảnh hưởng bởi việc thêm `public partial class Program;` vào `SplitBill.Web/
 Program.cs`).

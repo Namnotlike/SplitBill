@@ -55,6 +55,11 @@ public sealed class GroupExpenseFlowTests(E2EFixture fixture)
         // Input.Rows được CreateModel.OnGetAsync khởi tạo sẵn EqualParticipant = true cho MỌI thành
         // viên (xem Create.cshtml.cs) — chỉ cần điền số tiền đã ứng cho đúng 1 dòng (Owner), không
         // cần đụng tới checkbox "Tham gia?" của chế độ Equal mặc định.
+        // ⚠️ .First giả định Group.Members[0] (dòng đầu DOM) là Owner — đúng thực tế trên EF Core
+        // InMemory (không ORDER BY nào can thiệp, trả về đúng thứ tự insert) nhưng đây KHÔNG phải hợp
+        // đồng được đảm bảo của EF Core, chỉ là hành vi hiện tại của provider. Nếu giả định này sai:
+        // thất bại sẽ LỘ RÕ NGAY (điền nhầm PayerAmount cho Guest thay vì Owner khiến bước assert sau
+        // — "+50.000đ"/"-50.000đ" đúng người — sai ngay lập tức), không âm thầm pass sai.
         await page.Locator("input[id^='Input_Rows_'][id$='__PayerAmount']").First.FillAsync("100000");
         await page.ClickAsync("button:has-text('Lưu khoản chi')");
         // Cùng quy ước lược "Index": route thật của Expenses/Index.cshtml (@page "{groupId:guid}") là
