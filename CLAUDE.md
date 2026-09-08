@@ -2272,10 +2272,16 @@ thì Chromium headless sẽ không khởi động được trên CI dù build/te
 `ApiTestFactory` dùng EF Core InMemory (mục 24.3) nên không cần SQL Server/LocalDB thật, khớp nguyên
 tắc CI hiện có (mục "CI" trong README.md).
 
-> Cùng giới hạn đã ghi ở mục "CI" (README.md): bước cài Playwright browsers này viết đúng theo tài liệu
-> chính thức của Playwright .NET nhưng **chưa tự verify được trên GitHub Actions thật** (repo chưa có
-> remote GitHub) — chỉ verify được cục bộ trên Windows (nơi không cần `--with-deps` vì Chromium tải sẵn
-> mọi thứ cần trong gói cho Windows).
+> ✅ **Cập nhật 2026-09-08 — đã verify thật trên GitHub Actions**, không còn là "chưa verify" nữa: repo
+> đã có remote (`https://github.com/Namnotlike/SplitBill`, quyết định người dùng), `git push` kích hoạt
+> đúng workflow. Bước `Install Playwright browsers` (`--with-deps chromium`) chạy đúng như dự kiến
+> trên `ubuntu-latest`. Lần chạy ĐẦU TIÊN thất bại — nhưng không phải vì Playwright/E2E: `Test` step
+> báo 4 test fail trong `CsvBuilderTests` (UnitTests), một bug thật hoàn toàn không liên quan tới E2E —
+> xem callout ⚠️ ở mục 8 ("`CsvBuilder` dùng `Environment.NewLine` thay vì `\"\r\n\"` cứng"). Đây chính
+> xác là loại lỗi mà chạy CI trên OS khác máy dev (Windows) sinh ra để bắt được — bug đã tồn tại từ lâu,
+> chưa từng lộ ra vì mọi lần `dotnet test` trước đó đều chạy trên Windows. Sau khi sửa, lần chạy tiếp
+> theo (commit `25ddd20`) **thành công**, 240/240 test pass, ~1 phút 30 giây. Xem
+> https://github.com/Namnotlike/SplitBill/actions.
 
 Đã verify sống (thật sự chạy qua trình duyệt Chromium headless, không phải chỉ review code): cả 4 test
 pass cục bộ, kèm log HTTP request/response đầy đủ xác nhận từng bước (POST `/auth/register` → 200, GET

@@ -102,12 +102,16 @@ JWT signing key trong Docker được đặt qua biến môi trường `Jwt__Sig
 
 ## CI
 
-`.github/workflows/ci.yml` chạy `dotnet build` + `dotnet test` (cấu hình Release) trên mỗi
-push/pull request nhắm tới `main`/`master`. `SplitBill.IntegrationTests` dùng EF Core InMemory (không
-phải SQL Server thật) nên chạy được thẳng trên runner GitHub-hosted, không cần service container nào.
-Workflow đã được viết và các bước build/test đã verify chạy đúng cục bộ với đúng flag Release y hệt
-CI dùng — nhưng repo này hiện **chưa có remote GitHub** nên chưa tự kích hoạt/verify được thật trên
-GitHub Actions; sẽ chạy ngay khi bạn `git push` lên một repo GitHub.
+`.github/workflows/ci.yml` chạy `dotnet build` + cài trình duyệt Playwright + `dotnet test` (cấu hình
+Release) trên mỗi push/pull request nhắm tới `main`/`master`. `SplitBill.IntegrationTests` và
+`SplitBill.E2ETests` đều dùng EF Core InMemory (không phải SQL Server thật) nên chạy được thẳng trên
+runner GitHub-hosted, không cần service container nào.
+
+**Đã verify chạy thật trên GitHub Actions** (`ubuntu-latest`, 2026-09-08, https://github.com/Namnotlike/SplitBill/actions)
+— lần chạy đầu tiên phát hiện ngay 1 bug thật (`CsvBuilder` dùng `Environment.NewLine` thay vì `"\r\n"`
+cứng, chỉ lộ ra trên Linux — xem CLAUDE.md mục 8), đã sửa và lần chạy tiếp theo **thành công** (240/240
+test pass, ~1 phút 30 giây). Đây là bằng chứng cụ thể cho lý do nên chạy CI trên runner khác OS với máy
+dev thay vì chỉ tin vào kết quả cục bộ.
 
 ## E2E test (Playwright)
 
@@ -143,9 +147,8 @@ settlement (mục 6.4), đa ngôn ngữ VI/EN (mục 22), PWA (mục 23) đều 
 
 - **Docker chưa được verify chạy thật end-to-end** — cấu hình `docker-compose.yml` đã rà soát kỹ bằng
   mắt nhưng môi trường phát triển hiện tại không có sẵn Docker CLI (CLAUDE.md mục 10b).
-- **CI (GitHub Actions) và bước cài Playwright browsers trong CI chưa tự verify được trên GitHub Actions
-  thật** — repo chưa có remote GitHub, chỉ verify được cục bộ với đúng flag/lệnh CI dùng (mục "CI" và
-  mục 24.6 CLAUDE.md).
+- ~~CI (GitHub Actions) chưa verify được trên GitHub Actions thật~~ — **đã verify 2026-09-08**, xem mục
+  "CI" ở trên.
 - **i18n (mục 22) chỉ dịch nhãn cố định của giao diện Web** — nội dung do người dùng tự nhập (tên
   nhóm, ghi chú...) và text do Api tự sinh bằng tiếng Việt (`AuditLog.Summary`, `Notification.Title`/
   `Message`, nhãn danh mục/tiền tệ) cố tình không dịch — ranh giới có chủ đích, không phải thiếu sót.
