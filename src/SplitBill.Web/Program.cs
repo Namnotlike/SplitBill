@@ -74,3 +74,10 @@ app.MapRazorPages()
    .WithStaticAssets();
 
 app.Run();
+
+namespace SplitBill.Web
+{
+    /// <summary>Cho phép WebApplicationFactory trong test project (SplitBill.E2ETests) tham chiếu tới
+    /// entry point — cùng mẫu đã có sẵn ở SplitBill.Api/Program.cs.</summary>
+    public partial class Program;
+}

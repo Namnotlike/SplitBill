@@ -106,6 +106,26 @@ Workflow đã được viết và các bước build/test đã verify chạy đ�
 CI dùng — nhưng repo này hiện **chưa có remote GitHub** nên chưa tự kích hoạt/verify được thật trên
 GitHub Actions; sẽ chạy ngay khi bạn `git push` lên một repo GitHub.
 
+## E2E test (Playwright)
+
+`tests/SplitBill.E2ETests` lái 1 trình duyệt Chromium headless thật qua toàn bộ chồng công nghệ thật
+(Chromium → Kestrel của `SplitBill.Web` → HTTP → Kestrel của `SplitBill.Api` → EF Core) — khác 3
+project test còn lại vốn không đi qua tầng HTTP/trình duyệt thật (xem CLAUDE.md mục 24). Chạy cùng lúc
+với các test khác:
+
+```powershell
+dotnet test SplitBill.sln
+```
+
+Lần chạy đầu tiên trên 1 máy chưa có Playwright sẽ tự tải trình duyệt Chromium (`E2EFixture` tự gọi
+`playwright install chromium` lúc khởi động — chỉ mất thời gian đúng lần đầu, các lần sau bỏ qua rất
+nhanh). Nếu muốn cài trước thủ công (hoặc cần `--with-deps` để cài thêm thư viện hệ thống Linux):
+
+```powershell
+dotnet build tests/SplitBill.E2ETests
+pwsh tests/SplitBill.E2ETests/bin/Debug/net9.0/playwright.ps1 install chromium
+```
+
 ## Tài khoản & dữ liệu mẫu
 
 Không có seed data sẵn — đăng ký tài khoản qua `/Account/Register`, tạo nhóm, rồi thêm thành viên

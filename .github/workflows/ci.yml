@@ -27,7 +27,17 @@ jobs:
       - name: Build
         run: dotnet build SplitBill.sln --no-restore --configuration Release
 
-      # SplitBill.IntegrationTests dùng EF Core InMemory (xem TestHarness.cs), KHÔNG cần SQL Server/
-      # LocalDB thật — nên chạy được thẳng trên runner ubuntu-latest, không cần service container nào.
+      # SplitBill.E2ETests (Playwright, xem CLAUDE.md mục 24) cần trình duyệt Chromium + thư viện hệ
+      # thống Linux (libnss3, libatk...) mà runner ubuntu-latest không có sẵn. "--with-deps" cài cả 2
+      # trong 1 lệnh (dùng apt-get, cần sudo — có sẵn không cần mật khẩu trên GitHub-hosted runner).
+      # E2EFixture cũng tự gọi Program.Main(["install","chromium"]) lúc InitializeAsync (tiện cho máy
+      # dev chưa cài Playwright thủ công) nhưng KHÔNG đủ trên CI vì thiếu "--with-deps" (chỉ tải browser
+      # binary, không cài lib hệ thống) — bước riêng này bắt buộc phải có trên CI.
+      - name: Install Playwright browsers
+        run: pwsh tests/SplitBill.E2ETests/bin/Release/net9.0/playwright.ps1 install --with-deps chromium
+
+      # SplitBill.IntegrationTests + SplitBill.E2ETests (ApiTestFactory) đều dùng EF Core InMemory,
+      # KHÔNG cần SQL Server/LocalDB thật — nên chạy được thẳng trên runner ubuntu-latest, không cần
+      # service container nào.
       - name: Test
         run: dotnet test SplitBill.sln --no-build --configuration Release --logger "console;verbosity=normal"

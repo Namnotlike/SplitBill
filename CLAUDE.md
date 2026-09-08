@@ -31,7 +31,7 @@ Bài toán cốt lõi: nhiều người cùng ứng tiền cho nhiều khoản c
 | Auth | JWT Bearer + share-link token cho khách chưa đăng ký |
 | Validation | FluentValidation |
 | Mapping | Không dùng AutoMapper. Viết extension method `ToDto()` thủ công. |
-| Test | xUnit + FluentAssertions + EF Core InMemory (unit) / Testcontainers hoặc LocalDB (integration) |
+| Test | xUnit + FluentAssertions + EF Core InMemory (unit) / Testcontainers hoặc LocalDB (integration). E2E: Microsoft.Playwright (bổ sung 2026-09-08, quyết định người dùng — xem mục 24) |
 | Log | Serilog |
 | API docs | Swashbuckle (Swagger) |
 | Password hashing | `Microsoft.AspNetCore.Identity.PasswordHasher<User>` (chỉ dùng riêng class hasher, KHÔNG cài toàn bộ ASP.NET Core Identity/EF Identity) |
@@ -2100,3 +2100,161 @@ trang chủ, `navigator.serviceWorker.getRegistrations()` xác nhận đã đăn
 đã được precache, không có trang HTML động (Balances/Expenses/...) nào lọt vào cache. `dotnet build`:
 0 warning, 0 error. `dotnet test`: 233/233 pass (không đổi — tính năng này thuần phía trình duyệt,
 không có logic C# nào để unit test).
+
+---
+
+## 24. E2E test qua Playwright — bổ sung 2026-09-08
+
+Sau khi CI/CD (mục "CI" trong README.md), i18n (mục 22) và các lỗ hổng bảo mật phát hiện qua
+`security-review` (2026-09-07/08) đều đã hoàn thành, người dùng chọn làm tiếp hạng mục còn lại:
+**thêm Microsoft.Playwright, viết E2E test** — quyết định người dùng (2026-09-08), bổ sung
+`Microsoft.Playwright` vào danh sách NuGet được phép ở mục 2.
+
+Cả 3 project test trước đó đều KHÔNG đi qua toàn bộ chồng công nghệ thật: `SplitBill.UnitTests` chỉ
+test thuật toán thuần; `SplitBill.IntegrationTests` gọi thẳng Application service qua `TestHarness`
+(bỏ qua hoàn toàn tầng Controller/HTTP/Razor Pages); `SplitBill.Web.Tests` không render Razor View
+thật (CLAUDE.md mục 10b). Project mới `tests/SplitBill.E2ETests` lấp đúng khoảng trống đó: lái 1
+trình duyệt Chromium headless thật qua **Chromium → Kestrel của `SplitBill.Web` → HTTP → Kestrel của
+`SplitBill.Api` → EF Core**, xác nhận cookie đăng nhập (BFF, mục 10b), việc render HTML thật, và toàn
+bộ pipeline HTTP thật sự khớp shape dữ liệu với nhau.
+
+### 24.1 Kiến trúc: Kestrel thật, không phải TestServer
+
+`Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<T>` mặc định host ứng dụng qua `TestServer` —
+gọi được bằng `HttpClient` in-process nhưng KHÔNG lắng nghe cổng mạng thật, nên trình duyệt Playwright
+(một tiến trình Chromium thật, tách biệt khỏi tiến trình test) không kết nối được.
+
+> ⚠️ **Không có API `UseKestrel()` sẵn trên .NET 9** cho `WebApplicationFactory` — đã tìm hiểu qua
+> WebSearch để xác nhận (không suy đoán): tính năng này chỉ có từ **.NET 10**. Với .NET 9 (bản dự án
+> đang dùng), chỉ đơn giản override `CreateHost` để build 1 host Kestrel duy nhất rồi trả thẳng về sẽ
+> ném `InvalidCastException: Unable to cast ... KestrelServerImpl ... to ... TestServer` — vì
+> `EnsureServer()` (gọi ngầm bởi `CreateClient()`/`Server`/`Services`) LUÔN ép kiểu giá trị trả về của
+> `CreateHost` sang `TestServer`, bất kể `CreateHost` đã override gì. Đã tìm và áp dụng đúng mẫu cộng
+> đồng đã kiểm chứng (xem
+> https://danieldonbavand.com/2022/06/13/using-playwright-with-the-webapplicationfactory-to-test-a-blazor-application/):
+> build **2 host từ cùng 1 `IHostBuilder`** — build lần 1 (chưa gắn Kestrel) ra 1 "vỏ" `TestServer` chỉ
+> để thỏa mãn ép kiểu nội bộ của `WebApplicationFactory` (không bao giờ dùng để gọi HTTP thật), rồi mới
+> `ConfigureWebHost(webHostBuilder => webHostBuilder.UseKestrel())` và build lần 2 để có host Kestrel
+> THẬT — khởi động, đọc lại địa chỉ cổng ngẫu nhiên (`UseUrls("http://127.0.0.1:0")`) đã bind qua
+> `IServerAddressesFeature`. `KestrelWebApplicationFactory<TEntryPoint>` (base class dùng chung cho cả
+> `ApiTestFactory`/`WebTestFactory`) đóng gói đúng mẫu này, cộng thêm `StopRealHostAsync()` — gọi tường
+> minh trước khi `DisposeAsync()` của factory, vì lớp cơ sở chỉ biết dọn "vỏ" `TestServer`, không biết
+> gì về host Kestrel thật thứ 2.
+
+### 24.2 Ba lỗi thật phát hiện khi dựng hạ tầng (không suy luận tay — verify bằng chạy thực tế từng bước)
+
+> ⚠️ **Config override qua `ConfigureAppConfiguration` KHÔNG có tác dụng cho giá trị Program.cs đọc
+> EAGER (đọc ngay, đóng gói vào 1 biến local) — chỉ có tác dụng cho thứ đọc LAZY (qua `IOptions<T>`
+> hoặc mutate `IServiceCollection`).** Cả `SplitBill.Api/Program.cs` (đọc `jwtOptions.SigningKey` để
+> fail-fast) lẫn `SplitBill.Web/Program.cs` (đọc `Api:BaseUrl` vào biến `apiBaseUrl` rồi đóng gói vào
+> closure của `AddHttpClient`) đều đọc `builder.Configuration[...]` **NGAY SAU** `WebApplication.
+> CreateBuilder(args)` — thời điểm này chạy trước khi `WebApplicationFactory`'s `ConfigureWebHost`/
+> `ConfigureAppConfiguration` callback (chỉ chạy lúc `IHostBuilder.Build()`, ở bước SAU trong luồng dựng
+> host) kịp gắn vào. Lần thử đầu tiên dùng `ConfigureAppConfiguration` để cấp `Jwt:SigningKey`/
+> `Api:BaseUrl` giả **"tình cờ" không lộ lỗi cho `Jwt:SigningKey`** vì máy dev cục bộ đã có sẵn
+> `dotnet user-secrets set Jwt:SigningKey ...` (mục 10b) — giá trị đó mới thực sự được dùng, không phải
+> giá trị test cấp. Với `Api:BaseUrl` thì lộ ngay: request thật từ `SplitBillApiClient` bay thẳng tới
+> cổng `5199` mặc định trong `appsettings.json` thay vì cổng ngẫu nhiên của `ApiTestFactory`, xác nhận
+> qua log Serilog thấy `HttpRequestException: ... refused ...` khi gọi `/auth/register`. **Đã sửa**:
+> đặt biến môi trường (`Environment.SetEnvironmentVariable("Jwt__SigningKey", ...)` /
+> `"Api__BaseUrl"`) **TRONG CONSTRUCTOR** của `ApiTestFactory`/`WebTestFactory`, TRƯỚC KHI host được
+> kích hoạt — `WebApplication.CreateBuilder(args)` tự thêm `AddEnvironmentVariables()` làm 1 nguồn cấu
+> hình đọc đồng bộ NGAY LÚC ĐÓ, nên kịp áp dụng trước dòng code eager-read của Program.cs. Cùng quy ước
+> `"__"` → `":"` đã dùng cho `docker-compose.yml` (mục 10b, biến `Database__AutoMigrateOnStartup`).
+> Ngược lại, việc gỡ/thay `DbContextOptions<SplitBillDbContext>` qua `ConfigureServices` (mục 24.3) vẫn
+> hoạt động đúng dù đăng ký muộn — vì đó là mutate trực tiếp `IServiceCollection`, không phải đọc 1
+> biến local đã đóng gói từ trước.
+
+> ⚠️ **`page.WaitForURLAsync(...)` gọi SAU `page.ClickAsync(...)` luôn timeout 30s dù luồng thật hoàn
+> toàn thành công.** Nguyên nhân: `ClickAsync` trên 1 nút submit đã TỰ CHỜ XONG điều hướng phát sinh
+> bởi chính cú click đó trước khi trả về (hành vi auto-wait chuẩn của Playwright) — gọi
+> `WaitForURLAsync` SAU đó là chờ một sự kiện điều hướng TƯƠNG LAI không còn xảy ra nữa (điều hướng đã
+> xảy ra RỒI). Phát hiện qua log Serilog: `POST /auth/register` → 200, tiếp theo `GET /users/me`,
+> `/groups`, `/notifications/unread-count` đều 200 (đúng luồng `SignInHelper.SignInAsync` +
+> `Groups/Index.OnGetAsync` + `NotificationBadgeViewComponent`) — server xử lý hoàn toàn đúng, chỉ có
+> assertion phía test sai cách chờ. **Đã sửa**: dùng `Assertions.Expect(page).ToHaveURLAsync(regex)`
+> thay `WaitForURLAsync` — kiểm tra URL HIỆN TẠI trước, chỉ retry (tối đa 5s) nếu chưa khớp, nên an
+> toàn với cả 2 tình huống (đã điều hướng xong hoặc đang chờ điều hướng).
+
+> ⚠️ **URL thật của 1 trang gốc trong thư mục (`Index.cshtml`) KHÔNG có hậu tố `/Index`** — quy ước
+> route mặc định của Razor Pages tự lược bỏ "Index" (`Pages/Groups/Index.cshtml` → route `/Groups`,
+> `Pages/Expenses/Index.cshtml` với `@page "{groupId:guid}"` → route `/Expenses/{groupId}`, KHÔNG phải
+> `/Groups/Index`/`/Expenses/Index/{groupId}`). `asp-page="/Groups/Index"` trong `.cshtml` dùng đúng
+> TÊN TRANG (không phải route) nên không bị ảnh hưởng — chỉ URL cuối cùng trình duyệt thấy là rút gọn.
+> Test code tự gõ tay URL/regex ban đầu giả định sai theo tên file, sửa lại theo route thật đã quan sát
+> được (`page.Url`) qua chạy thực tế, không suy đoán theo tên `.cshtml`.
+
+### 24.3 DB InMemory cho Api: xung đột 2 provider trong cùng 1 service provider
+
+`ApiTestFactory` cần thay `UseSqlServer` (LocalDB, chỉ chạy được trên Windows — mục 2) bằng EF Core
+InMemory (cùng pattern `TestHarness` đã dùng ở `SplitBill.IntegrationTests`) để chạy được cả trên CI
+(`ubuntu-latest`, không có LocalDB). Cách làm tưởng chừng hiển nhiên — gỡ descriptor
+`DbContextOptions<SplitBillDbContext>` khỏi `IServiceCollection` rồi `AddDbContext(UseInMemoryDatabase(...))`
+— build được nhưng request thật ném `InvalidOperationException: Services for database providers
+'SqlServer', 'InMemory' have been registered in the service provider. Only a single database provider
+can be registered in a service provider.`
+
+> ⚠️ Nguyên nhân: gỡ 1 descriptor `DbContextOptions<T>` KHÔNG undo được tác dụng phụ mà lệnh
+> `UseSqlServer(...)` gốc (trong `Program.cs`) đã gây ra lúc `AddDbContext` chạy lần đầu — nó đăng ký
+> sẵn dịch vụ nội bộ của provider SqlServer thẳng vào `IServiceCollection` DÙNG CHUNG của cả app. Nếu
+> `DbContextOptions` mới chỉ đơn thuần `UseInMemoryDatabase(...)` mà không chỉ định service provider
+> riêng, EF Core lúc resolve vẫn nhìn thấy CẢ HAI provider cùng có mặt trong service provider gốc và từ
+> chối chạy. **Đã sửa** bằng đúng mẫu chính thức của Microsoft cho tình huống swap provider này: dựng 1
+> `ServiceProvider` RIÊNG chỉ chứa `AddEntityFrameworkInMemoryDatabase()`, rồi gọi
+> `options.UseInternalServiceProvider(inMemoryServiceProvider)` trỏ `DbContextOptions` mới về đúng
+> service provider cô lập đó — không đụng gì tới service provider gốc của app (vẫn còn dịch vụ
+> SqlServer, nhưng không còn được EF Core dùng tới cho `SplitBillDbContext` nữa).
+
+### 24.4 `Program.cs` cần `public partial class Program` để test tham chiếu được
+
+`WebApplicationFactory<TEntryPoint>` cần `TEntryPoint` là 1 type công khai truy cập được từ project
+test. `SplitBill.Api/Program.cs` đã có sẵn `public partial class Program;` từ trước (dùng cho
+`SplitBill.IntegrationTests`). `SplitBill.Web/Program.cs` **CHƯA CÓ** — bổ sung thêm, cùng mẫu, để
+`SplitBill.E2ETests` build được (`WebTestFactory : KestrelWebApplicationFactory<SplitBill.Web.Program>`).
+
+### 24.5 Nội dung test đã viết
+
+Cố tình viết ít nhưng SÂU (2 file, 3 test) — mỗi test là 1 luồng dài (nhiều bước liên tiếp), không phải
+nhiều test atomic rời rạc, vì chi phí khởi động 2 Kestrel host + 1 trình duyệt là cố định 1 lần cho cả
+`[Collection("E2E")]` (dùng chung `E2EFixture` qua `ICollectionFixture`), còn chi phí drive từng bước
+qua trình duyệt thật (fill form, click, chờ điều hướng) là chi phí thật trên MỖI test — gộp thành luồng
+dài tận dụng tối đa 1 lần setup mà vẫn phủ được nhiều bước nghiệp vụ nối tiếp nhau.
+
+- `AuthFlowTests`: đăng ký → redirect `/Groups` → đăng xuất → redirect `/` (trang chủ, KHÔNG PHẢI
+  `/Account/Login` — xác nhận qua đọc `LogoutModel.OnPostAsync`, `RedirectToPage("/Index")`), xác nhận
+  form đăng xuất trên navbar biến mất (đã thật sự đăng xuất, không chỉ đổi URL); đăng nhập sai mật khẩu
+  → hiện đúng câu chung chung "Email hoặc mật khẩu không đúng." (mục 8, không tiết lộ email tồn tại).
+- `GroupExpenseFlowTests`: đăng ký → tạo nhóm (VND) → thêm 1 khách vãng lai → tạo khoản chi 100.000đ do
+  Owner ứng toàn bộ, chia đều 2 người → xác nhận trang Số dư đúng "+50.000đ"/"-50.000đ" → xác nhận trang
+  Kế hoạch thanh toán đúng 1 giao dịch "Guest Friend chuyển cho Owner Tester" 50.000đ — đúng bài toán
+  cốt lõi của cả dự án (mục 1) đi qua toàn bộ pipeline thật, không chỉ qua thuật toán thuần (mục 7) hay
+  service in-process (`SplitBill.IntegrationTests`).
+
+DB dùng chung `[Collection("E2E")]` (1 `ApiTestFactory`/instance InMemory DB cho cả 3 test) nhưng mỗi
+test tự đăng ký 1 email `Guid.NewGuid()` riêng và tự mở 1 `IBrowserContext` riêng (cookie cô lập từng
+test) — không có state rò rỉ giữa các test dù chạy tuần tự trên cùng DB.
+
+### 24.6 CI
+
+`.github/workflows/ci.yml` thêm bước `Install Playwright browsers` (chạy
+`playwright.ps1 install --with-deps chromium`) SAU bước build, TRƯỚC bước test — bắt buộc vì
+`E2EFixture` tuy có tự gọi `Microsoft.Playwright.Program.Main(["install", "chromium"])` lúc
+`InitializeAsync` (tiện cho máy dev chưa cài Playwright thủ công) nhưng chỉ tải browser binary, KHÔNG
+cài thư viện hệ thống Linux (libnss3, libatk...) mà `ubuntu-latest` không có sẵn — thiếu `--with-deps`
+thì Chromium headless sẽ không khởi động được trên CI dù build/test project không báo lỗi gì.
+`ApiTestFactory` dùng EF Core InMemory (mục 24.3) nên không cần SQL Server/LocalDB thật, khớp nguyên
+tắc CI hiện có (mục "CI" trong README.md).
+
+> Cùng giới hạn đã ghi ở mục "CI" (README.md): bước cài Playwright browsers này viết đúng theo tài liệu
+> chính thức của Playwright .NET nhưng **chưa tự verify được trên GitHub Actions thật** (repo chưa có
+> remote GitHub) — chỉ verify được cục bộ trên Windows (nơi không cần `--with-deps` vì Chromium tải sẵn
+> mọi thứ cần trong gói cho Windows).
+
+Đã verify sống (thật sự chạy qua trình duyệt Chromium headless, không phải chỉ review code): cả 3 test
+pass cục bộ, kèm log HTTP request/response đầy đủ xác nhận từng bước (POST `/auth/register` → 200, GET
+`/users/me`/`/groups`/`/notifications/unread-count` → 200, POST `.../expenses` → 201, GET
+`.../balances`/`.../settlement-plan` → 200 — không có bước nào bị mock/giả lập). `dotnet build
+SplitBill.sln --configuration Release`: 0 warning, 0 error. `dotnet test SplitBill.sln --configuration
+Release`: **239/239 pass** (25 UnitTests + 69 Web.Tests + 142 IntegrationTests + 3 E2ETests mới —
+không có test cũ nào bị ảnh hưởng bởi việc thêm `public partial class Program;` vào `SplitBill.Web/
+Program.cs`).
