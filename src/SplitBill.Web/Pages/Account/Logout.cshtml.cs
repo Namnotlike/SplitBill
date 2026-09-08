@@ -24,9 +24,12 @@ public class LogoutModel : PageModel
             {
                 await _apiClient.LogoutAsync(refreshToken, cancellationToken);
             }
-            catch (ApiException)
+            catch (Exception ex) when (ex is ApiException or HttpRequestException)
             {
-                // Vẫn đăng xuất cookie kể cả khi gọi API thất bại (token đã hết hạn chẳng hạn).
+                // Vẫn đăng xuất cookie kể cả khi gọi API thất bại (token đã hết hạn, hoặc Api không
+                // phản hồi được — HttpRequestException trước đây không bị bắt ở đây, nghĩa là người
+                // dùng không đăng xuất được cục bộ nếu Api sập, cùng lớp bug đã sửa ở Index.cshtml.cs,
+                // CLAUDE.md mục 23.4).
             }
         }
 

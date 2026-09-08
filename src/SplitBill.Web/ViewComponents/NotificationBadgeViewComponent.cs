@@ -26,8 +26,11 @@ public sealed class NotificationBadgeViewComponent : ViewComponent
             var result = await _apiClient.GetUnreadNotificationCountAsync(HttpContext.RequestAborted);
             return View(result.Count);
         }
-        catch (ApiException)
+        catch (Exception ex) when (ex is ApiException or HttpRequestException)
         {
+            // Component này chạy trên MỌI trang đã đăng nhập (_Layout.cshtml) — HttpRequestException
+            // (Api không phản hồi được) trước đây không bị bắt, nghĩa là Api sập sẽ làm sập TOÀN BỘ
+            // trang, không chỉ mỗi badge. Cùng lớp bug đã sửa ở Index.cshtml.cs (CLAUDE.md mục 23.4).
             return Content(string.Empty);
         }
     }

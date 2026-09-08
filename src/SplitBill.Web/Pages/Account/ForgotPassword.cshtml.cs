@@ -44,10 +44,12 @@ public class ForgotPasswordModel : PageModel
         {
             await _apiClient.ForgotPasswordAsync(new ForgotPasswordRequest(Input.Email), cancellationToken);
         }
-        catch (ApiException)
+        catch (Exception ex) when (ex is ApiException or HttpRequestException)
         {
-            // Kể cả lỗi (vd validation email sai định dạng phía API) cũng không tiết lộ gì thêm —
-            // hiện đúng thông báo chung như thành công, tránh oracle cho việc dò email tồn tại.
+            // Kể cả lỗi (vd validation email sai định dạng phía API, hoặc Api không phản hồi được —
+            // HttpRequestException) cũng không tiết lộ gì thêm — hiện đúng thông báo chung như thành
+            // công, tránh oracle cho việc dò email tồn tại. HttpRequestException trước đây không bị
+            // bắt ở đây — cùng lớp bug đã sửa ở Index.cshtml.cs (CLAUDE.md mục 23.4).
         }
 
         Submitted = true;

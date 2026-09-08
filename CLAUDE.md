@@ -2037,13 +2037,28 @@ duyệt hiện đúng `offline.html` ("Bạn đang ngoại tuyến", tiêu đề
 phải trang lỗi mặc định của Chrome. Khởi động lại `SplitBill.Web` → tải lại trang → về đúng trang chủ
 bình thường với dữ liệu số dư mới nhất (không phải bản cache cũ).
 
-> Phát hiện phụ ngoài phạm vi PWA lúc test: khi tạm dừng `SplitBill.Api` (không phải `SplitBill.Web`)
-> để chạy `dotnet test`, tải lại trang chủ ra lỗi 500 chưa được xử lý (`HttpRequestException`/
-> `SocketException` từ `SplitBillApiClient.GetMyBalancesOverviewAsync` không được catch — khối
-> `try/catch` ở `Index.cshtml.cs` chỉ bắt `ApiException`, tức lỗi HTTP có response, không bắt được lỗi
-> tầng kết nối khi chính `SplitBill.Api` không chạy). Đây là lỗ hổng có sẵn từ mục 15.4 (2026-09-05,
-> trước tính năng PWA này), không liên quan tới Service Worker — nêu ra để ghi nhận, CHƯA sửa trong
-> commit này vì ngoài phạm vi hạng mục 8/8, cần người dùng xác nhận trước khi đụng vào.
+> **Phát hiện phụ ngoài phạm vi PWA lúc test, đã sửa riêng ngay sau đó (2026-09-08, người dùng xác
+> nhận):** khi tạm dừng `SplitBill.Api` (không phải `SplitBill.Web`) để chạy `dotnet test`, tải lại
+> trang chủ ra lỗi 500 chưa được xử lý — `HttpRequestException` từ `SplitBillApiClient` (Api không
+> phản hồi được ở tầng kết nối, khác `ApiException` vốn chỉ bắt lỗi HTTP có response) không được bắt ở
+> `Index.cshtml.cs`. Đây là lỗ hổng có sẵn từ mục 15.4 (2026-09-05), không liên quan tới Service
+> Worker. Grep toàn bộ `SplitBill.Web` tìm mẫu `catch (ApiException)` phát hiện thêm **5 điểm khác**
+> mắc đúng lớp lỗi này: `Expenses/Create.cshtml.cs` (`LoadPresetsAsync`), `Expenses/Edit.cshtml.cs`
+> (`OnGetReceiptImageAsync`), `Account/ForgotPassword.cshtml.cs`, `Account/Logout.cshtml.cs`, và đặc
+> biệt `NotificationBadgeViewComponent` — component này chạy trên **mọi trang đã đăng nhập** qua
+> `_Layout.cshtml`, nghĩa là Api sập trước khi sửa sẽ làm sập TOÀN BỘ trang chứ không riêng gì trang
+> chủ. Đã sửa cả 6 điểm bằng `catch (Exception ex) when (ex is ApiException or HttpRequestException)`
+> — dùng exception filter (C# 9+) thay vì 2 khối `catch` lặp lại thân giống hệt nhau, và cố tình không
+> bắt `Exception` trần để không vô tình nuốt luôn các lỗi lập trình thật (NullReferenceException...).
+> Không gộp thành 1 helper/base class dùng chung — theo đúng tiền lệ đã chọn ở mục 19.2 (chấp nhận
+> trùng lặp nhỏ giữa các PageModel/ViewComponent độc lập). Thêm `IndexModelTests` (2 test: Api không
+> phản hồi được thì không throw và cả 2 widget rỗng; chưa đăng nhập thì không gọi API) — đây là
+> `SplitBill.Web.Tests` đầu tiên giả lập lỗi tầng kết nối (`FakeHttpMessageHandler` ném thẳng
+> `HttpRequestException` thay vì trả `HttpResponseMessage`), các test trước đó chỉ giả lập response
+> HTTP có status code. Verify sống: tắt hẳn `SplitBill.Api`, giữ `SplitBill.Web` chạy, hard-reload
+> (`Ctrl+Shift+R`, bỏ qua cache trình duyệt) trang chủ → đúng 200 OK, widget số dư/counterparty biến
+> mất thay vì trang lỗi 500; khởi động lại Api, hard-reload lại → về đúng dữ liệu số dư mới nhất.
+> `dotnet test`: 235/235 pass (233 cũ + 2 test mới).
 
 Đã verify sống trên trình duyệt: `manifest.webmanifest` trả đúng `Content-Type: application/manifest+json`,
 `service-worker.js` trả `Content-Type: text/javascript`, cả 3 icon trả `200`/`image/png`; sau khi tải

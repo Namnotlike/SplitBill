@@ -239,8 +239,10 @@ public class EditModel : PageModel
             var image = await _apiClient.GetReceiptImageAsync(ExpenseId, cancellationToken);
             return File(image.Content, image.ContentType, image.FileName);
         }
-        catch (ApiException)
+        catch (Exception ex) when (ex is ApiException or HttpRequestException)
         {
+            // HttpRequestException (Api không phản hồi được) trước đây không bị bắt ở đây — cùng lớp
+            // bug đã sửa ở Index.cshtml.cs (CLAUDE.md mục 23.4).
             return NotFound();
         }
     }

@@ -191,8 +191,10 @@ public class CreateModel : PageModel
         {
             Presets = await _apiClient.GetSplitPresetsAsync(GroupId, cancellationToken);
         }
-        catch (ApiException)
+        catch (Exception ex) when (ex is ApiException or HttpRequestException)
         {
+            // Preset chỉ là tiện ích phụ — Api không phản hồi (HttpRequestException) không được làm
+            // sập cả form tạo khoản chi, cùng nguyên tắc đã sửa ở Index.cshtml.cs (CLAUDE.md mục 23.4).
         }
     }
 }

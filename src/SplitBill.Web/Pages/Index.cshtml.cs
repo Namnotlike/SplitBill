@@ -31,17 +31,20 @@ public class IndexModel : PageModel
         {
             MyOverview = await _apiClient.GetMyBalancesOverviewAsync(cancellationToken);
         }
-        catch (ApiException)
+        catch (Exception ex) when (ex is ApiException or HttpRequestException)
         {
-            // Trang chủ vẫn phải hiển thị được dù widget tổng quan lỗi (vd token vừa hết hạn) —
-            // không TempData/redirect, chỉ đơn giản ẩn widget.
+            // Trang chủ vẫn phải hiển thị được dù widget tổng quan lỗi (vd token vừa hết hạn, hoặc
+            // chính SplitBill.Api không phản hồi được — HttpRequestException, khác ApiException vốn
+            // chỉ bắt lỗi HTTP có response) — không TempData/redirect, chỉ đơn giản ẩn widget. Phát
+            // hiện qua verify sống PWA (CLAUDE.md mục 23.4): tắt Api rồi tải trang chủ ra lỗi 500 chưa
+            // xử lý vì trước đây chỉ bắt ApiException.
         }
 
         try
         {
             CounterpartyBalances = await _apiClient.GetMyCounterpartyBalancesAsync(cancellationToken);
         }
-        catch (ApiException)
+        catch (Exception ex) when (ex is ApiException or HttpRequestException)
         {
         }
     }
