@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="Hồ sơ của tôi" xml:space="preserve">
+    <value>My profile</value>
+  </data>
+  <data name="Thông tin tài khoản ngân hàng dùng để sinh mã VietQR khi người khác cần chuyển tiền cho bạn." xml:space="preserve">
+    <value>Bank account details used to generate a VietQR code when someone needs to transfer money to you.</value>
+  </data>
+  <data name="Tên hiển thị" xml:space="preserve">
+    <value>Display name</value>
+  </data>
+  <data name="Mã BIN ngân hàng (6 số)" xml:space="preserve">
+    <value>Bank BIN code (6 digits)</value>
+  </data>
+  <data name="Số tài khoản" xml:space="preserve">
+    <value>Account number</value>
+  </data>
+  <data name="Lưu thay đổi" xml:space="preserve">
+    <value>Save changes</value>
+  </data>
+</root>

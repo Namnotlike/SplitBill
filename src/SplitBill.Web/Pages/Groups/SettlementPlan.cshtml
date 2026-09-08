@@ -4,8 +4,8 @@
     ViewData["Title"] = "Kế hoạch thanh toán";
 }
 
-<a asp-page="/Groups/Details" asp-route-id="@Model.Group.Id" class="text-muted small">← Về nhóm</a>
-<h1 class="mt-1 mb-4">Kế hoạch thanh toán — @Model.Group.Name</h1>
+<a asp-page="/Groups/Details" asp-route-id="@Model.Group.Id" class="text-muted small">← @Localizer["Về nhóm"]</a>
+<h1 class="mt-1 mb-4">@Localizer["Kế hoạch thanh toán"] — @Model.Group.Name</h1>
 
 @if (TempData["SuccessMessage"] is string ok)
 {
@@ -17,8 +17,8 @@
 }
 
 <h5 class="mb-3">
-    @(Model.Plan.Simplified ? "🔀 Đề xuất gộp nợ tối ưu" : "Nợ trực tiếp theo từng khoản chi")
-    <span class="text-muted fw-normal">— @Model.Plan.TransactionCount giao dịch</span>
+    @(Model.Plan.Simplified ? Localizer["🔀 Đề xuất gộp nợ tối ưu"] : Localizer["Nợ trực tiếp theo từng khoản chi"])
+    <span class="text-muted fw-normal">— @Localizer["{0} giao dịch", Model.Plan.TransactionCount]</span>
 </h5>
 
 @if (Model.Plan.Transactions.Count == 0)
@@ -26,7 +26,7 @@
     <div class="card mb-4">
         <div class="card-body text-center py-5">
             <div class="fs-1 mb-2">🎉</div>
-            <p class="text-muted mb-0">Mọi người đã cân bằng, không cần chuyển gì thêm.</p>
+            <p class="text-muted mb-0">@Localizer["Mọi người đã cân bằng, không cần chuyển gì thêm."]</p>
         </div>
     </div>
 }
@@ -38,16 +38,16 @@ else
             <div class="col-md-4">
                 <div class="card h-100">
                     <div class="card-body text-center">
-                        <p class="mb-1"><strong>@tx.FromName</strong> chuyển cho <strong>@tx.ToName</strong></p>
+                        <p class="mb-1"><strong>@tx.FromName</strong> @Localizer["chuyển cho"] <strong>@tx.ToName</strong></p>
                         <p class="fs-4 fw-700 mb-2" style="color: var(--sb-brand-dark);">@SupportedCurrencies.Format(tx.Amount, Model.Group.Currency)</p>
                         @if (tx.VietQr is not null)
                         {
                             <div class="qr-canvas d-flex justify-content-center mb-2" data-payload="@tx.VietQr.Payload"></div>
-                            <p class="small text-muted mb-0">Quét để chuyển khoản qua @tx.VietQr.BankBin</p>
+                            <p class="small text-muted mb-0">@Localizer["Quét để chuyển khoản qua {0}", tx.VietQr.BankBin]</p>
                         }
                         else
                         {
-                            <p class="small text-muted">@tx.ToName chưa khai báo tài khoản ngân hàng.</p>
+                            <p class="small text-muted">@Localizer["{0} chưa khai báo tài khoản ngân hàng.", tx.ToName]</p>
                         }
                         @if (Model.MyMemberId == tx.FromMemberId)
                         {
@@ -55,7 +55,7 @@ else
                                 <input type="hidden" name="NewSettlement.FromMemberId" value="@tx.FromMemberId" />
                                 <input type="hidden" name="NewSettlement.ToMemberId" value="@tx.ToMemberId" />
                                 <input type="hidden" name="NewSettlement.Amount" value="@tx.Amount" />
-                                <button type="submit" class="btn btn-sm btn-primary">Tôi đã chuyển khoản này</button>
+                                <button type="submit" class="btn btn-sm btn-primary">@Localizer["Tôi đã chuyển khoản này"]</button>
                             </form>
                         }
                     </div>
@@ -67,10 +67,10 @@ else
 
 <div class="card mb-4">
     <div class="card-body">
-        <h5 class="card-title">Ghi nhận thanh toán khác</h5>
+        <h5 class="card-title">@Localizer["Ghi nhận thanh toán khác"]</h5>
         <form method="post" asp-page-handler="Record" asp-route-id="@Model.Group.Id" class="row g-2 align-items-end">
             <div class="col-auto">
-                <label class="form-label">Từ</label>
+                <label class="form-label">@Localizer["Từ"]</label>
                 <select name="NewSettlement.FromMemberId" class="form-select">
                     @foreach (var m in Model.Group.Members)
                     {
@@ -79,7 +79,7 @@ else
                 </select>
             </div>
             <div class="col-auto">
-                <label class="form-label">Đến</label>
+                <label class="form-label">@Localizer["Đến"]</label>
                 <select name="NewSettlement.ToMemberId" class="form-select">
                     @foreach (var m in Model.Group.Members)
                     {
@@ -88,15 +88,15 @@ else
                 </select>
             </div>
             <div class="col-auto">
-                <label class="form-label">Số tiền (@Model.Group.Currency)</label>
+                <label class="form-label">@Localizer["Số tiền"] (@Model.Group.Currency)</label>
                 <input name="NewSettlement.Amount" type="number" min="1" class="form-control" />
             </div>
             <div class="col-auto">
-                <label class="form-label">Ghi chú</label>
+                <label class="form-label">@Localizer["Ghi chú"]</label>
                 <input name="NewSettlement.Note" class="form-control" />
             </div>
             <div class="col-auto">
-                <button type="submit" class="btn btn-secondary">Ghi nhận</button>
+                <button type="submit" class="btn btn-secondary">@Localizer["Ghi nhận"]</button>
             </div>
         </form>
     </div>
@@ -104,16 +104,16 @@ else
 
 <div class="card">
     <div class="card-body @(Model.Settlements.Count > 0 ? "p-0" : "")">
-        <h5 class="card-title @(Model.Settlements.Count > 0 ? "px-4 pt-4" : "")">Lịch sử ghi nhận</h5>
+        <h5 class="card-title @(Model.Settlements.Count > 0 ? "px-4 pt-4" : "")">@Localizer["Lịch sử ghi nhận"]</h5>
         @if (Model.Settlements.Count == 0)
         {
-            <p class="text-muted mb-0">Chưa có ghi nhận nào.</p>
+            <p class="text-muted mb-0">@Localizer["Chưa có ghi nhận nào."]</p>
         }
         else
         {
             <div class="table-responsive">
                 <table class="table mb-0">
-                    <thead><tr><th class="ps-4">Từ</th><th>Đến</th><th>Số tiền</th><th>Trạng thái</th><th class="pe-4"></th></tr></thead>
+                    <thead><tr><th class="ps-4">@Localizer["Từ"]</th><th>@Localizer["Đến"]</th><th>@Localizer["Số tiền"]</th><th>@Localizer["Trạng thái"]</th><th class="pe-4"></th></tr></thead>
                     <tbody>
                         @foreach (var s in Model.Settlements)
                         {
@@ -136,16 +136,16 @@ else
                                     @if (s.Status == "Pending" && Model.MyMemberId == s.ToMemberId)
                                     {
                                         <form method="post" asp-page-handler="Confirm" asp-route-id="@Model.Group.Id" asp-route-settlementId="@s.Id" class="d-inline">
-                                            <button type="submit" class="btn btn-sm btn-success">Xác nhận</button>
+                                            <button type="submit" class="btn btn-sm btn-success">@Localizer["Xác nhận"]</button>
                                         </form>
                                         <form method="post" asp-page-handler="Reject" asp-route-id="@Model.Group.Id" asp-route-settlementId="@s.Id" class="d-inline">
-                                            <button type="submit" class="btn btn-sm btn-outline-danger">Từ chối</button>
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">@Localizer["Từ chối"]</button>
                                         </form>
                                     }
                                     @if (s.Status == "Pending")
                                     {
                                         <form method="post" asp-page-handler="Delete" asp-route-id="@Model.Group.Id" asp-route-settlementId="@s.Id" class="d-inline">
-                                            <button type="submit" class="btn btn-sm btn-outline-secondary">Xóa</button>
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary">@Localizer["Xóa"]</button>
                                         </form>
                                     }
                                 </td>
@@ -165,7 +165,7 @@ else
             try {
                 new QRCode(el, { text: el.dataset.payload, width: 180, height: 180 });
             } catch (e) {
-                el.textContent = 'Không tải được mã QR.';
+                el.textContent = '@Localizer["Không tải được mã QR."]';
                 console.error(e);
             }
         });

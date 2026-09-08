@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="Về nhóm" xml:space="preserve">
+    <value>Back to group</value>
+  </data>
+  <data name="Khoản chi định kỳ" xml:space="preserve">
+    <value>Recurring expenses</value>
+  </data>
+  <data name="Các mẫu đang có" xml:space="preserve">
+    <value>Existing templates</value>
+  </data>
+  <data name="Chưa có khoản chi định kỳ nào — tạo mẫu mới bên dưới." xml:space="preserve">
+    <value>No recurring expenses yet — create a new template below.</value>
+  </data>
+  <data name="Tiêu đề" xml:space="preserve">
+    <value>Title</value>
+  </data>
+  <data name="Số tiền" xml:space="preserve">
+    <value>Amount</value>
+  </data>
+  <data name="Chu kỳ" xml:space="preserve">
+    <value>Interval</value>
+  </data>
+  <data name="Lần kế tiếp" xml:space="preserve">
+    <value>Next occurrence</value>
+  </data>
+  <data name="Trạng thái" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="Đang chạy" xml:space="preserve">
+    <value>Active</value>
+  </data>
+  <data name="Đã tắt" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="Tắt" xml:space="preserve">
+    <value>Turn off</value>
+  </data>
+  <data name="Tạo mẫu mới" xml:space="preserve">
+    <value>Create new template</value>
+  </data>
+  <data name="Tổng tiền" xml:space="preserve">
+    <value>Total</value>
+  </data>
+  <data name="Phụ phí" xml:space="preserve">
+    <value>Extra fee</value>
+  </data>
+  <data name="Danh mục" xml:space="preserve">
+    <value>Category</value>
+  </data>
+  <data name="Chu kỳ lặp lại" xml:space="preserve">
+    <value>Repeat interval</value>
+  </data>
+  <data name="Hàng ngày" xml:space="preserve">
+    <value>Daily</value>
+  </data>
+  <data name="Hàng tuần" xml:space="preserve">
+    <value>Weekly</value>
+  </data>
+  <data name="Hàng tháng" xml:space="preserve">
+    <value>Monthly</value>
+  </data>
+  <data name="Lần đầu tiên sinh khoản chi" xml:space="preserve">
+    <value>First expense generated on</value>
+  </data>
+  <data name="Ghi chú" xml:space="preserve">
+    <value>Note</value>
+  </data>
+  <data name="Cách chia" xml:space="preserve">
+    <value>Split method</value>
+  </data>
+  <data name="Chia đều" xml:space="preserve">
+    <value>Equal</value>
+  </data>
+  <data name="Theo phần" xml:space="preserve">
+    <value>By shares</value>
+  </data>
+  <data name="Theo %" xml:space="preserve">
+    <value>By percentage</value>
+  </data>
+  <data name="Nhập tay" xml:space="preserve">
+    <value>Exact amounts</value>
+  </data>
+  <data name="Theo món" xml:space="preserve">
+    <value>By item</value>
+  </data>
+  <data name="Thành viên" xml:space="preserve">
+    <value>Member</value>
+  </data>
+  <data name="Ai ứng mỗi lần" xml:space="preserve">
+    <value>Who pays each time</value>
+  </data>
+  <data name="Tham gia?" xml:space="preserve">
+    <value>Included?</value>
+  </data>
+  <data name="Trọng số" xml:space="preserve">
+    <value>Weight</value>
+  </data>
+  <data name="Món ăn" xml:space="preserve">
+    <value>Items</value>
+  </data>
+  <data name="Tên món" xml:space="preserve">
+    <value>Item name</value>
+  </data>
+  <data name="Giá" xml:space="preserve">
+    <value>Price</value>
+  </data>
+  <data name="Người ăn" xml:space="preserve">
+    <value>Consumed by</value>
+  </data>
+  <data name="Thêm món" xml:space="preserve">
+    <value>Add item</value>
+  </data>
+  <data name="Xóa" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="Tạo mẫu định kỳ" xml:space="preserve">
+    <value>Create recurring template</value>
+  </data>
+</root>

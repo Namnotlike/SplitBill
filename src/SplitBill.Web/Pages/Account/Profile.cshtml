@@ -4,8 +4,8 @@
     ViewData["Title"] = "Hồ sơ";
 }
 
-<h1>Hồ sơ của tôi</h1>
-<p class="text-muted mb-4">Thông tin tài khoản ngân hàng dùng để sinh mã VietQR khi người khác cần chuyển tiền cho bạn.</p>
+<h1>@Localizer["Hồ sơ của tôi"]</h1>
+<p class="text-muted mb-4">@Localizer["Thông tin tài khoản ngân hàng dùng để sinh mã VietQR khi người khác cần chuyển tiền cho bạn."]</p>
 
 @if (Model.SuccessMessage is not null)
 {
@@ -20,19 +20,19 @@
     <div class="card-body p-4">
         <form method="post">
             <div class="mb-3">
-                <label asp-for="Input.DisplayName" class="form-label">Tên hiển thị</label>
+                <label asp-for="Input.DisplayName" class="form-label">@Localizer["Tên hiển thị"]</label>
                 <input asp-for="Input.DisplayName" class="form-control" />
             </div>
             <div class="mb-3">
-                <label asp-for="Input.BankBin" class="form-label">Mã BIN ngân hàng (6 số)</label>
+                <label asp-for="Input.BankBin" class="form-label">@Localizer["Mã BIN ngân hàng (6 số)"]</label>
                 <input asp-for="Input.BankBin" class="form-control" placeholder="VD: 970436 (Vietcombank)" />
                 <span asp-validation-for="Input.BankBin" class="text-danger"></span>
             </div>
             <div class="mb-4">
-                <label asp-for="Input.BankAccountNumber" class="form-label">Số tài khoản</label>
+                <label asp-for="Input.BankAccountNumber" class="form-label">@Localizer["Số tài khoản"]</label>
                 <input asp-for="Input.BankAccountNumber" class="form-control" />
             </div>
-            <button type="submit" class="btn btn-primary">Lưu thay đổi</button>
+            <button type="submit" class="btn btn-primary">@Localizer["Lưu thay đổi"]</button>
         </form>
     </div>
 </div>

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="Về nhóm" xml:space="preserve">
+    <value>Back to group</value>
+  </data>
+  <data name="Kế hoạch thanh toán" xml:space="preserve">
+    <value>Settlement plan</value>
+  </data>
+  <data name="🔀 Đề xuất gộp nợ tối ưu" xml:space="preserve">
+    <value>🔀 Optimal debt simplification</value>
+  </data>
+  <data name="Nợ trực tiếp theo từng khoản chi" xml:space="preserve">
+    <value>Direct debts per expense</value>
+  </data>
+  <data name="{0} giao dịch" xml:space="preserve">
+    <value>{0} transactions</value>
+  </data>
+  <data name="Mọi người đã cân bằng, không cần chuyển gì thêm." xml:space="preserve">
+    <value>Everyone is settled up, no more transfers needed.</value>
+  </data>
+  <data name="chuyển cho" xml:space="preserve">
+    <value>transfers to</value>
+  </data>
+  <data name="Quét để chuyển khoản qua {0}" xml:space="preserve">
+    <value>Scan to transfer via {0}</value>
+  </data>
+  <data name="{0} chưa khai báo tài khoản ngân hàng." xml:space="preserve">
+    <value>{0} hasn't set up a bank account yet.</value>
+  </data>
+  <data name="Tôi đã chuyển khoản này" xml:space="preserve">
+    <value>I've made this transfer</value>
+  </data>
+  <data name="Ghi nhận thanh toán khác" xml:space="preserve">
+    <value>Record another payment</value>
+  </data>
+  <data name="Từ" xml:space="preserve">
+    <value>From</value>
+  </data>
+  <data name="Đến" xml:space="preserve">
+    <value>To</value>
+  </data>
+  <data name="Số tiền" xml:space="preserve">
+    <value>Amount</value>
+  </data>
+  <data name="Ghi chú" xml:space="preserve">
+    <value>Note</value>
+  </data>
+  <data name="Ghi nhận" xml:space="preserve">
+    <value>Record</value>
+  </data>
+  <data name="Lịch sử ghi nhận" xml:space="preserve">
+    <value>Payment history</value>
+  </data>
+  <data name="Chưa có ghi nhận nào." xml:space="preserve">
+    <value>No payments recorded yet.</value>
+  </data>
+  <data name="Trạng thái" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="Xác nhận" xml:space="preserve">
+    <value>Confirm</value>
+  </data>
+  <data name="Từ chối" xml:space="preserve">
+    <value>Reject</value>
+  </data>
+  <data name="Xóa" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="Không tải được mã QR." xml:space="preserve">
+    <value>Couldn't load the QR code.</value>
+  </data>
+</root>

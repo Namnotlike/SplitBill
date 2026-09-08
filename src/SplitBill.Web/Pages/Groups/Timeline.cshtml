@@ -4,8 +4,8 @@
     ViewData["Title"] = "Hoạt động nhóm";
 }
 
-<a asp-page="/Groups/Details" asp-route-id="@Model.Group.Id" class="text-muted small">← Về nhóm</a>
-<h1 class="mt-1 mb-4">Hoạt động — @Model.Group.Name</h1>
+<a asp-page="/Groups/Details" asp-route-id="@Model.Group.Id" class="text-muted small">← @Localizer["Về nhóm"]</a>
+<h1 class="mt-1 mb-4">@Localizer["Hoạt động"] — @Model.Group.Name</h1>
 
 @if (TempData["ErrorMessage"] is string err)
 {
@@ -17,7 +17,7 @@
     <div class="card">
         <div class="card-body text-center py-5">
             <div class="fs-1 mb-2">🕒</div>
-            <p class="text-muted mb-0">Chưa có hoạt động nào.</p>
+            <p class="text-muted mb-0">@Localizer["Chưa có hoạt động nào."]</p>
         </div>
     </div>
 }
@@ -31,6 +31,8 @@ else
                     <li class="list-group-item d-flex gap-3 align-items-start py-3">
                         <span class="fs-4">@SplitBill.Web.Pages.Groups.TimelineModel.IconFor(log.EntityType)</span>
                         <div class="flex-fill">
+                            @* log.Summary do Api tu sinh (GroupService.BuildSummary, CLAUDE.md mục
+                               15.5) - luon tieng Viet, ngoai pham vi i18n phia Web (muc 22.3). *@
                             <div><span class="fw-600">@log.ActorMemberName</span> @log.Summary</div>
                             <div class="small text-muted">@log.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</div>
                         </div>
@@ -43,12 +45,12 @@ else
     {
         var totalPages = (int)Math.Ceiling(Model.Logs.TotalCount / (double)Model.Logs.PageSize);
         <div class="d-flex justify-content-between align-items-center mt-3">
-            <p class="text-muted small mb-0">Trang @Model.Logs.Page/@Math.Max(totalPages, 1) — tổng @Model.Logs.TotalCount hoạt động.</p>
+            <p class="text-muted small mb-0">@Localizer["Trang {0}/{1} — tổng {2} hoạt động.", Model.Logs.Page, Math.Max(totalPages, 1), Model.Logs.TotalCount]</p>
             <div class="d-flex gap-2">
                 <a class="btn btn-sm btn-outline-secondary @(Model.Logs.Page <= 1 ? "disabled" : "")"
-                   asp-page="/Groups/Timeline" asp-route-id="@Model.Group.Id" asp-route-page="@(Model.Logs.Page - 1)">‹ Trước</a>
+                   asp-page="/Groups/Timeline" asp-route-id="@Model.Group.Id" asp-route-page="@(Model.Logs.Page - 1)">‹ @Localizer["Trước"]</a>
                 <a class="btn btn-sm btn-outline-secondary @(Model.Logs.Page >= totalPages ? "disabled" : "")"
-                   asp-page="/Groups/Timeline" asp-route-id="@Model.Group.Id" asp-route-page="@(Model.Logs.Page + 1)">Sau ›</a>
+                   asp-page="/Groups/Timeline" asp-route-id="@Model.Group.Id" asp-route-page="@(Model.Logs.Page + 1)">@Localizer["Sau"] ›</a>
             </div>
         </div>
     }

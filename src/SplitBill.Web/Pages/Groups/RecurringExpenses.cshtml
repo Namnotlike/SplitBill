@@ -4,8 +4,8 @@
     ViewData["Title"] = "Khoản chi định kỳ";
 }
 
-<a asp-page="/Groups/Details" asp-route-id="@Model.GroupId" class="text-muted small">← Về nhóm</a>
-<h1 class="mt-1 mb-4">Khoản chi định kỳ — @Model.Group.Name</h1>
+<a asp-page="/Groups/Details" asp-route-id="@Model.GroupId" class="text-muted small">← @Localizer["Về nhóm"]</a>
+<h1 class="mt-1 mb-4">@Localizer["Khoản chi định kỳ"] — @Model.Group.Name</h1>
 
 @if (TempData["SuccessMessage"] is string ok)
 {
@@ -27,10 +27,10 @@
 @* ===== Danh sách mẫu hiện có (CLAUDE.md mục 15.7) ===== *@
 <div class="card mb-4">
     <div class="card-body">
-        <h5 class="card-title mb-3">Các mẫu đang có</h5>
+        <h5 class="card-title mb-3">@Localizer["Các mẫu đang có"]</h5>
         @if (Model.Templates.Count == 0)
         {
-            <p class="text-muted mb-0">Chưa có khoản chi định kỳ nào — tạo mẫu mới bên dưới.</p>
+            <p class="text-muted mb-0">@Localizer["Chưa có khoản chi định kỳ nào — tạo mẫu mới bên dưới."]</p>
         }
         else
         {
@@ -38,11 +38,11 @@
                 <table class="table table-sm align-middle mb-0">
                     <thead>
                         <tr>
-                            <th>Tiêu đề</th>
-                            <th>Số tiền</th>
-                            <th>Chu kỳ</th>
-                            <th>Lần kế tiếp</th>
-                            <th>Trạng thái</th>
+                            <th>@Localizer["Tiêu đề"]</th>
+                            <th>@Localizer["Số tiền"]</th>
+                            <th>@Localizer["Chu kỳ"]</th>
+                            <th>@Localizer["Lần kế tiếp"]</th>
+                            <th>@Localizer["Trạng thái"]</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -57,18 +57,18 @@
                                 <td>
                                     @if (template.IsActive)
                                     {
-                                        <span class="badge bg-success">Đang chạy</span>
+                                        <span class="badge bg-success">@Localizer["Đang chạy"]</span>
                                     }
                                     else
                                     {
-                                        <span class="badge bg-secondary">Đã tắt</span>
+                                        <span class="badge bg-secondary">@Localizer["Đã tắt"]</span>
                                     }
                                 </td>
                                 <td class="text-end">
                                     @if (template.IsActive)
                                     {
                                         <form method="post" asp-page-handler="Deactivate" asp-route-templateId="@template.Id" class="d-inline">
-                                            <button type="submit" class="btn btn-sm btn-outline-danger">Tắt</button>
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">@Localizer["Tắt"]</button>
                                         </form>
                                     }
                                 </td>
@@ -84,23 +84,23 @@
 @* ===== Form tạo mẫu mới — tái dùng UI cách chia giống Expenses/Create.cshtml ===== *@
 <div class="card">
     <div class="card-body p-4">
-        <h5 class="card-title mb-3">+ Tạo mẫu mới</h5>
+        <h5 class="card-title mb-3">+ @Localizer["Tạo mẫu mới"]</h5>
         <form method="post">
             <div class="row">
                 <div class="col-md-4 mb-3">
-                    <label asp-for="Input.Title" class="form-label">Tiêu đề</label>
+                    <label asp-for="Input.Title" class="form-label">@Localizer["Tiêu đề"]</label>
                     <input asp-for="Input.Title" class="form-control" placeholder="VD: Tiền nhà" />
                 </div>
                 <div class="col-md-3 mb-3">
-                    <label asp-for="Input.TotalAmount" class="form-label">Tổng tiền (@Model.Group.Currency)</label>
+                    <label asp-for="Input.TotalAmount" class="form-label">@Localizer["Tổng tiền"] (@Model.Group.Currency)</label>
                     <input asp-for="Input.TotalAmount" class="form-control" type="number" min="1" />
                 </div>
                 <div class="col-md-2 mb-3">
-                    <label asp-for="Input.ExtraFeeAmount" class="form-label">Phụ phí (@Model.Group.Currency)</label>
+                    <label asp-for="Input.ExtraFeeAmount" class="form-label">@Localizer["Phụ phí"] (@Model.Group.Currency)</label>
                     <input asp-for="Input.ExtraFeeAmount" class="form-control" type="number" min="0" />
                 </div>
                 <div class="col-md-3 mb-3">
-                    <label asp-for="Input.Category" class="form-label">Danh mục</label>
+                    <label asp-for="Input.Category" class="form-label">@Localizer["Danh mục"]</label>
                     <select asp-for="Input.Category" class="form-select">
                         @foreach (var category in ExpenseCategoryOptions.All)
                         {
@@ -112,27 +112,27 @@
 
             <div class="row">
                 <div class="col-md-4 mb-3">
-                    <label asp-for="Input.Interval" class="form-label">Chu kỳ lặp lại</label>
+                    <label asp-for="Input.Interval" class="form-label">@Localizer["Chu kỳ lặp lại"]</label>
                     <select asp-for="Input.Interval" class="form-select">
-                        <option value="Daily">Hàng ngày</option>
-                        <option value="Weekly">Hàng tuần</option>
-                        <option value="Monthly">Hàng tháng</option>
+                        <option value="Daily">@Localizer["Hàng ngày"]</option>
+                        <option value="Weekly">@Localizer["Hàng tuần"]</option>
+                        <option value="Monthly">@Localizer["Hàng tháng"]</option>
                     </select>
                 </div>
                 <div class="col-md-4 mb-3">
-                    <label asp-for="Input.FirstRunAt" class="form-label">Lần đầu tiên sinh khoản chi</label>
+                    <label asp-for="Input.FirstRunAt" class="form-label">@Localizer["Lần đầu tiên sinh khoản chi"]</label>
                     <input asp-for="Input.FirstRunAt" class="form-control" type="date" />
                 </div>
                 <div class="col-md-4 mb-3">
-                    <label asp-for="Input.Note" class="form-label">Ghi chú</label>
+                    <label asp-for="Input.Note" class="form-label">@Localizer["Ghi chú"]</label>
                     <input asp-for="Input.Note" class="form-control" />
                 </div>
             </div>
 
             <div class="mb-4">
-                <label class="form-label d-block">Cách chia</label>
+                <label class="form-label d-block">@Localizer["Cách chia"]</label>
                 @{
-                    var modes = new[] { ("Equal", "Chia đều"), ("Shares", "Theo phần"), ("Percentage", "Theo %"), ("ExactAmount", "Nhập tay"), ("Itemized", "Theo món") };
+                    var modes = new[] { ("Equal", Localizer["Chia đều"]), ("Shares", Localizer["Theo phần"]), ("Percentage", Localizer["Theo %"]), ("ExactAmount", Localizer["Nhập tay"]), ("Itemized", Localizer["Theo món"]) };
                 }
                 <div class="btn-group flex-wrap" role="group">
                     @foreach (var (value, label) in modes)
@@ -148,12 +148,12 @@
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Thành viên</th>
-                            <th>Ai ứng mỗi lần (@Model.Group.Currency)</th>
-                            <th class="split-col" data-mode="Equal">Tham gia?</th>
-                            <th class="split-col" data-mode="Shares">Trọng số</th>
+                            <th>@Localizer["Thành viên"]</th>
+                            <th>@Localizer["Ai ứng mỗi lần"] (@Model.Group.Currency)</th>
+                            <th class="split-col" data-mode="Equal">@Localizer["Tham gia?"]</th>
+                            <th class="split-col" data-mode="Shares">@Localizer["Trọng số"]</th>
                             <th class="split-col" data-mode="Percentage">%</th>
-                            <th class="split-col" data-mode="ExactAmount">Số tiền (@Model.Group.Currency)</th>
+                            <th class="split-col" data-mode="ExactAmount">@Localizer["Số tiền"] (@Model.Group.Currency)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -185,21 +185,21 @@
             </div>
 
             <div class="split-col mb-3" data-mode="Itemized">
-                <label class="form-label d-block">Món ăn</label>
+                <label class="form-label d-block">@Localizer["Món ăn"]</label>
                 <div class="table-responsive">
                     <table class="table table-sm">
                         <thead>
                             <tr>
-                                <th style="width: 25%">Tên món</th>
-                                <th style="width: 15%">Giá (@Model.Group.Currency)</th>
-                                <th>Người ăn</th>
+                                <th style="width: 25%">@Localizer["Tên món"]</th>
+                                <th style="width: 15%">@Localizer["Giá"] (@Model.Group.Currency)</th>
+                                <th>@Localizer["Người ăn"]</th>
                                 <th></th>
                             </tr>
                         </thead>
                         <tbody id="items-tbody"></tbody>
                     </table>
                 </div>
-                <button type="button" id="add-item-btn" class="btn btn-sm btn-secondary">+ Thêm món</button>
+                <button type="button" id="add-item-btn" class="btn btn-sm btn-secondary">+ @Localizer["Thêm món"]</button>
             </div>
 
             <template id="item-row-template">
@@ -220,12 +220,12 @@
                             </div>
                         }
                     </td>
-                    <td><button type="button" class="btn btn-sm btn-outline-danger remove-item-row">Xóa</button></td>
+                    <td><button type="button" class="btn btn-sm btn-outline-danger remove-item-row">@Localizer["Xóa"]</button></td>
                 </tr>
             </template>
 
             <div class="d-flex gap-2 mt-4">
-                <button type="submit" class="btn btn-primary">Tạo mẫu định kỳ</button>
+                <button type="submit" class="btn btn-primary">@Localizer["Tạo mẫu định kỳ"]</button>
             </div>
         </form>
     </div>

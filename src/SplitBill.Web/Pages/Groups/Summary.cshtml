@@ -6,8 +6,8 @@
 }
 
 <div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2 no-print">
-    <a asp-page="/Groups/Details" asp-route-id="@Model.Group.Id" class="text-muted small">← Về nhóm</a>
-    <button type="button" class="btn btn-primary" onclick="window.print()">🖨️ In / Lưu PDF</button>
+    <a asp-page="/Groups/Details" asp-route-id="@Model.Group.Id" class="text-muted small">← @Localizer["Về nhóm"]</a>
+    <button type="button" class="btn btn-primary" onclick="window.print()">🖨️ @Localizer["In / Lưu PDF"]</button>
 </div>
 
 @* ===== Xuất PDF tổng kết (CLAUDE.md mục 15.9) — trang HTML thuần, in qua trình duyệt bằng
@@ -15,19 +15,19 @@
    không cần thư viện sinh PDF nào ở backend. CSS @@media print trong site.css ẩn header/.footer/
    .no-print khi in — chỉ nội dung bên dưới xuất hiện trên bản in/PDF. ===== *@
 <div class="text-center mb-4">
-    <h1 class="mb-1">📊 Tổng kết — @Model.Group.Name</h1>
+    <h1 class="mb-1">📊 @Localizer["Tổng kết"] — @Model.Group.Name</h1>
     @if (!string.IsNullOrEmpty(Model.Group.Description))
     {
         <p class="text-muted mb-1">@Model.Group.Description</p>
     }
-    <p class="text-muted small mb-0">Xuất lúc @Model.GeneratedAt.ToString("dd/MM/yyyy HH:mm")</p>
+    <p class="text-muted small mb-0">@Localizer["Xuất lúc {0}", Model.GeneratedAt.ToString("dd/MM/yyyy HH:mm")]</p>
 </div>
 
 <div class="row g-3 mb-4">
     <div class="col-md-4">
         <div class="card h-100 text-center">
             <div class="card-body">
-                <div class="text-muted small">Tổng chi tiêu</div>
+                <div class="text-muted small">@Localizer["Tổng chi tiêu"]</div>
                 <div class="fs-4 fw-700">@SupportedCurrencies.Format(Model.Expenses.Sum(e => e.TotalAmount + e.ExtraFeeAmount), Model.Group.Currency)</div>
             </div>
         </div>
@@ -35,7 +35,7 @@
     <div class="col-md-4">
         <div class="card h-100 text-center">
             <div class="card-body">
-                <div class="text-muted small">Số khoản chi</div>
+                <div class="text-muted small">@Localizer["Số khoản chi"]</div>
                 <div class="fs-4 fw-700">@Model.Expenses.Count</div>
             </div>
         </div>
@@ -43,7 +43,7 @@
     <div class="col-md-4">
         <div class="card h-100 text-center">
             <div class="card-body">
-                <div class="text-muted small">Số thành viên</div>
+                <div class="text-muted small">@Localizer["Số thành viên"]</div>
                 <div class="fs-4 fw-700">@Model.Group.Members.Count</div>
             </div>
         </div>
@@ -54,7 +54,7 @@
 {
     <div class="card mb-4">
         <div class="card-body">
-            <h5 class="card-title mb-3">Chi tiêu theo danh mục</h5>
+            <h5 class="card-title mb-3">@Localizer["Chi tiêu theo danh mục"]</h5>
             <div class="row g-2">
                 @foreach (var (category, total) in Model.CategoryTotals)
                 {
@@ -71,10 +71,10 @@
 
 <div class="card mb-4">
     <div class="card-body">
-        <h5 class="card-title mb-3">Số dư từng người</h5>
+        <h5 class="card-title mb-3">@Localizer["Số dư từng người"]</h5>
         @if (Model.Balances.Count == 0)
         {
-            <p class="text-muted mb-0">Chưa có khoản chi/thanh toán nào được ghi nhận nên không có số dư để hiển thị.</p>
+            <p class="text-muted mb-0">@Localizer["Chưa có khoản chi/thanh toán nào được ghi nhận nên không có số dư để hiển thị."]</p>
         }
         else
         {
@@ -97,15 +97,15 @@
 
 <div class="card mb-4">
     <div class="card-body">
-        <h5 class="card-title mb-3">Kế hoạch thanh toán (@Model.Plan.TransactionCount giao dịch)</h5>
+        <h5 class="card-title mb-3">@Localizer["Kế hoạch thanh toán ({0} giao dịch)", Model.Plan.TransactionCount]</h5>
         @if (Model.Plan.Transactions.Count == 0)
         {
-            <p class="text-muted mb-0">Mọi người đã cân bằng.</p>
+            <p class="text-muted mb-0">@Localizer["Mọi người đã cân bằng."]</p>
         }
         else
         {
             <table class="table table-sm mb-0">
-                <thead><tr><th>Từ</th><th>Đến</th><th>Số tiền</th></tr></thead>
+                <thead><tr><th>@Localizer["Từ"]</th><th>@Localizer["Đến"]</th><th>@Localizer["Số tiền"]</th></tr></thead>
                 <tbody>
                     @foreach (var t in Model.Plan.Transactions)
                     {
@@ -123,17 +123,17 @@
 
 <div class="card mb-4">
     <div class="card-body">
-        <h5 class="card-title mb-3">Danh sách khoản chi (@Model.Expenses.Count)</h5>
+        <h5 class="card-title mb-3">@Localizer["Danh sách khoản chi ({0})", Model.Expenses.Count]</h5>
         @if (Model.Expenses.Count == 0)
         {
-            <p class="text-muted mb-0">Chưa có khoản chi nào.</p>
+            <p class="text-muted mb-0">@Localizer["Chưa có khoản chi nào."]</p>
         }
         else
         {
             <div class="table-responsive">
                 <table class="table table-sm mb-0">
                     <thead>
-                        <tr><th>Ngày</th><th>Tiêu đề</th><th>Danh mục</th><th>Ai ứng</th><th>Số tiền</th></tr>
+                        <tr><th>@Localizer["Ngày"]</th><th>@Localizer["Tiêu đề"]</th><th>@Localizer["Danh mục"]</th><th>@Localizer["Ai ứng"]</th><th>@Localizer["Số tiền"]</th></tr>
                     </thead>
                     <tbody>
                         @foreach (var expense in Model.Expenses)
@@ -154,4 +154,4 @@
     </div>
 </div>
 
-<p class="text-center text-muted small no-print">SplitBill — chia tiền minh bạch, không lăn tăn.</p>
+<p class="text-center text-muted small no-print">@Localizer["SplitBill — chia tiền minh bạch, không lăn tăn."]</p>

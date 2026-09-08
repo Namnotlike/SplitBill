@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="Khoản chi" xml:space="preserve">
+    <value>Expenses</value>
+  </data>
+  <data name="Sửa khoản chi" xml:space="preserve">
+    <value>Edit expense</value>
+  </data>
+  <data name="Ảnh hóa đơn" xml:space="preserve">
+    <value>Receipt image</value>
+  </data>
+  <data name="Chưa có ảnh hóa đơn." xml:space="preserve">
+    <value>No receipt image yet.</value>
+  </data>
+  <data name="Tải ảnh lên" xml:space="preserve">
+    <value>Upload image</value>
+  </data>
+  <data name="Thay ảnh khác" xml:space="preserve">
+    <value>Replace image</value>
+  </data>
+  <data name="Tiêu đề" xml:space="preserve">
+    <value>Title</value>
+  </data>
+  <data name="Tổng tiền" xml:space="preserve">
+    <value>Total</value>
+  </data>
+  <data name="Phụ phí" xml:space="preserve">
+    <value>Extra fee</value>
+  </data>
+  <data name="Thời gian" xml:space="preserve">
+    <value>Date &amp; time</value>
+  </data>
+  <data name="Ghi chú" xml:space="preserve">
+    <value>Note</value>
+  </data>
+  <data name="Danh mục" xml:space="preserve">
+    <value>Category</value>
+  </data>
+  <data name="Cách chia" xml:space="preserve">
+    <value>Split method</value>
+  </data>
+  <data name="Chia đều" xml:space="preserve">
+    <value>Equal</value>
+  </data>
+  <data name="Theo phần" xml:space="preserve">
+    <value>By shares</value>
+  </data>
+  <data name="Theo %" xml:space="preserve">
+    <value>By percentage</value>
+  </data>
+  <data name="Nhập tay" xml:space="preserve">
+    <value>Exact amounts</value>
+  </data>
+  <data name="Theo món" xml:space="preserve">
+    <value>By item</value>
+  </data>
+  <data name="Thành viên" xml:space="preserve">
+    <value>Member</value>
+  </data>
+  <data name="Đã ứng" xml:space="preserve">
+    <value>Paid</value>
+  </data>
+  <data name="Tham gia?" xml:space="preserve">
+    <value>Included?</value>
+  </data>
+  <data name="Trọng số" xml:space="preserve">
+    <value>Weight</value>
+  </data>
+  <data name="Số tiền" xml:space="preserve">
+    <value>Amount</value>
+  </data>
+  <data name="Món ăn" xml:space="preserve">
+    <value>Items</value>
+  </data>
+  <data name="Tên món" xml:space="preserve">
+    <value>Item name</value>
+  </data>
+  <data name="Giá" xml:space="preserve">
+    <value>Price</value>
+  </data>
+  <data name="Người ăn" xml:space="preserve">
+    <value>Consumed by</value>
+  </data>
+  <data name="Thêm món" xml:space="preserve">
+    <value>Add item</value>
+  </data>
+  <data name="Xóa" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="Lưu thay đổi" xml:space="preserve">
+    <value>Save changes</value>
+  </data>
+  <data name="Hủy" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Bình luận" xml:space="preserve">
+    <value>Comments</value>
+  </data>
+  <data name="Chưa có bình luận nào." xml:space="preserve">
+    <value>No comments yet.</value>
+  </data>
+  <data name="Viết bình luận..." xml:space="preserve">
+    <value>Write a comment...</value>
+  </data>
+  <data name="Gửi" xml:space="preserve">
+    <value>Send</value>
+  </data>
+</root>

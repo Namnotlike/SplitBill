@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="Bạn đang xem nhóm qua link chia sẻ (chỉ xem, không cần đăng nhập)." xml:space="preserve">
+    <value>You're viewing this group via a share link (read-only, no login required).</value>
+  </data>
+  <data name="Tham gia nhóm này" xml:space="preserve">
+    <value>Join this group</value>
+  </data>
+  <data name="Đăng nhập hoặc tạo tài khoản để tham gia nhóm này." xml:space="preserve">
+    <value>Log in or create an account to join this group.</value>
+  </data>
+  <data name="Đăng nhập" xml:space="preserve">
+    <value>Log in</value>
+  </data>
+  <data name="Đăng ký" xml:space="preserve">
+    <value>Sign up</value>
+  </data>
+  <data name="Thành viên" xml:space="preserve">
+    <value>Members</value>
+  </data>
+</root>

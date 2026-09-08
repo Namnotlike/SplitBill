@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="Về nhóm" xml:space="preserve">
+    <value>Back to group</value>
+  </data>
+  <data name="In / Lưu PDF" xml:space="preserve">
+    <value>Print / Save PDF</value>
+  </data>
+  <data name="Tổng kết" xml:space="preserve">
+    <value>Summary</value>
+  </data>
+  <data name="Xuất lúc {0}" xml:space="preserve">
+    <value>Generated at {0}</value>
+  </data>
+  <data name="Tổng chi tiêu" xml:space="preserve">
+    <value>Total spending</value>
+  </data>
+  <data name="Số khoản chi" xml:space="preserve">
+    <value>Number of expenses</value>
+  </data>
+  <data name="Số thành viên" xml:space="preserve">
+    <value>Number of members</value>
+  </data>
+  <data name="Chi tiêu theo danh mục" xml:space="preserve">
+    <value>Spending by category</value>
+  </data>
+  <data name="Số dư từng người" xml:space="preserve">
+    <value>Balance per person</value>
+  </data>
+  <data name="Chưa có khoản chi/thanh toán nào được ghi nhận nên không có số dư để hiển thị." xml:space="preserve">
+    <value>No expenses/payments recorded yet, so there's no balance to show.</value>
+  </data>
+  <data name="Kế hoạch thanh toán ({0} giao dịch)" xml:space="preserve">
+    <value>Settlement plan ({0} transactions)</value>
+  </data>
+  <data name="Mọi người đã cân bằng." xml:space="preserve">
+    <value>Everyone is settled up.</value>
+  </data>
+  <data name="Từ" xml:space="preserve">
+    <value>From</value>
+  </data>
+  <data name="Đến" xml:space="preserve">
+    <value>To</value>
+  </data>
+  <data name="Số tiền" xml:space="preserve">
+    <value>Amount</value>
+  </data>
+  <data name="Danh sách khoản chi ({0})" xml:space="preserve">
+    <value>Expense list ({0})</value>
+  </data>
+  <data name="Chưa có khoản chi nào." xml:space="preserve">
+    <value>No expenses yet.</value>
+  </data>
+  <data name="Ngày" xml:space="preserve">
+    <value>Date</value>
+  </data>
+  <data name="Tiêu đề" xml:space="preserve">
+    <value>Title</value>
+  </data>
+  <data name="Danh mục" xml:space="preserve">
+    <value>Category</value>
+  </data>
+  <data name="Ai ứng" xml:space="preserve">
+    <value>Paid by</value>
+  </data>
+  <data name="SplitBill — chia tiền minh bạch, không lăn tăn." xml:space="preserve">
+    <value>SplitBill — transparent bill-splitting, no fuss.</value>
+  </data>
+</root>

@@ -14,7 +14,7 @@
 }
 @if (Model.Group is not null)
 {
-    <div class="alert alert-info">🔗 Bạn đang xem nhóm qua link chia sẻ (chỉ xem, không cần đăng nhập).</div>
+    <div class="alert alert-info">🔗 @Localizer["Bạn đang xem nhóm qua link chia sẻ (chỉ xem, không cần đăng nhập)."]</div>
     <h1 class="mb-1">@Model.Group.Name</h1>
     @if (!string.IsNullOrEmpty(Model.Group.Description))
     {
@@ -27,23 +27,23 @@
     @if (User.Identity?.IsAuthenticated == true)
     {
         <form method="post" asp-page-handler="Join" class="mt-3">
-            <button type="submit" class="btn btn-primary">+ Tham gia nhóm này</button>
+            <button type="submit" class="btn btn-primary">+ @Localizer["Tham gia nhóm này"]</button>
         </form>
     }
     else
     {
         <div class="card mt-3" style="max-width: 480px;">
             <div class="card-body">
-                <p class="mb-3">Đăng nhập hoặc tạo tài khoản để tham gia nhóm này.</p>
-                <a asp-page="/Account/Login" asp-route-returnUrl="@($"/Public/Group/{Model.Group.ShareToken}")" class="btn btn-primary me-2">Đăng nhập</a>
-                <a asp-page="/Account/Register" asp-route-returnUrl="@($"/Public/Group/{Model.Group.ShareToken}")" class="btn btn-outline-secondary">Đăng ký</a>
+                <p class="mb-3">@Localizer["Đăng nhập hoặc tạo tài khoản để tham gia nhóm này."]</p>
+                <a asp-page="/Account/Login" asp-route-returnUrl="@($"/Public/Group/{Model.Group.ShareToken}")" class="btn btn-primary me-2">@Localizer["Đăng nhập"]</a>
+                <a asp-page="/Account/Register" asp-route-returnUrl="@($"/Public/Group/{Model.Group.ShareToken}")" class="btn btn-outline-secondary">@Localizer["Đăng ký"]</a>
             </div>
         </div>
     }
 
     <div class="card mt-3" style="max-width: 480px;">
         <div class="card-body">
-            <h5 class="card-title">Thành viên (@Model.Group.Members.Count)</h5>
+            <h5 class="card-title">@Localizer["Thành viên"] (@Model.Group.Members.Count)</h5>
             <table class="table table-sm mb-0">
                 <tbody>
                     @foreach (var member in Model.Group.Members)

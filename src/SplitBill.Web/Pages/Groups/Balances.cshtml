@@ -4,8 +4,8 @@
     ViewData["Title"] = "Số dư";
 }
 
-<a asp-page="/Groups/Details" asp-route-id="@Model.Group.Id" class="text-muted small">← Về nhóm</a>
-<h1 class="mt-1">Số dư — @Model.Group.Name</h1>
+<a asp-page="/Groups/Details" asp-route-id="@Model.Group.Id" class="text-muted small">← @Localizer["Về nhóm"]</a>
+<h1 class="mt-1">@Localizer["Số dư"] — @Model.Group.Name</h1>
 
 <div class="row g-3 mt-1 mb-4">
     @foreach (var balance in Model.Balances.OrderByDescending(b => b.Net))
@@ -24,11 +24,11 @@
                 }
                 else
                 {
-                    <span class="text-muted">Đã cân bằng</span>
+                    <span class="text-muted">@Localizer["Đã cân bằng"]</span>
                 }
             </div>
         </div>
     }
 </div>
 
-<a asp-page="/Groups/SettlementPlan" asp-route-id="@Model.Group.Id" class="btn btn-primary">🔀 Xem kế hoạch thanh toán</a>
+<a asp-page="/Groups/SettlementPlan" asp-route-id="@Model.Group.Id" class="btn btn-primary">🔀 @Localizer["Xem kế hoạch thanh toán"]</a>

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="Về nhóm" xml:space="preserve">
+    <value>Back to group</value>
+  </data>
+  <data name="Thống kê" xml:space="preserve">
+    <value>Statistics</value>
+  </data>
+  <data name="Xem trang tổng kết / In PDF" xml:space="preserve">
+    <value>View summary page / Print PDF</value>
+  </data>
+  <data name="Chưa có khoản chi nào trong nhóm này để thống kê." xml:space="preserve">
+    <value>No expenses in this group yet to show statistics for.</value>
+  </data>
+  <data name="Tổng chi tiêu" xml:space="preserve">
+    <value>Total spending</value>
+  </data>
+  <data name="Số khoản chi" xml:space="preserve">
+    <value>Number of expenses</value>
+  </data>
+  <data name="Số tháng có phát sinh" xml:space="preserve">
+    <value>Months with activity</value>
+  </data>
+  <data name="Chi tiêu theo thời gian" xml:space="preserve">
+    <value>Spending over time</value>
+  </data>
+  <data name="Chi tiêu theo danh mục" xml:space="preserve">
+    <value>Spending by category</value>
+  </data>
+  <data name="Biểu đồ chi tiêu theo tháng" xml:space="preserve">
+    <value>Monthly spending chart</value>
+  </data>
+  <data name="Biểu đồ chi tiêu theo danh mục" xml:space="preserve">
+    <value>Spending-by-category chart</value>
+  </data>
+</root>

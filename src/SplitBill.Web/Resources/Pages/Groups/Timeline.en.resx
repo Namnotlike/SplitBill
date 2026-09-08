@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="Về nhóm" xml:space="preserve">
+    <value>Back to group</value>
+  </data>
+  <data name="Hoạt động" xml:space="preserve">
+    <value>Activity</value>
+  </data>
+  <data name="Chưa có hoạt động nào." xml:space="preserve">
+    <value>No activity yet.</value>
+  </data>
+  <data name="Trang {0}/{1} — tổng {2} hoạt động." xml:space="preserve">
+    <value>Page {0}/{1} — {2} activity events total.</value>
+  </data>
+  <data name="Trước" xml:space="preserve">
+    <value>Previous</value>
+  </data>
+  <data name="Sau" xml:space="preserve">
+    <value>Next</value>
+  </data>
+</root>

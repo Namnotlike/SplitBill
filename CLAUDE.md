@@ -1959,29 +1959,43 @@ về `LocalizedHtmlString` (cho phép chứa HTML), trong khi `IStringLocalizer<
 
 ### 22.3 Phạm vi đã dịch (trung thực, không phóng đại)
 
-**Đã dịch nội dung trang** (kiểm chứng qua build sạch + verify sống cả 2 culture `vi`/`en`): navbar/
-footer (`_Layout.cshtml`), `Index.cshtml` (trang chủ), `Account/Login.cshtml`, `Account/Register.cshtml`,
-`Groups/Index.cshtml`, `Groups/Details.cshtml`, `Expenses/Index.cshtml`, `Expenses/Create.cshtml`. Riêng
-`ViewData["Title"]` (tiêu đề tab trình duyệt) của các trang này vẫn hardcode tiếng Việt, chưa qua
-`Localizer` — chỉ nội dung thân trang được dịch, không phải "đầy đủ" theo đúng nghĩa đen.
+> ✅ **Cập nhật 2026-09-08:** đã dịch nốt toàn bộ các trang còn lại liệt kê là "CHƯA dịch" ở lần đầu
+> triển khai (2026-09-07). Mục này giữ nguyên cấu trúc gốc nhưng nay phản ánh trạng thái ĐÃ HOÀN THÀNH.
 
-**Cố tình CHƯA dịch** (giới hạn phạm vi, không phải thiếu sót — để tránh phình việc dịch toàn bộ ~30
-trang Razor Pages của dự án trong 1 lần, ưu tiên đúng luồng lõi "xem nhóm → xem/thêm khoản chi" trước):
-mọi trang còn lại (`Expenses/Edit`, `Groups/Balances`, `Groups/SettlementPlan`, `Groups/Timeline`,
-`Groups/Statistics`, `Groups/RecurringExpenses`, `Groups/Summary`, `Notifications/Index`,
-`Public/Group`, `Account/Profile`...) vẫn hiển thị tiếng Việt hardcode dù đổi sang `en` — không dùng
-`Localizer[]` nên không có cơ chế fallback nào áp dụng, chỉ đơn thuần chưa được đụng tới. Nội dung do
-người dùng tự nhập (tên nhóm, tên khoản chi, ghi chú, tên thành viên...) không bao giờ dịch, kể cả
-trên các trang đã dịch — chỉ nhãn/label cố định của giao diện mới thuộc phạm vi tính năng này.
+**Đã dịch nội dung trang** (kiểm chứng qua build sạch + verify sống cả 2 culture `vi`/`en`, xem danh
+sách xác nhận ở cuối mục): navbar/footer (`_Layout.cshtml`), `Index.cshtml` (trang chủ),
+`Account/Login.cshtml`, `Account/Register.cshtml`, `Account/ForgotPassword.cshtml`,
+`Account/ResetPassword.cshtml`, `Account/Profile.cshtml`, `Groups/Index.cshtml`, `Groups/Details.cshtml`,
+`Groups/Balances.cshtml`, `Groups/SettlementPlan.cshtml`, `Groups/Timeline.cshtml`,
+`Groups/Statistics.cshtml`, `Groups/RecurringExpenses.cshtml`, `Groups/Summary.cshtml`,
+`Expenses/Index.cshtml`, `Expenses/Create.cshtml`, `Expenses/Edit.cshtml`, `Notifications/Index.cshtml`,
+`Public/Group.cshtml`. Riêng `ViewData["Title"]` (tiêu đề tab trình duyệt) của mọi trang vẫn hardcode
+tiếng Việt, chưa qua `Localizer` — chỉ nội dung thân trang được dịch, không phải "đầy đủ" theo đúng
+nghĩa đen. `Account/Logout.cshtml` (chỉ có `<form>` POST rỗng, không có text hiển thị),
+`Shared/Components/NotificationBadge/Default.cshtml` (chỉ icon + số, không có text), và `Error.cshtml`
+(trang lỗi scaffold mặc định của ASP.NET Core, vốn đã là tiếng Anh từ đầu, không thuộc phạm vi "dịch
+VI→EN" của tính năng này) không cần đụng tới.
+
+**Cố tình vẫn KHÔNG dịch** (ranh giới có chủ đích, không phải thiếu sót): nội dung do người dùng tự
+nhập (tên nhóm, tên khoản chi, ghi chú, tên thành viên, nội dung bình luận...) không bao giờ dịch, kể
+cả trên các trang đã dịch — chỉ nhãn/label cố định của giao diện mới thuộc phạm vi tính năng này. Nội
+dung do **API tự sinh** bằng tiếng Việt cũng ngoài phạm vi (Web chỉ hiển thị nguyên văn, không dịch
+lại): `AuditLog.Summary` (`Groups/Timeline`, mục 15.5) và `Notification.Title`/`Notification.Message`
+(`Notifications/Index`, mục 13) — dịch những chuỗi này cần đổi ở tầng `SplitBill.Application`
+(`GroupService.BuildSummary`/`NotificationService`), không phải việc của lớp `IViewLocalizer` ở Web.
 `ExpenseCategoryOptions`/`SupportedCurrencies` (nhãn danh mục, tên tiền tệ) cũng chưa được đưa vào hệ
-thống resource — dropdown "Danh mục" trên `Expenses/Index`/`Create` vẫn hiện nhãn tiếng Việt
-("📦 Khác", "🍜 Ăn uống"...) dù trang đã ở chế độ `en`.
+thống resource — dropdown "Danh mục" vẫn hiện nhãn tiếng Việt ("📦 Khác", "🍜 Ăn uống"...) ở mọi trang
+dùng nó dù trang đã ở chế độ `en`.
 
-Đã verify sống trên trình duyệt (cả 2 chiều): đổi ngôn ngữ qua `/SetLanguage?culture=en` → `Groups/
-Details` hiện đúng "(guest)" (đúng bug đã sửa ở 22.2), `Expenses/Index` và `Expenses/Create` hiện đúng
-toàn bộ nhãn tiếng Anh, không còn chuỗi `LocalizedHtmlString` nào lộ ra; đổi lại `culture=vi` → mọi
-nhãn trở về đúng tiếng Việt gốc. `dotnet test`: 233/233 pass (không đổi so với trước tính năng này, vì
-Razor rendering không nằm trong phạm vi test tự động hiện có — xem giới hạn đã nêu ở mục 10b).
+Đã verify sống trên trình duyệt (cả 2 chiều `vi`/`en`, tạo dữ liệu thật — nhóm, thành viên khách, 2
+khoản chi, 1 bình luận, 1 yêu cầu quên mật khẩu — không chỉ đọc trang trống): tất cả 19 trang liệt kê ở
+trên hiện đúng nhãn tiếng Anh khi đổi `culture=en`, không còn chuỗi `LocalizedHtmlString` nào lộ ra
+(kể cả câu ghép động dạng "X transfers to Y", "Page {0}/{1}...", "Settlement plan ({0} transactions)"
+dùng `Localizer["...", args]`); đổi lại `culture=vi` → mọi nhãn (kể cả các key mới thêm) trở về đúng
+tiếng Việt gốc qua đúng cơ chế fallback. Không có lỗi console nào phát sinh (kể cả ở `Groups/Statistics`,
+nơi 1 chuỗi dịch được nhúng vào literal JavaScript cho nhãn biểu đồ Chart.js). `dotnet test`: 236/236
+pass (không đổi do phần dịch thêm — Razor rendering không nằm trong phạm vi test tự động hiện có, xem
+giới hạn đã nêu ở mục 10b).
 
 ## 23. PWA (cài đặt thành ứng dụng, dùng ngoại tuyến giới hạn) — bổ sung 2026-09-07
 

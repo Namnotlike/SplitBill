@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="Thông báo" xml:space="preserve">
+    <value>Notifications</value>
+  </data>
+  <data name="Đánh dấu tất cả đã đọc" xml:space="preserve">
+    <value>Mark all as read</value>
+  </data>
+  <data name="Chưa có thông báo nào." xml:space="preserve">
+    <value>No notifications yet.</value>
+  </data>
+  <data name="Xem" xml:space="preserve">
+    <value>View</value>
+  </data>
+  <data name="Đã đọc" xml:space="preserve">
+    <value>Mark read</value>
+  </data>
+  <data name="Trang {0} — tổng {1} thông báo." xml:space="preserve">
+    <value>Page {0} — {1} notifications total.</value>
+  </data>
+</root>
