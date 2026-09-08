@@ -2255,6 +2255,6 @@ pass cục bộ, kèm log HTTP request/response đầy đủ xác nhận từng 
 `/users/me`/`/groups`/`/notifications/unread-count` → 200, POST `.../expenses` → 201, GET
 `.../balances`/`.../settlement-plan` → 200 — không có bước nào bị mock/giả lập). `dotnet build
 SplitBill.sln --configuration Release`: 0 warning, 0 error. `dotnet test SplitBill.sln --configuration
-Release`: **239/239 pass** (25 UnitTests + 69 Web.Tests + 142 IntegrationTests + 3 E2ETests mới —
+Release`: **239/239 pass** (69 UnitTests + 25 Web.Tests + 142 IntegrationTests + 3 E2ETests mới —
 không có test cũ nào bị ảnh hưởng bởi việc thêm `public partial class Program;` vào `SplitBill.Web/
 Program.cs`).

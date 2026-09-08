@@ -21,11 +21,13 @@ SplitBill.sln
 └── tests/
     ├── SplitBill.UnitTests/          # Thuật toán chia tiền + settlement (thuần, không cần DB)
     ├── SplitBill.IntegrationTests/   # Service layer đầy đủ, EF Core InMemory
-    └── SplitBill.Web.Tests/          # SplitBillApiClient, form helpers, LoginModel
+    ├── SplitBill.Web.Tests/          # SplitBillApiClient, form helpers, LoginModel/IndexModel
+    └── SplitBill.E2ETests/           # Playwright — trình duyệt thật qua Web + Api thật (mục "E2E test" dưới đây)
 ```
 
 **Tech stack**: .NET 9 · ASP.NET Core Web API + Razor Pages · EF Core 9 (Code-First) · SQL Server ·
-JWT Bearer + refresh-token rotation · FluentValidation · Serilog · Swashbuckle · xUnit + FluentAssertions.
+JWT Bearer + refresh-token rotation · FluentValidation · Serilog · Swashbuckle · MailKit (gửi email) ·
+xUnit + FluentAssertions · Microsoft.Playwright (E2E).
 
 ## Yêu cầu
 
@@ -83,8 +85,9 @@ Swagger UI cho Api (chỉ bật ở Development): `http://localhost:5199/swagger
 dotnet test SplitBill.sln
 ```
 
-100 test (33 unit + 50 integration + 17 web), toàn bộ chạy trên EF Core InMemory — không cần SQL
-Server thật để chạy test.
+239 test (69 unit + 142 integration + 25 web + 3 E2E — xem mục "E2E test" dưới đây), toàn bộ chạy trên
+EF Core InMemory — không cần SQL Server thật để chạy test. Lần chạy đầu tiên có thể chậm hơn vì
+`SplitBill.E2ETests` tự tải trình duyệt Chromium (một lần duy nhất, xem mục "E2E test").
 
 ## Chạy bằng Docker
 
@@ -133,5 +136,23 @@ Không có seed data sẵn — đăng ký tài khoản qua `/Account/Register`, 
 
 ## Giới hạn đã biết
 
-Xem mục "Giới hạn đã biết" trong `CLAUDE.md` — ví dụ: form Edit không khôi phục chính xác trọng số/%
-gốc đã nhập lúc tạo khoản chi, ràng buộc mềm cho settlement (mục 6.4) chưa làm, chưa hỗ trợ đa tiền tệ.
+Toàn bộ 9 tính năng bổ sung sau M6 (mục 15 CLAUDE.md), đa tiền tệ (mục 14), ràng buộc mềm cho
+settlement (mục 6.4), đa ngôn ngữ VI/EN (mục 22), PWA (mục 23) đều đã hoàn thành — các giới hạn dưới
+đây là những gì **thật sự còn tồn tại**, không phải danh sách việc-chưa-làm cũ (tránh liệt kê nhầm việc
+đã xong, xem đúng nội dung mới nhất ở từng mục `CLAUDE.md` được trỏ tới):
+
+- **Docker chưa được verify chạy thật end-to-end** — cấu hình `docker-compose.yml` đã rà soát kỹ bằng
+  mắt nhưng môi trường phát triển hiện tại không có sẵn Docker CLI (CLAUDE.md mục 10b).
+- **CI (GitHub Actions) và bước cài Playwright browsers trong CI chưa tự verify được trên GitHub Actions
+  thật** — repo chưa có remote GitHub, chỉ verify được cục bộ với đúng flag/lệnh CI dùng (mục "CI" và
+  mục 24.6 CLAUDE.md).
+- **i18n (mục 22) chỉ dịch nhãn cố định của giao diện Web** — nội dung do người dùng tự nhập (tên
+  nhóm, ghi chú...) và text do Api tự sinh bằng tiếng Việt (`AuditLog.Summary`, `Notification.Title`/
+  `Message`, nhãn danh mục/tiền tệ) cố tình không dịch — ranh giới có chủ đích, không phải thiếu sót.
+- **Icon PWA (mục 23.2) là placeholder chức năng** — hình vuông bo góc màu thương hiệu đơn sắc, sinh
+  bằng script vì môi trường dev không có công cụ thiết kế/xử lý ảnh; cần thay bằng bộ nhận diện thật
+  nếu cần cho production.
+- **API `/auth/*` giới hạn 10 request/phút theo IP** (chống brute-force) — có thể gây `429` nếu test
+  thủ công gọi liên tục nhiều lần trong 1 phút.
+
+Xem `CLAUDE.md` để biết đầy đủ quyết định thiết kế và các lỗi đã phát hiện + sửa qua từng tính năng.
