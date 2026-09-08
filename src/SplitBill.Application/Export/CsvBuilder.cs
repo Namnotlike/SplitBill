@@ -9,7 +9,15 @@ public sealed class CsvBuilder
 
     public CsvBuilder AddRow(params object?[] fields)
     {
-        _builder.AppendLine(string.Join(",", fields.Select(Escape)));
+        // ⚠️ Bug thật phát hiện qua CI chạy trên GitHub Actions (ubuntu-latest, 2026-09-08) — lần đầu
+        // tiên bộ test chạy trên Linux thay vì máy dev Windows: AppendLine() nối Environment.NewLine,
+        // "\r\n" trên Windows nhưng CHỈ "\n" trên Linux. RFC 4180 (mà class này tự nhận tuân theo, xem
+        // doc comment) BẮT BUỘC dòng CSV kết thúc bằng CRLF bất kể hệ điều hành server đang chạy — dùng
+        // Environment.NewLine nghĩa là CSV xuất ra từ container Api chạy Linux (docker-compose.yml, mục
+        // 10b) trước đây sẽ SAI chuẩn thật, không chỉ là lỗi test. Đã sửa: nối cứng "\r\n", không phụ
+        // thuộc platform — cùng nguyên tắc đã áp dụng cho SupportedCurrencies.Format (mục 14.2, không
+        // bao giờ dựa vào giá trị ambient của môi trường chạy để quyết định định dạng output).
+        _builder.Append(string.Join(",", fields.Select(Escape))).Append("\r\n");
         return this;
     }
 

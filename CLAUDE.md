@@ -654,6 +654,21 @@ GET    /groups/{id}/export/balances.csv      Xuất CSV số dư từng người
 > injection kiểu "thêm `'` cho mọi field bắt đầu bằng `=+-@`" là cạm bẫy phổ biến, phải phân biệt field
 > text tự do với field số/enum do server tự sinh. Test: `CsvBuilderTests` (UnitTests).
 
+> ⚠️ **Bug thật thứ 2 phát hiện trong cùng class, lần này qua CI chạy trên GitHub Actions
+> (`ubuntu-latest`) thật lần đầu tiên (2026-09-08 — xem mục 24.6):** `CsvBuilder.AddRow` dùng
+> `StringBuilder.AppendLine(...)`, nối `Environment.NewLine` — `"\r\n"` trên Windows (mọi lần
+> `dotnet test` trước đó đều chạy trên máy dev Windows nên không bao giờ lộ ra) nhưng CHỈ `"\n"` trên
+> Linux. RFC 4180 (chuẩn mà chính class này ghi trong doc comment là tuân theo) **bắt buộc** dòng CSV
+> kết thúc bằng CRLF bất kể hệ điều hành server đang chạy — nghĩa là đây không chỉ là lỗi làm 4 test
+> trong `CsvBuilderTests` fail trên CI, mà là bug thật ảnh hưởng production: container `SplitBill.Api`
+> chạy Linux (`docker-compose.yml`, mục 10b) trước nay vẫn xuất CSV sai chuẩn CRLF cho người dùng thật,
+> chỉ là chưa ai (kể cả bộ test) từng chạy trên môi trường non-Windows để phát hiện ra. Đã sửa: nối
+> cứng `"\r\n"` bằng `Append(...).Append("\r\n")`, không dùng `AppendLine`/`Environment.NewLine` — cùng
+> nguyên tắc "không bao giờ dựa vào giá trị ambient của môi trường chạy để quyết định format output"
+> đã áp dụng cho `SupportedCurrencies.Format` (mục 14.2, cũng từng dính đúng lớp lỗi này với
+> `CultureInfo.CurrentCulture`). Đây là bằng chứng cụ thể cho giá trị của việc thật sự chạy CI trên
+> runner khác OS với máy dev, không chỉ viết workflow rồi tin là đúng.
+
 `PUT /expenses/{expenseId}` và các endpoint ghi vào `Settlement` yêu cầu client gửi kèm `rowVersion` (base64) lấy từ lần đọc gần nhất; server so khớp trước khi ghi, lệch thì trả `409 CONCURRENCY_CONFLICT` (xem 4.3/4.4).
 
 `POST /expenses` request body:
