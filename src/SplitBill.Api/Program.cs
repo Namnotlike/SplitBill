@@ -25,6 +25,7 @@ using SplitBill.Application.Users;
 using SplitBill.Application.VietQr;
 using SplitBill.Infrastructure.Email;
 using SplitBill.Infrastructure.Persistence;
+using SplitBill.Infrastructure.Push;
 using SplitBill.Infrastructure.Persistence.Repositories;
 using SplitBill.Infrastructure.Security;
 
@@ -138,6 +139,7 @@ try
     builder.Services.AddScoped<IExpenseCommentRepository, ExpenseCommentRepository>();
     builder.Services.AddScoped<ISplitPresetRepository, SplitPresetRepository>();
     builder.Services.AddScoped<IGroupTemplateRepository, GroupTemplateRepository>();
+    builder.Services.AddScoped<IPushSubscriptionRepository, PushSubscriptionRepository>();
     builder.Services.AddSingleton<IShareTokenGenerator, ShareTokenGenerator>();
     builder.Services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
 
@@ -166,6 +168,13 @@ try
     {
         builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
     }
+
+    // ===== Web Push (CLAUDE.md mục 25.7) — bí mật VAPID, tính năng tùy chọn. Không fail-fast nếu
+    // thiếu (cùng nguyên tắc GoogleAuthOptions/SmtpOptions): để trống chỉ khiến GetVapidPublicKey()
+    // trả rỗng (client không subscribe được) và NotificationService tự bỏ qua bước gửi push, không
+    // chặn Api chạy.
+    builder.Services.Configure<WebPushOptions>(builder.Configuration.GetSection(WebPushOptions.SectionName));
+    builder.Services.AddSingleton<IWebPushSender, WebPushSender>();
 
     // ===== Application services (thuật toán thuần — có thể singleton) =====
     builder.Services.AddSingleton<IExpenseSplitCalculator, ExpenseSplitCalculator>();

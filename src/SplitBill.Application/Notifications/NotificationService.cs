@@ -14,23 +14,32 @@ namespace SplitBill.Application.Notifications;
 public sealed class NotificationService : INotificationService
 {
     private readonly INotificationRepository _notificationRepository;
+    private readonly IPushSubscriptionRepository _pushSubscriptionRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IEmailSender _emailSender;
+    private readonly IWebPushSender _webPushSender;
     private readonly ILogger<NotificationService> _logger;
     private readonly WebOptions _webOptions;
+    private readonly WebPushOptions _webPushOptions;
 
     public NotificationService(
         INotificationRepository notificationRepository,
+        IPushSubscriptionRepository pushSubscriptionRepository,
         IUnitOfWork unitOfWork,
         IEmailSender emailSender,
+        IWebPushSender webPushSender,
         ILogger<NotificationService> logger,
-        IOptions<WebOptions> webOptions)
+        IOptions<WebOptions> webOptions,
+        IOptions<WebPushOptions> webPushOptions)
     {
         _notificationRepository = notificationRepository;
+        _pushSubscriptionRepository = pushSubscriptionRepository;
         _unitOfWork = unitOfWork;
         _emailSender = emailSender;
+        _webPushSender = webPushSender;
         _logger = logger;
         _webOptions = webOptions.Value;
+        _webPushOptions = webPushOptions.Value;
     }
 
     public async Task NotifyAsync(
@@ -90,6 +99,108 @@ public sealed class NotificationService : INotificationService
                 _logger.LogError(ex, "Không gửi được email thông báo tới {Email}", recipient.Email);
             }
         }
+
+        await SendWebPushAsync(recipients, title, message, linkUrl, cancellationToken);
+    }
+
+    private async Task SendWebPushAsync(
+        IEnumerable<NotificationRecipient> recipients, string title, string message, string? linkUrl, CancellationToken cancellationToken)
+    {
+        // Tính năng tùy chọn (mục 25.7) — chưa cấu hình VAPID thì bỏ qua ngay, không tốn 1 lượt đọc
+        // PushSubscription nào cho mỗi người nhận.
+        if (string.IsNullOrWhiteSpace(_webPushOptions.VapidPublicKey) || string.IsNullOrWhiteSpace(_webPushOptions.VapidPrivateKey))
+        {
+            return;
+        }
+
+        var absoluteUrl = linkUrl is not null && linkUrl.StartsWith('/') && !linkUrl.StartsWith("//", StringComparison.Ordinal)
+            ? _webOptions.BaseUrl.TrimEnd('/') + linkUrl
+            : null;
+
+        foreach (var recipient in recipients)
+        {
+            List<PushSubscription> subscriptions;
+            try
+            {
+                subscriptions = await _pushSubscriptionRepository.GetByUserIdAsync(recipient.UserId, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Không đọc được push subscription cho user {UserId}", recipient.UserId);
+                continue;
+            }
+
+            foreach (var subscription in subscriptions)
+            {
+                try
+                {
+                    await _webPushSender.SendAsync(
+                        new PushSubscriptionTarget(subscription.Endpoint, subscription.P256dhKey, subscription.AuthKey),
+                        title, message, absoluteUrl, cancellationToken);
+                }
+                catch (PushSubscriptionGoneException)
+                {
+                    // Self-heal: subscription hết hạn/bị thu hồi phía trình duyệt/OS là vòng đời BÌNH
+                    // THƯỜNG của Web Push (mục 25.7), không phải sự cố — xóa khỏi DB, không log lỗi.
+                    try
+                    {
+                        await _pushSubscriptionRepository.DeleteAsync(subscription, cancellationToken);
+                        await _unitOfWork.SaveChangesAsync(cancellationToken);
+                    }
+                    catch (Exception cleanupEx)
+                    {
+                        _logger.LogError(cleanupEx, "Không xóa được push subscription hết hạn {Endpoint}", subscription.Endpoint);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Lỗi tạm thời (timeout, 5xx từ push service...) — không xóa subscription, chỉ log,
+                    // không được chặn người nhận/subscription còn lại.
+                    _logger.LogError(ex, "Không gửi được push notification tới subscription {Endpoint}", subscription.Endpoint);
+                }
+            }
+        }
+    }
+
+    public string GetVapidPublicKey() => _webPushOptions.VapidPublicKey;
+
+    public async Task SubscribeToPushAsync(Guid callerUserId, CreatePushSubscriptionRequest request, CancellationToken cancellationToken)
+    {
+        var existing = await _pushSubscriptionRepository.GetByEndpointAsync(request.Endpoint, cancellationToken);
+        if (existing is not null)
+        {
+            // Cùng 1 trình duyệt/thiết bị có thể đã đăng ký trước đó dưới tài khoản khác — lần đăng ký
+            // mới nhất "thắng" (cập nhật UserId + keys), không tạo dòng trùng.
+            existing.UserId = callerUserId;
+            existing.P256dhKey = request.P256dhKey;
+            existing.AuthKey = request.AuthKey;
+        }
+        else
+        {
+            await _pushSubscriptionRepository.AddAsync(new PushSubscription
+            {
+                Id = Guid.NewGuid(),
+                UserId = callerUserId,
+                Endpoint = request.Endpoint,
+                P256dhKey = request.P256dhKey,
+                AuthKey = request.AuthKey,
+                CreatedAt = DateTimeOffset.UtcNow,
+            }, cancellationToken);
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UnsubscribeFromPushAsync(Guid callerUserId, string endpoint, CancellationToken cancellationToken)
+    {
+        var existing = await _pushSubscriptionRepository.GetByEndpointAsync(endpoint, cancellationToken);
+        if (existing is not null && existing.UserId == callerUserId)
+        {
+            await _pushSubscriptionRepository.DeleteAsync(existing, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        // Không tồn tại hoặc thuộc user khác -> coi như đã "hủy đăng ký" thành công (idempotent),
+        // không báo lỗi — xem doc comment INotificationService.UnsubscribeFromPushAsync.
     }
 
     public async Task<PagedResult<NotificationDto>> GetPagedAsync(Guid userId, int page, int pageSize, CancellationToken cancellationToken)

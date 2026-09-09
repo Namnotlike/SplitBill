@@ -16,3 +16,7 @@ public sealed record UnreadCountDto(int Count);
 
 /// <summary>1 người nhận thông báo — luôn là User có tài khoản (CLAUDE.md mục 13).</summary>
 public sealed record NotificationRecipient(Guid UserId, string? Email);
+
+// ===== Web Push (CLAUDE.md mục 25.7) =====
+public sealed record CreatePushSubscriptionRequest(string Endpoint, string P256dhKey, string AuthKey);
+public sealed record VapidPublicKeyDto(string PublicKey);

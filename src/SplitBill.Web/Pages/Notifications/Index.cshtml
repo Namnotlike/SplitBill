@@ -24,6 +24,31 @@
     }
 </div>
 
+@* ===== Web Push (CLAUDE.md mục 25.7) — bổ sung 2026-09-09. Ẩn hẳn nếu server chưa cấu hình VAPID
+   (Model.VapidPublicKey rỗng) hoặc trình duyệt không hỗ trợ (JS tự ẩn thêm 1 lớp nữa qua feature-detect,
+   xem site đoạn script cuối trang) — không hiện nút chắc chắn sẽ lỗi. ===== *@
+@if (!string.IsNullOrEmpty(Model.VapidPublicKey))
+{
+    <div class="card mb-4" id="sb-push-card" hidden data-vapid-public-key="@Model.VapidPublicKey">
+        <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h5 class="card-title mb-1">@Localizer["Thông báo đẩy trình duyệt"]</h5>
+                <p class="text-muted small mb-0">@Localizer["Nhận thông báo ngay cả khi không mở SplitBill — trình duyệt sẽ hỏi quyền trước."]</p>
+            </div>
+            <button type="button" id="sb-push-toggle-btn" class="btn btn-outline-primary">…</button>
+        </div>
+    </div>
+
+    <form method="post" asp-page-handler="SubscribePush" id="sb-push-subscribe-form" hidden>
+        <input type="hidden" name="PushSubscribe.Endpoint" id="sb-push-endpoint" />
+        <input type="hidden" name="PushSubscribe.P256dhKey" id="sb-push-p256dh" />
+        <input type="hidden" name="PushSubscribe.AuthKey" id="sb-push-auth" />
+    </form>
+    <form method="post" asp-page-handler="UnsubscribePush" id="sb-push-unsubscribe-form" hidden>
+        <input type="hidden" name="endpoint" id="sb-push-unsubscribe-endpoint" />
+    </form>
+}
+
 @if (Model.Notifications.Items.Count == 0)
 {
     <div class="card">
@@ -70,4 +95,93 @@ else
     </div>
 
     <p class="text-muted small mt-3">@Localizer["Trang {0} — tổng {1} thông báo.", Model.Notifications.Page, Model.Notifications.TotalCount]</p>
+}
+
+@section Scripts {
+    @if (!string.IsNullOrEmpty(Model.VapidPublicKey))
+    {
+        <script>
+            // Web Push (CLAUDE.md mục 25.7). Cố tình KHÔNG dùng fetch() để gửi subscription lên server
+            // — codebase này luôn dùng <form method="post"> thật (antiforgery token có sẵn, không cần
+            // tự cấu hình header token riêng cho AJAX) — điền hidden input rồi submit form, đúng quy
+            // ước "không fetch()" đã áp dụng nhất quán cho mọi trang tương tác khác trong dự án.
+            (function () {
+                var card = document.getElementById('sb-push-card');
+                var toggleBtn = document.getElementById('sb-push-toggle-btn');
+                if (!card || !toggleBtn) return;
+
+                // Feature-detect: trình duyệt cũ/không hỗ trợ thì ẩn hẳn khối này, không hiện nút chắc
+                // chắn sẽ lỗi khi bấm.
+                if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+                    return;
+                }
+                card.hidden = false;
+
+                function urlBase64ToUint8Array(base64String) {
+                    var padding = '='.repeat((4 - base64String.length % 4) % 4);
+                    var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+                    var rawData = window.atob(base64);
+                    var outputArray = new Uint8Array(rawData.length);
+                    for (var i = 0; i < rawData.length; ++i) {
+                        outputArray[i] = rawData.charCodeAt(i);
+                    }
+                    return outputArray;
+                }
+
+                async function syncButtonState() {
+                    if (Notification.permission === 'denied') {
+                        toggleBtn.textContent = '@Localizer["🔕 Đã chặn (đổi trong cài đặt trình duyệt)"]';
+                        toggleBtn.disabled = true;
+                        return;
+                    }
+                    try {
+                        var registration = await navigator.serviceWorker.ready;
+                        var subscription = await registration.pushManager.getSubscription();
+                        toggleBtn.textContent = subscription ? '@Localizer["🔕 Tắt thông báo đẩy"]' : '@Localizer["🔔 Bật thông báo đẩy"]';
+                        toggleBtn.dataset.subscribed = subscription ? 'true' : 'false';
+                        toggleBtn.dataset.endpoint = subscription ? subscription.endpoint : '';
+                    } catch (e) {
+                        toggleBtn.textContent = '@Localizer["🔔 Bật thông báo đẩy"]';
+                    }
+                }
+
+                toggleBtn.addEventListener('click', async function () {
+                    toggleBtn.disabled = true;
+                    try {
+                        if (toggleBtn.dataset.subscribed === 'true') {
+                            var registration = await navigator.serviceWorker.ready;
+                            var existing = await registration.pushManager.getSubscription();
+                            if (existing) {
+                                await existing.unsubscribe();
+                            }
+                            document.getElementById('sb-push-unsubscribe-endpoint').value = toggleBtn.dataset.endpoint || '';
+                            document.getElementById('sb-push-unsubscribe-form').submit();
+                            return;
+                        }
+
+                        var permission = await Notification.requestPermission();
+                        if (permission !== 'granted') {
+                            toggleBtn.disabled = false;
+                            return;
+                        }
+
+                        var reg = await navigator.serviceWorker.ready;
+                        var sub = await reg.pushManager.subscribe({
+                            userVisibleOnly: true,
+                            applicationServerKey: urlBase64ToUint8Array('@Model.VapidPublicKey'),
+                        });
+                        var json = sub.toJSON();
+                        document.getElementById('sb-push-endpoint').value = json.endpoint;
+                        document.getElementById('sb-push-p256dh').value = json.keys.p256dh;
+                        document.getElementById('sb-push-auth').value = json.keys.auth;
+                        document.getElementById('sb-push-subscribe-form').submit();
+                    } catch (e) {
+                        toggleBtn.disabled = false;
+                    }
+                });
+
+                syncButtonState();
+            })();
+        </script>
+    }
 }

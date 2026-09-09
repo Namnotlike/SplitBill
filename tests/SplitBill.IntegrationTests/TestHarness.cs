@@ -45,6 +45,7 @@ public sealed class TestHarness : IDisposable
     public IGroupTemplateService GroupTemplateService { get; }
     public IUserDashboardService UserDashboardService { get; }
     public FakeEmailSender EmailSender { get; }
+    public FakeWebPushSender WebPushSender { get; }
 
     private TestHarness(SplitBillDbContext dbContext)
     {
@@ -79,8 +80,21 @@ public sealed class TestHarness : IDisposable
         var settlementPlanner = new SocialSettlementPlanner(settlementRanker);
         var notificationRepository = new NotificationRepository(dbContext);
         var recurringExpenseRepository = new RecurringExpenseRepository(dbContext);
+        var pushSubscriptionRepository = new PushSubscriptionRepository(dbContext);
+        // VapidPublicKey/PrivateKey KHÔNG rỗng ở test harness (khác giá trị mặc định rỗng thật ở
+        // appsettings.json) — nếu để rỗng, NotificationService.SendWebPushAsync luôn bỏ qua sớm (mục
+        // 25.7) và mọi test push sẽ "pass giả" vì SentPushes luôn rỗng bất kể logic đúng hay sai.
+        var webPushOptions = Options.Create(new WebPushOptions
+        {
+            VapidPublicKey = "test-vapid-public-key",
+            VapidPrivateKey = "test-vapid-private-key",
+            VapidSubject = "mailto:test@example.com",
+        });
         EmailSender = new FakeEmailSender();
-        NotificationService = new NotificationService(notificationRepository, unitOfWork, EmailSender, NullLogger<NotificationService>.Instance, webOptions);
+        WebPushSender = new FakeWebPushSender();
+        NotificationService = new NotificationService(
+            notificationRepository, pushSubscriptionRepository, unitOfWork, EmailSender, WebPushSender,
+            NullLogger<NotificationService>.Instance, webOptions, webPushOptions);
 
         AuthService = new AuthService(
             userRepository, refreshTokenRepository, passwordResetTokenRepository, unitOfWork,

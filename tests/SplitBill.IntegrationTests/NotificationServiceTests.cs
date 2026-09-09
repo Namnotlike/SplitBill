@@ -169,4 +169,99 @@ public sealed class NotificationServiceTests
         page.Items[0].Title.Should().Be("Sau cung");
         page.Items[1].Title.Should().Be("Dau tien");
     }
+
+    // ===== Web Push (CLAUDE.md mục 25.7) =====
+
+    [Fact]
+    public async Task SubscribeToPushAsync_ThenNotifyAsync_SendsPushWithAbsoluteUrl()
+    {
+        using var harness = TestHarness.Create();
+        var userId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        await harness.NotificationService.SubscribeToPushAsync(
+            userId, new CreatePushSubscriptionRequest("https://push.example/ep1", "p256dh-key", "auth-key"), CancellationToken.None);
+        var groupId = Guid.NewGuid();
+
+        await harness.NotificationService.NotifyAsync(
+            [new NotificationRecipient(userId, null)], groupId, "ExpenseCreated", "Tieu de", "Noi dung", "/Expenses/Index/abc", CancellationToken.None);
+
+        var sent = harness.WebPushSender.SentPushes.Should().ContainSingle().Which;
+        sent.Endpoint.Should().Be("https://push.example/ep1");
+        sent.Title.Should().Be("Tieu de");
+        sent.Body.Should().Be("Noi dung");
+        sent.Url.Should().Be("http://localhost:5103/Expenses/Index/abc"); // cùng quy tắc URL tuyệt đối như email (WebOptions)
+    }
+
+    [Fact]
+    public async Task SubscribeToPushAsync_SameEndpointTwice_UpsertsInsteadOfDuplicating()
+    {
+        using var harness = TestHarness.Create();
+        var userId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        await harness.NotificationService.SubscribeToPushAsync(
+            userId, new CreatePushSubscriptionRequest("https://push.example/ep1", "old-key", "old-auth"), CancellationToken.None);
+        await harness.NotificationService.SubscribeToPushAsync(
+            userId, new CreatePushSubscriptionRequest("https://push.example/ep1", "new-key", "new-auth"), CancellationToken.None);
+        var groupId = Guid.NewGuid();
+
+        await harness.NotificationService.NotifyAsync(
+            [new NotificationRecipient(userId, null)], groupId, "ExpenseCreated", "T", "M", null, CancellationToken.None);
+
+        harness.WebPushSender.SentPushes.Should().ContainSingle(); // không gửi trùng 2 lần cho 1 endpoint
+    }
+
+    [Fact]
+    public async Task NotifyAsync_SubscriptionGone_SelfHeals_RemovesSubscriptionFromDb()
+    {
+        using var harness = TestHarness.Create();
+        var userId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        await harness.NotificationService.SubscribeToPushAsync(
+            userId, new CreatePushSubscriptionRequest("https://push.example/gone", "k", "a"), CancellationToken.None);
+        harness.WebPushSender.ThrowGoneForEndpoint = "https://push.example/gone";
+        var groupId = Guid.NewGuid();
+
+        // Không throw ra ngoài dù push service báo subscription hết hạn — đây là vòng đời bình thường.
+        var act = () => harness.NotificationService.NotifyAsync(
+            [new NotificationRecipient(userId, null)], groupId, "ExpenseCreated", "T", "M", null, CancellationToken.None);
+        await act.Should().NotThrowAsync();
+
+        // Self-heal: gọi lần 2 (Gone tắt đi) không còn subscription nào để gửi nữa -> xác nhận đã xóa khỏi DB.
+        harness.WebPushSender.ThrowGoneForEndpoint = null;
+        await harness.NotificationService.NotifyAsync(
+            [new NotificationRecipient(userId, null)], groupId, "ExpenseCreated", "T2", "M2", null, CancellationToken.None);
+        harness.WebPushSender.SentPushes.Should().BeEmpty(); // subscription đã bị xóa, không còn gì để gửi
+    }
+
+    [Fact]
+    public async Task UnsubscribeFromPushAsync_RemovesSubscription_NoLongerReceivesPush()
+    {
+        using var harness = TestHarness.Create();
+        var userId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        await harness.NotificationService.SubscribeToPushAsync(
+            userId, new CreatePushSubscriptionRequest("https://push.example/ep1", "k", "a"), CancellationToken.None);
+
+        await harness.NotificationService.UnsubscribeFromPushAsync(userId, "https://push.example/ep1", CancellationToken.None);
+
+        var groupId = Guid.NewGuid();
+        await harness.NotificationService.NotifyAsync(
+            [new NotificationRecipient(userId, null)], groupId, "ExpenseCreated", "T", "M", null, CancellationToken.None);
+        harness.WebPushSender.SentPushes.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task UnsubscribeFromPushAsync_ByOtherUser_DoesNothing_Idempotent()
+    {
+        using var harness = TestHarness.Create();
+        var owner = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var stranger = await harness.RegisterUserAsync("b@example.com", "La");
+        await harness.NotificationService.SubscribeToPushAsync(
+            owner, new CreatePushSubscriptionRequest("https://push.example/ep1", "k", "a"), CancellationToken.None);
+
+        // Không ném lỗi dù endpoint thuộc người khác — idempotent theo thiết kế (xem doc comment).
+        var act = () => harness.NotificationService.UnsubscribeFromPushAsync(stranger, "https://push.example/ep1", CancellationToken.None);
+        await act.Should().NotThrowAsync();
+
+        var groupId = Guid.NewGuid();
+        await harness.NotificationService.NotifyAsync(
+            [new NotificationRecipient(owner, null)], groupId, "ExpenseCreated", "T", "M", null, CancellationToken.None);
+        harness.WebPushSender.SentPushes.Should().ContainSingle(); // subscription của owner vẫn còn nguyên
+    }
 }

@@ -75,3 +75,47 @@ self.addEventListener('fetch', event => {
 
     // Mọi request GET khác (API gọi từ trình duyệt nếu có, ảnh hóa đơn...) — network-only, không cache.
 });
+
+// ===== Web Push (CLAUDE.md mục 25.7, bổ sung 2026-09-09) =====
+// Payload luôn là JSON { title, body, url } do NotificationService dựng ở server (mục 25.7) — không
+// bao giờ tự tin dữ liệu payload (có thể thiếu/lỗi nếu push service giao sai định dạng), nên bọc
+// try/catch quanh JSON.parse và luôn có fallback hợp lý.
+self.addEventListener('push', event => {
+    var data = { title: 'SplitBill', body: 'Bạn có thông báo mới.', url: '/' };
+    if (event.data) {
+        try {
+            var parsed = event.data.json();
+            data.title = parsed.title || data.title;
+            data.body = parsed.body || data.body;
+            data.url = parsed.url || data.url;
+        } catch (e) { /* payload không phải JSON hợp lệ — giữ nguyên fallback trung lập */ }
+    }
+
+    event.waitUntil(
+        self.registration.showNotification(data.title, {
+            body: data.body,
+            icon: '/icons/icon-192.png',
+            data: { url: data.url },
+        })
+    );
+});
+
+self.addEventListener('notificationclick', event => {
+    event.notification.close();
+    var url = (event.notification.data && event.notification.data.url) || '/';
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+            // Nếu đã có tab SplitBill đang mở, focus tab đó thay vì mở tab mới trùng lặp.
+            for (var i = 0; i < clientList.length; i++) {
+                var client = clientList[i];
+                if (client.url.indexOf(self.location.origin) === 0 && 'focus' in client) {
+                    client.navigate(url);
+                    return client.focus();
+                }
+            }
+            if (self.clients.openWindow) {
+                return self.clients.openWindow(url);
+            }
+        })
+    );
+});

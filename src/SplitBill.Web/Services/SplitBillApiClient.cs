@@ -311,6 +311,16 @@ public sealed class SplitBillApiClient
     public Task MarkAllNotificationsAsReadAsync(CancellationToken ct) =>
         PostNoContentAsync("notifications/read-all", new { }, ct);
 
+    // ===== Web Push (CLAUDE.md mục 25.7) =====
+    public Task<VapidPublicKeyDto> GetVapidPublicKeyAsync(CancellationToken ct) =>
+        GetAsync<VapidPublicKeyDto>("users/me/push-vapid-public-key", ct);
+
+    public Task SubscribeToPushAsync(CreatePushSubscriptionRequest request, CancellationToken ct) =>
+        PostNoContentAsync("users/me/push-subscriptions", request, ct);
+
+    public Task UnsubscribeFromPushAsync(string endpoint, CancellationToken ct) =>
+        DeleteAsync($"users/me/push-subscriptions?endpoint={Uri.EscapeDataString(endpoint)}", ct);
+
     // ===== Helpers =====
     private async Task<TResponse> GetAsync<TResponse>(string path, CancellationToken ct)
     {

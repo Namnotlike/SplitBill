@@ -36,6 +36,7 @@ Bài toán cốt lõi: nhiều người cùng ứng tiền cho nhiều khoản c
 | API docs | Swashbuckle (Swagger) |
 | Password hashing | `Microsoft.AspNetCore.Identity.PasswordHasher<User>` (chỉ dùng riêng class hasher, KHÔNG cài toàn bộ ASP.NET Core Identity/EF Identity) |
 | Gửi email | MailKit (bổ sung 2026-09-05, quyết định người dùng — xem mục 13.3) |
+| Web Push | `WebPush` 1.0.13 (bổ sung 2026-09-09, quyết định người dùng — xem mục 25.7) |
 
 Không thêm thư viện NuGet nào ngoài danh sách trên nếu chưa hỏi người dùng.
 
@@ -2309,7 +2310,8 @@ Tiến độ: 1. Khôi phục khoản chi/thanh toán đã xóa — đã làm (m
 3. Đăng nhập bằng Google — đã làm (mục 25.3, người dùng đã đồng ý thêm
 `Microsoft.AspNetCore.Authentication.Google`). 4. Xuất/backup dữ liệu nhóm dạng JSON — đã làm (mục
 25.4, không cần NuGet mới). 5. Dashboard cá nhân nâng cao — đã làm (mục 25.5, không cần NuGet mới).
-6. Mẫu nhóm tái sử dụng — đã làm (mục 25.6, không cần NuGet mới).
+6. Mẫu nhóm tái sử dụng — đã làm (mục 25.6, không cần NuGet mới). 7. Thông báo đẩy trình duyệt (Web
+Push) — đã làm (mục 25.7, người dùng đã đồng ý thêm package `WebPush`).
 
 ### 25.1 Khôi phục khoản chi/thanh toán đã xóa (hạng mục 1/9)
 
@@ -2756,3 +2758,119 @@ không có cấu trúc lồng nhau nào cần JS động.
 `DeleteAsync_TemplateStillDeletedAfterSourceGroupDeleted_UnrelatedToAnyGroupLifecycle`,
 `DeleteAsync_ByOwner_RemovesFromList`, `DeleteAsync_ByOtherUser_ThrowsGroupTemplateNotFound`,
 `CreateGroupFromTemplateAsync_ByOtherUser_ThrowsGroupTemplateNotFound` (`GroupTemplateServiceTests`)).
+
+### 25.7 Thông báo đẩy trình duyệt — Web Push (hạng mục 7/9)
+
+Hạng mục thứ 2 trong danh sách mục 25 cần thêm NuGet package — đã hỏi lại người dùng trước khi thêm
+(đúng CLAUDE.md mục 2, cùng tinh thần Google OAuth mục 25.3). Người dùng đồng ý thêm gói `WebPush`
+1.0.13 (thư viện ký VAPID + mã hóa payload theo chuẩn Web Push, RFC 8291/8292 — namespace `WebPush`,
+class `WebPushClient`/`VapidHelper`/`VapidDetails`).
+
+**Đây là kênh thông báo THỨ 3**, cạnh in-app (DB) + email (mục 13) — dùng CHUNG đúng 4 sự kiện kích
+hoạt đã chốt ở mục 13 ("không hơn, không tự ý thêm"), không thêm sự kiện mới nào. `NotificationService.
+NotifyAsync` (đã có sẵn từ mục 13.5) mở rộng thêm bước thứ 3 sau email: với mỗi người nhận, đọc mọi
+`PushSubscription` của họ, gọi `IWebPushSender.SendAsync` cho từng cái, bọc try/catch KHÔNG BAO GIỜ
+throw ra ngoài — đúng nguyên tắc "lỗi gửi thông báo phụ không được làm hỏng thao tác chính" đã áp dụng
+cho email.
+
+**Mô hình dữ liệu**: `PushSubscription { Id, UserId, Endpoint, P256dhKey, AuthKey, CreatedAt }` — 1
+dòng cho mỗi (trình duyệt, thiết bị) đã bấm "Bật thông báo đẩy". `Endpoint` (URL do chính push service
+của trình duyệt cấp) KHÔNG unique theo `UserId` — cùng 1 trình duyệt có thể lần lượt đăng nhập bởi
+nhiều tài khoản, đăng ký lại thì `UserId` được cập nhật sang tài khoản mới nhất (upsert theo
+`Endpoint`, xem `NotificationService.SubscribeToPushAsync`). Migration `AddPushSubscription`.
+
+> ⚠️ **Quyết định kỹ thuật — KHÔNG đặt unique index trên `Endpoint` ở tầng DB**: URL push service có
+> thể dài hơn giới hạn mặc định của SQL Server cho non-clustered index key (900 byte); rủi ro migration
+> thất bại nếu 1 endpoint thật sự dài vượt ngưỡng đó không đáng để đánh đổi lấy 1 ràng buộc mà tầng
+> Application đã tự đảm bảo đúng qua "check rồi ghi" (`GetByEndpointAsync` trước khi `AddAsync`/update)
+> — chấp nhận về mặt lý thuyết có race condition nếu 2 request trùng `Endpoint` đến CÙNG lúc (không
+> thực tế: 1 trình duyệt chỉ tự gọi subscribe 1 lần cho 1 hành động bấm nút của người dùng).
+
+**Kiến trúc — giữ đúng ranh giới Application/Infrastructure**: `IWebPushSender`/`PushSubscriptionTarget`
+(DTO thuần, KHÔNG phải Domain entity)/`PushSubscriptionGoneException` nằm ở `SplitBill.Application.
+Notifications` — Application layer không bao giờ tham chiếu thư viện `WebPush`. `WebPushSender`
+(implementation thật) nằm ở `SplitBill.Infrastructure.Push` — namespace CỐ Ý không đặt tên trùng
+`WebPush` (namespace của thư viện) để tránh bị chính namespace bao quanh che khuất `using WebPush;`
+(C# ưu tiên namespace lồng gần hơn `using`), phải viết `global::WebPush.X` ở mọi chỗ nếu đặt trùng tên
+— đổi tên namespace tránh hẳn vấn đề, không cần alias từng type. Domain entity `PushSubscription` và
+type `WebPush.PushSubscription` của thư viện CÙNG TÊN nhưng khác namespace — file `WebPushSender.cs`
+không bao giờ tham chiếu Domain entity (chỉ nhận `PushSubscriptionTarget`), nên không có xung đột thật
+nào xảy ra, chỉ cần biết tên trùng để không nhầm lẫn khi đọc code sau này.
+
+**Self-heal**: `WebPushException` với `StatusCode` 404/410 (push service xác nhận subscription
+không còn tồn tại — người dùng gỡ app/xóa dữ liệu trình duyệt/thu hồi quyền, vòng đời BÌNH THƯỜNG của
+Web Push, không phải sự cố) được `WebPushSender` chuyển thành `PushSubscriptionGoneException` riêng;
+`NotificationService` bắt đúng loại này để tự xóa `PushSubscription` khỏi DB, khác các lỗi tạm thời
+khác (timeout, 5xx) chỉ log và giữ nguyên subscription để thử lại ở thông báo kế tiếp.
+
+**API** (`UsersController`, cùng chỗ 3 API cá nhân khác — mục 15.4/20/25.5):
+```
+GET    /api/v1/users/me/push-vapid-public-key     Rỗng nếu chưa cấu hình VAPID (tính năng tùy chọn)
+POST   /api/v1/users/me/push-subscriptions          Body: { endpoint, p256dhKey, authKey }
+DELETE /api/v1/users/me/push-subscriptions           Query: ?endpoint=... (idempotent, không báo lỗi
+                                                      nếu không tồn tại/thuộc user khác)
+```
+
+**Web**: khối "🔔 Thông báo đẩy trình duyệt" trên `Notifications/Index.cshtml` — 1 nút duy nhất đổi
+nhãn/hành vi theo trạng thái subscribe THẬT của trình duyệt (đọc qua `registration.pushManager.
+getSubscription()` lúc tải trang, không dựa vào cờ nào lưu server). Cố tình **KHÔNG dùng `fetch()`** để
+gửi subscription lên server — toàn bộ codebase này luôn dùng `<form method="post">` thật (antiforgery
+token có sẵn tự động, không cần tự cấu hình header token riêng cho AJAX như `fetch()` sẽ cần) — JS chỉ
+lo phần BẮT BUỘC phải chạy client-side (`Notification.requestPermission()`, `PushManager.subscribe()`),
+rồi điền hidden input và `form.submit()`, giữ đúng quy ước "không fetch()" nhất quán của toàn dự án.
+
+> ⚠️ **Bẫy tái diễn đúng lớp lỗi đã ghi ở mục 25.2 — phát hiện + sửa TRƯỚC KHI build/test, không phải
+> qua lỗi runtime thật**: lần viết đầu tiên gắn `[Required]` lên cả 3 field của
+> `IndexModel.PushSubscribeInput` (1 `[BindProperty]` mới trên `Notifications/Index.cshtml.cs`, trang
+> vốn đã có sẵn 3 handler khác — `MarkRead`/`MarkAllRead`/`UnsubscribePush`). Vì `[BindProperty]` áp
+> dụng validation cho MỌI POST của page bất kể handler nào thực sự chạy, submit 1 trong 3 form kia sẽ
+> để `PushSubscribe.*` ở giá trị mặc định rỗng và luôn fail `[Required]`. May mắn là cả 4 handler hiện
+> tại đều KHÔNG kiểm tra `ModelState.IsValid` nên chưa gây lỗi thật ngay lúc này — nhưng đây là bẫy tiềm
+> ẩn cho bất kỳ ai sau này thêm 1 dòng `if (!ModelState.IsValid) return Page();` vào 1 trong 3 handler
+> kia. Đã sửa PHÒNG NGỪA trước: bỏ hẳn `[Required]`, validate thủ công bằng `string.IsNullOrWhiteSpace`
+> ngay trong `OnPostSubscribePushAsync`, không dựa vào `ModelState.IsValid` toàn trang — đúng mẫu đã
+> chốt ở mục 25.2 cho đúng lớp bẫy này.
+
+**Service Worker** (`wwwroot/service-worker.js`) thêm 2 listener mới, THUẦN CỘNG THÊM — không đụng gì
+tới chiến lược cache tĩnh/network-only đã có (mục 23.1), không cần bump `CACHE_NAME`:
+- `push`: parse payload JSON `{ title, body, url }` (bọc try/catch, fallback trung lập nếu payload
+  thiếu/lỗi định dạng — không bao giờ tin tưởng dữ liệu từ push service), gọi
+  `self.registration.showNotification(...)`.
+- `notificationclick`: focus tab SplitBill đang mở (nếu có) và điều hướng tới đúng URL, hoặc mở tab
+  mới — không bao giờ mở trùng nhiều tab cho cùng 1 lần bấm thông báo.
+
+**Sinh cặp khóa VAPID cho dev/test**: không có endpoint API nào lộ ra để tự sinh khóa (rủi ro bảo mật
+không cần thiết) — dùng `WebPush.VapidHelper.GenerateVapidKeys()` qua 1 script console throwaway (cùng
+mẫu script Python sinh icon PWA ở mục 23.2 — không lưu lại trong repo), rồi cấu hình qua
+`dotnet user-secrets set "WebPush:VapidPublicKey/VapidPrivateKey/VapidSubject"` như mọi bí mật khác
+(`Jwt:SigningKey`, `GoogleAuth:InternalSecret`).
+
+Đã verify sống đầy đủ, kể cả gọi THẬT tới push service của Google (FCM) qua network thật, không chỉ
+`dotnet test` (vốn dùng `FakeWebPushSender`, không đi qua mạng): sinh 1 cặp khóa VAPID thật, cấu hình
+qua user-secrets, khởi động Api+Web thật → `GET /users/me/push-vapid-public-key` trả đúng public key
+vừa sinh → `POST /users/me/push-subscriptions` với 1 endpoint FCM giả (không phải subscription thật,
+vì không có trình duyệt thật để lấy) → trigger sự kiện "Được thêm vào nhóm mới" (mục 13, thêm thành
+viên bằng `UserId`) → log Api xác nhận `WebPushSender` ĐÃ THẬT SỰ gọi ra `fcm.googleapis.com` (không
+throw lỗi chưa xử lý — không có dòng `ERR]` nào), FCM trả về lỗi đúng như dự đoán cho endpoint giả (404/
+410-equivalent) → `NotificationService` tự self-heal xóa `PushSubscription` (xác nhận qua log
+`DELETE FROM [PushSubscriptions]`) → in-app notification + email vẫn ghi nhận đầy đủ, không bị ảnh
+hưởng bởi lỗi push (đúng thiết kế "kênh phụ không chặn kênh chính"); test lại `POST`/`DELETE` subscribe/
+unsubscribe qua API trực tiếp → cả 2 đều `204`; trang `Notifications/Index` (qua cookie đăng nhập thật,
+không chỉ gọi thẳng Api) render đúng `data-vapid-public-key` với public key thật, đủ 3 phần tử UI
+(`sb-push-toggle-btn`/`sb-push-subscribe-form`/`sb-push-unsubscribe-form`); `service-worker.js` phục vụ
+qua Web xác nhận có đủ 2 listener `push`/`notificationclick` mới.
+
+**Chưa verify được** (giới hạn thành thật, giống mục 25.6): không có kết nối Chrome extension trong
+phiên này nên không click-through được nút "Bật thông báo đẩy" bằng trình duyệt thật để xác nhận
+`Notification.requestPermission()`/`PushManager.subscribe()` chạy đúng và popup xin quyền hiện ra —
+phần JS phía trình duyệt (client-side subscribe flow) mới chỉ được xác nhận đúng bằng đọc code + verify
+HTML/service-worker render đúng, chưa phải click thật. Cần verify sống bổ sung khi có trình duyệt thật
+(của người dùng, hoặc lần sau có Chrome extension) trước khi coi tính năng này đã kiểm chứng đầy đủ
+100%.
+
+`dotnet build`: 0 warning, 0 error. `dotnet test`: **282/282 pass** (74 unit + 25 web + 179 integration
++ 4 E2E — 5 test integration mới: `SubscribeToPushAsync_ThenNotifyAsync_SendsPushWithAbsoluteUrl`,
+`SubscribeToPushAsync_SameEndpointTwice_UpsertsInsteadOfDuplicating`,
+`NotifyAsync_SubscriptionGone_SelfHeals_RemovesSubscriptionFromDb`,
+`UnsubscribeFromPushAsync_RemovesSubscription_NoLongerReceivesPush`,
+`UnsubscribeFromPushAsync_ByOtherUser_DoesNothing_Idempotent` (`NotificationServiceTests`)).
