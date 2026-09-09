@@ -2308,7 +2308,7 @@ trước khi thêm dependency, đúng CLAUDE.md mục 2 — "Làm hết" chỉ p
 Tiến độ: 1. Khôi phục khoản chi/thanh toán đã xóa — đã làm (mục 25.1). 2. Miễn nợ — đã làm (mục 25.2).
 3. Đăng nhập bằng Google — đã làm (mục 25.3, người dùng đã đồng ý thêm
 `Microsoft.AspNetCore.Authentication.Google`). 4. Xuất/backup dữ liệu nhóm dạng JSON — đã làm (mục
-25.4, không cần NuGet mới).
+25.4, không cần NuGet mới). 5. Dashboard cá nhân nâng cao — đã làm (mục 25.5, không cần NuGet mới).
 
 ### 25.1 Khôi phục khoản chi/thanh toán đã xóa (hạng mục 1/9)
 
@@ -2639,3 +2639,52 @@ xác với kết quả `curl` trực tiếp trước đó.
 `ExportGroupBackupAsync_IncludesGroupMembersExpensesAndSettlements`,
 `ExportGroupBackupAsync_CallerNotMember_ThrowsMemberNotInGroup`,
 `ExportGroupBackupAsync_CallerLeftGroup_ThrowsMemberNotInGroup` (`ExportServiceTests`)).
+
+### 25.5 Dashboard cá nhân nâng cao (hạng mục 5/9)
+
+Không cần NuGet mới. Khác 2 widget "cá nhân" đã có ở trang chủ — "Tổng quan số dư" (mục 15.4, số dư
+từng nhóm) và "Ai đang nợ tôi" (mục 20, nợ gộp xuyên nhóm) — cả 2 đều trả lời câu hỏi "tôi đang đứng ở
+đâu về tiền bạc". Dashboard mới này trả lời 2 câu khác hẳn: **"có gì cần tôi xử lý ngay"** (settlement
+đang chờ mình xác nhận — hành động cụ thể, không phải chỉ để xem) và **"gần đây có gì mới xuyên mọi
+nhóm"** (hoạt động gộp từ Timeline từng nhóm, mục 15.5) — 2 mảnh thông tin mà 2 widget kia hoàn toàn
+không cung cấp.
+
+**Kiến trúc**: `UserDashboardService` (namespace `SplitBill.Application.Users`, service riêng — không
+nhét vào `BalanceService` dù đó là nơi 2 widget kia đang sống, vì phạm vi rộng hơn "balance": cần cả
+`Settlement`/`AuditLog`, không chỉ số dư) — **không viết lại logic đọc dữ liệu nào mới**, thuần
+orchestrate 3 service/repo đã có sẵn, cùng mẫu vòng lặp `IGroupRepository.GetByUserIdAsync` đã dùng ở
+`BalanceService.GetCounterpartyBalancesAsync` (mục 20):
+- `IExpenseService.GetAllForExportAsync` (đã có cho CSV/JSON export, mục 8/25.4) → đếm khoản chi có
+  `OccurredAt` rơi vào tháng/năm hiện tại (UTC).
+- `ISettlementRecordService.GetByGroupAsync` (đã có cho trang Web Settlements) → lọc
+  `Status == "Pending" && ToMemberId == callerMember.Id` (đúng người phải xác nhận/từ chối, theo luật
+  "người NHẬN xác nhận" ở mục 8 — không phải `FromMemberId`, vì đó là việc của người khác).
+- `IGroupService.GetAuditLogsAsync` (đã có cho Timeline, mục 15.5, đã dựng sẵn `Summary` tiếng Việt) →
+  lấy 5 dòng mới nhất/nhóm, gộp lại rồi chỉ giữ 10 dòng mới nhất trên TOÀN BỘ các nhóm.
+
+Không lưu bất kỳ số liệu tổng hợp nào vào DB (đúng nguyên tắc mục 1) — mọi con số tính lại từ đầu mỗi
+lần gọi API, giống hệt các widget cá nhân khác đã có.
+
+**API**: `GET /api/v1/users/me/dashboard` (đặt trong `UsersController`, cùng chỗ 2 API cá nhân kia).
+**Web**: thêm 1 khối "Dashboard cá nhân" trên `Pages/Index.cshtml`, giữa 2 widget cũ và hàng thẻ tính
+năng — 3 số liệu nhanh (số nhóm, số khoản chi tháng này, số settlement chờ xác nhận) + 2 danh sách con
+(chỉ hiện khi có nội dung, cùng nguyên tắc 2 widget cũ). `IndexModel.OnGetAsync` gọi API mới trong
+đúng khối try/catch bắt cả `ApiException` lẫn `HttpRequestException` (mục 23.4) — lỗi gọi API chỉ ẩn
+lặng lẽ widget này, không chặn phần còn lại trang chủ; `Dashboard` là `PersonalDashboardDto?` (null,
+không phải rỗng) để view phân biệt được "chưa tải xong/lỗi" với "đã tải, không có gì cần chú ý".
+
+Đã verify sống đầy đủ, không chỉ `dotnet test`: dùng lại đúng tài khoản + nhóm đã tạo lúc verify mục
+25.4 (1 nhóm, 1 khoản chi tháng này, 1 settlement Pending mà tài khoản này là người nhận) → `curl`
+thẳng `/users/me/dashboard` → đúng `totalActiveGroups=1`, `expensesThisMonth=1`, 1 dòng
+`pendingSettlementsToConfirm` (Guest Friend, 50.000đ), 4 dòng `recentActivity` đúng thứ tự mới nhất
+trước; đăng nhập trình duyệt thật, tải trang chủ → khối "Dashboard cá nhân" hiện ĐÚNG same y hệt dữ
+liệu trên (3 số liệu, danh sách "Cần bạn xác nhận" và "Hoạt động gần đây" đúng nội dung tiếng Việt),
+không có lỗi console nào.
+
+`dotnet build`: 0 warning, 0 error. `dotnet test`: **269/269 pass** (74 unit + 25 web + 166 integration
++ 4 E2E — 4 test integration mới: `GetDashboardAsync_CountsActiveGroupsAndExpensesThisMonth`,
+`GetDashboardAsync_OnlyIncludesSettlementsWhereCallerIsCreditor`,
+`GetDashboardAsync_IncludesRecentActivityAcrossGroups_NewestFirst`,
+`GetDashboardAsync_UserWithNoGroups_ReturnsEmptyDashboard` (`UserDashboardServiceTests`) — Web.Tests
+không tăng số lượng, chỉ mở rộng 2 test sẵn có trong `IndexModelTests` thêm assertion cho
+`Dashboard.Should().BeNull()`).

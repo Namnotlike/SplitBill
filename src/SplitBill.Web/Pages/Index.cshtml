@@ -88,6 +88,62 @@
     </div>
 }
 
+@* ===== Dashboard cá nhân nâng cao (CLAUDE.md mục 25.5) — bổ sung 2026-09-09. Khác 2 widget trên: trả
+   lời "có gì cần tôi xử lý ngay" (settlement đang chờ mình xác nhận) và "gần đây có gì mới xuyên mọi
+   nhóm" (hoạt động gộp từ Timeline từng nhóm), không phải số dư. ===== *@
+@if (User.Identity?.IsAuthenticated == true && Model.Dashboard is { TotalActiveGroups: > 0 } dashboard)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title mb-3">@Localizer["Dashboard cá nhân"]</h5>
+            <div class="row g-3 mb-3">
+                <div class="col-4">
+                    <div class="text-muted small">@Localizer["Nhóm đang tham gia"]</div>
+                    <div class="fs-4 fw-700">@dashboard.TotalActiveGroups</div>
+                </div>
+                <div class="col-4">
+                    <div class="text-muted small">@Localizer["Khoản chi tháng này"]</div>
+                    <div class="fs-4 fw-700">@dashboard.ExpensesThisMonth</div>
+                </div>
+                <div class="col-4">
+                    <div class="text-muted small">@Localizer["Chờ bạn xác nhận"]</div>
+                    <div class="fs-4 fw-700">@dashboard.PendingSettlementsToConfirm.Count</div>
+                </div>
+            </div>
+
+            @if (dashboard.PendingSettlementsToConfirm.Count > 0)
+            {
+                <h6>@Localizer["Cần bạn xác nhận"]</h6>
+                <ul class="list-unstyled mb-3">
+                    @foreach (var s in dashboard.PendingSettlementsToConfirm)
+                    {
+                        <li class="d-flex justify-content-between small mb-1">
+                            <a asp-page="/Groups/SettlementPlan" asp-route-id="@s.GroupId" class="text-muted text-decoration-none">
+                                @s.FromMemberName → @s.GroupName
+                            </a>
+                            <span class="fw-600">@SupportedCurrencies.Format(s.Amount, s.Currency)</span>
+                        </li>
+                    }
+                </ul>
+            }
+
+            @if (dashboard.RecentActivity.Count > 0)
+            {
+                <h6>@Localizer["Hoạt động gần đây"]</h6>
+                <ul class="list-unstyled mb-0">
+                    @foreach (var a in dashboard.RecentActivity)
+                    {
+                        <li class="small text-muted mb-1">
+                            <a asp-page="/Groups/Timeline" asp-route-id="@a.GroupId" class="text-decoration-none">@a.GroupName</a>
+                            — @a.Summary
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+}
+
 <div class="row g-4 mt-2">
     <div class="col-md-4">
         <div class="card h-100">

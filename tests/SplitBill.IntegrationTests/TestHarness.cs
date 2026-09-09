@@ -42,6 +42,7 @@ public sealed class TestHarness : IDisposable
     public IDebtReminderRunner DebtReminderRunner { get; }
     public IExpenseCommentService ExpenseCommentService { get; }
     public ISplitPresetService SplitPresetService { get; }
+    public IUserDashboardService UserDashboardService { get; }
     public FakeEmailSender EmailSender { get; }
 
     private TestHarness(SplitBillDbContext dbContext)
@@ -92,6 +93,7 @@ public sealed class TestHarness : IDisposable
         BalanceService = new BalanceService(groupRepository, expenseRepository, settlementRepository, balanceCalculator, vietQrGenerator, settlementPlanner);
         SettlementRecordService = new SettlementRecordService(groupRepository, settlementRepository, auditLogRepository, unitOfWork, NotificationService);
         ExportService = new ExportService(ExpenseService, GroupService, BalanceService, SettlementRecordService);
+        UserDashboardService = new UserDashboardService(groupRepository, GroupService, ExpenseService, SettlementRecordService);
         RecurringExpenseService = new RecurringExpenseService(recurringExpenseRepository, groupRepository, splitCalculator, unitOfWork);
         RecurringExpenseRunner = new RecurringExpenseRunner(
             recurringExpenseRepository, groupRepository, expenseRepository, auditLogRepository,

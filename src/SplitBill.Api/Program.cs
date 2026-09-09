@@ -176,6 +176,7 @@ try
     // ===== Application services (nghiệp vụ) =====
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<IUserService, UserService>();
+    builder.Services.AddScoped<IUserDashboardService, UserDashboardService>();
     builder.Services.AddScoped<IGroupService, GroupService>();
     builder.Services.AddScoped<IExpenseService, ExpenseService>();
     builder.Services.AddScoped<IBalanceService, BalanceService>();

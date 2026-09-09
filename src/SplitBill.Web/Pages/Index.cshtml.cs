@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using SplitBill.Application.Settlements;
+using SplitBill.Application.Users;
 using SplitBill.Web.Services;
 
 namespace SplitBill.Web.Pages;
@@ -19,6 +20,11 @@ public class IndexModel : PageModel
 
     // "Ai đang nợ tôi" xuyên nhóm (CLAUDE.md mục 20) — cùng nguyên tắc chịu lỗi im lặng như trên.
     public IReadOnlyList<CounterpartyBalanceDto> CounterpartyBalances { get; set; } = Array.Empty<CounterpartyBalanceDto>();
+
+    // Dashboard cá nhân nâng cao (CLAUDE.md mục 25.5) — cùng nguyên tắc chịu lỗi im lặng như 2 widget
+    // trên. Null (không phải rỗng) khi chưa tải được, để view phân biệt được "chưa tải xong/lỗi" với
+    // "đã tải, không có gì cần chú ý" (0 nhóm, 0 settlement chờ...).
+    public PersonalDashboardDto? Dashboard { get; set; }
 
     public async Task OnGetAsync(CancellationToken cancellationToken)
     {
@@ -43,6 +49,14 @@ public class IndexModel : PageModel
         try
         {
             CounterpartyBalances = await _apiClient.GetMyCounterpartyBalancesAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is ApiException or HttpRequestException)
+        {
+        }
+
+        try
+        {
+            Dashboard = await _apiClient.GetMyDashboardAsync(cancellationToken);
         }
         catch (Exception ex) when (ex is ApiException or HttpRequestException)
         {

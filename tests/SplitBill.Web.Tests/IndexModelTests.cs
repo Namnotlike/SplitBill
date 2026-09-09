@@ -47,6 +47,9 @@ public sealed class IndexModelTests
         await act.Should().NotThrowAsync();
         model.MyOverview.Should().BeEmpty();
         model.CounterpartyBalances.Should().BeEmpty();
+        // Dashboard ca nhan nang cao (CLAUDE.md muc 25.5) - cung nguyen tac chiu loi im lang nhu 2
+        // widget tren, null (khong phai rong) khi chua tai duoc.
+        model.Dashboard.Should().BeNull();
     }
 
     [Fact]
@@ -64,5 +67,6 @@ public sealed class IndexModelTests
         called.Should().BeFalse();
         model.MyOverview.Should().BeEmpty();
         model.CounterpartyBalances.Should().BeEmpty();
+        model.Dashboard.Should().BeNull();
     }
 }

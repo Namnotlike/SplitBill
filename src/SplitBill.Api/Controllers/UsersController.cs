@@ -13,11 +13,13 @@ public sealed class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
     private readonly IBalanceService _balanceService;
+    private readonly IUserDashboardService _dashboardService;
 
-    public UsersController(IUserService userService, IBalanceService balanceService)
+    public UsersController(IUserService userService, IBalanceService balanceService, IUserDashboardService dashboardService)
     {
         _userService = userService;
         _balanceService = balanceService;
+        _dashboardService = dashboardService;
     }
 
     [HttpGet("me")]
@@ -42,6 +44,15 @@ public sealed class UsersController : ControllerBase
     {
         var balances = await _balanceService.GetCounterpartyBalancesAsync(User.GetUserId(), cancellationToken);
         return Ok(balances);
+    }
+
+    /// <summary>Dashboard cá nhân nâng cao (CLAUDE.md mục 25.5) — settlement đang chờ mình xác nhận +
+    /// hoạt động gần đây xuyên mọi nhóm.</summary>
+    [HttpGet("me/dashboard")]
+    public async Task<ActionResult<PersonalDashboardDto>> GetMyDashboardAsync(CancellationToken cancellationToken)
+    {
+        var dashboard = await _dashboardService.GetDashboardAsync(User.GetUserId(), cancellationToken);
+        return Ok(dashboard);
     }
 
     [HttpPatch("me")]
