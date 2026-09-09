@@ -510,6 +510,15 @@ public sealed class GroupService : IGroupService
                     var deletedExpense = Parse<ExpenseDto>(log.BeforeJson);
                     return deletedExpense is null ? "đã xóa 1 khoản chi" : $"đã xóa khoản chi \"{deletedExpense.Title}\" ({SupportedCurrencies.Format(deletedExpense.TotalAmount, currency)})";
 
+                // Khôi phục khoản chi/thanh toán đã xóa (CLAUDE.md mục 24, bổ sung 2026-09-09) —
+                // ⚠️ phát hiện qua verify sống: thiếu 2 case này khiến Timeline rơi vào nhánh default
+                // "$"{log.Action} {log.EntityType}"", hiện nguyên văn tiếng Anh "Restored Expense" thay
+                // vì 1 câu tiếng Việt như mọi hành động khác — cùng lớp lỗi "AuditLog.Action mới thêm
+                // nhưng quên khớp case trong BuildSummary" mà mục 15.6 đã từng gặp với GroupMember.
+                case ("Expense", "Restored"):
+                    var restoredExpense = Parse<ExpenseDto>(log.AfterJson);
+                    return restoredExpense is null ? "đã khôi phục 1 khoản chi" : $"đã khôi phục khoản chi \"{restoredExpense.Title}\" ({SupportedCurrencies.Format(restoredExpense.TotalAmount, currency)})";
+
                 case ("Settlement", "Created"):
                     var settlementCreated = Parse<SettlementDto>(log.AfterJson);
                     return settlementCreated is null
@@ -535,6 +544,14 @@ public sealed class GroupService : IGroupService
                     return settlementDeleted is null
                         ? "đã xóa 1 khoản thanh toán"
                         : $"đã xóa khoản thanh toán {SupportedCurrencies.Format(settlementDeleted.Amount, currency)} (từ {MemberName(settlementDeleted.FromMemberId)} đến {MemberName(settlementDeleted.ToMemberId)})";
+
+                // Khôi phục settlement đã xóa (CLAUDE.md mục 24) — xem ghi chú ⚠️ ở case ("Expense",
+                // "Restored") phía trên, cùng lỗi.
+                case ("Settlement", "Restored"):
+                    var settlementRestored = Parse<SettlementDto>(log.AfterJson);
+                    return settlementRestored is null
+                        ? "đã khôi phục 1 khoản thanh toán"
+                        : $"đã khôi phục khoản thanh toán {SupportedCurrencies.Format(settlementRestored.Amount, currency)} (từ {MemberName(settlementRestored.FromMemberId)} đến {MemberName(settlementRestored.ToMemberId)})";
 
                 // Tham gia nhóm qua link chia sẻ (CLAUDE.md mục 15.6): ActorMemberId == EntityId nghĩa
                 // là chính người đó tự thêm mình, khác hẳn "đã thêm X vào nhóm" (ai đó thêm hộ) —

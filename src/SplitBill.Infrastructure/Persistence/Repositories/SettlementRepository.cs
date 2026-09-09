@@ -20,6 +20,16 @@ public sealed class SettlementRepository : ISettlementRepository
     public Task<SettlementEntity?> GetByIdAsync(Guid settlementId, CancellationToken cancellationToken) =>
         _dbContext.Settlements.FirstOrDefaultAsync(s => s.Id == settlementId, cancellationToken);
 
+    public Task<SettlementEntity?> GetByIdIncludingDeletedAsync(Guid settlementId, CancellationToken cancellationToken) =>
+        _dbContext.Settlements.IgnoreQueryFilters().FirstOrDefaultAsync(s => s.Id == settlementId, cancellationToken);
+
+    public Task<List<SettlementEntity>> GetDeletedByGroupIdAsync(Guid groupId, CancellationToken cancellationToken) =>
+        _dbContext.Settlements
+            .IgnoreQueryFilters()
+            .Where(s => s.GroupId == groupId && s.IsDeleted)
+            .OrderByDescending(s => s.CreatedAt)
+            .ToListAsync(cancellationToken);
+
     public async Task AddAsync(SettlementEntity settlement, CancellationToken cancellationToken) =>
         await _dbContext.Settlements.AddAsync(settlement, cancellationToken);
 

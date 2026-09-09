@@ -146,6 +146,13 @@ public sealed class SplitBillApiClient
 
     public Task DeleteExpenseAsync(Guid expenseId, CancellationToken ct) => DeleteAsync($"expenses/{expenseId}", ct);
 
+    // ===== Khôi phục khoản chi/thanh toán đã xóa (CLAUDE.md mục 24) =====
+    public Task<IReadOnlyList<ExpenseDto>> GetDeletedExpensesAsync(Guid groupId, CancellationToken ct) =>
+        GetAsync<IReadOnlyList<ExpenseDto>>($"groups/{groupId}/deleted-expenses", ct);
+
+    public Task<ExpenseDto> RestoreExpenseAsync(Guid expenseId, CancellationToken ct) =>
+        PostAsync<object?, ExpenseDto>($"expenses/{expenseId}/restore", null, ct);
+
     // ===== Preset cách chia hay dùng (CLAUDE.md mục 21) =====
     public Task<IReadOnlyList<SplitPresetDto>> GetSplitPresetsAsync(Guid groupId, CancellationToken ct) =>
         GetAsync<IReadOnlyList<SplitPresetDto>>($"groups/{groupId}/split-presets", ct);
@@ -238,6 +245,12 @@ public sealed class SplitBillApiClient
         PostAsync<object?, SettlementDto>($"settlements/{settlementId}/reject", null, ct);
 
     public Task DeleteSettlementAsync(Guid settlementId, CancellationToken ct) => DeleteAsync($"settlements/{settlementId}", ct);
+
+    public Task<IReadOnlyList<SettlementDto>> GetDeletedSettlementsAsync(Guid groupId, CancellationToken ct) =>
+        GetAsync<IReadOnlyList<SettlementDto>>($"groups/{groupId}/deleted-settlements", ct);
+
+    public Task<SettlementDto> RestoreSettlementAsync(Guid settlementId, CancellationToken ct) =>
+        PostAsync<object?, SettlementDto>($"settlements/{settlementId}/restore", null, ct);
 
     // ===== Notifications (CLAUDE.md mục 13) =====
     public Task<PagedResult<NotificationDto>> GetNotificationsAsync(int page, int pageSize, CancellationToken ct) =>

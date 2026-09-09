@@ -207,6 +207,42 @@ public sealed class ExpenseService : IExpenseService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ExpenseDto>> GetDeletedAsync(Guid callerUserId, Guid groupId, CancellationToken cancellationToken)
+    {
+        var group = await LoadGroupAsync(groupId, cancellationToken);
+        ResolveCallerMember(group, callerUserId);
+
+        var expenses = await _expenseRepository.GetDeletedByGroupIdAsync(groupId, cancellationToken);
+        return expenses.Select(ToDto).ToList();
+    }
+
+    // CLAUDE.md mục 24 — khôi phục khoản chi đã xóa. Quyền hạn cố tình KHÔNG hạn chế hơn quyền Xóa
+    // (mục 4.4: "Tạo/sửa/xóa Expense... Owner ✅ Member ✅") — mọi thành viên đang active đều xóa được
+    // 1 khoản chi nên cũng được phép khôi phục lại, giữ đối xứng thay vì tự ý thêm ràng buộc mới không
+    // có trong bảng phân quyền gốc. Cố tình KHÔNG validate lại "Payers/Splits còn active" (mục 5.4) —
+    // khôi phục không đổi Payers/Splits, cùng nguyên tắc miễn trừ đã áp dụng cho Update một khoản chi
+    // lịch sử.
+    public async Task<ExpenseDto> RestoreAsync(Guid callerUserId, Guid expenseId, CancellationToken cancellationToken)
+    {
+        var expense = await _expenseRepository.GetByIdIncludingDeletedAsync(expenseId, cancellationToken)
+            ?? throw new DomainException(ErrorCodes.ExpenseNotFound, "Không tìm thấy khoản chi.");
+        var group = await LoadGroupAsync(expense.GroupId, cancellationToken);
+        var caller = ResolveCallerMember(group, callerUserId);
+
+        if (!expense.IsDeleted)
+        {
+            throw new DomainException(ErrorCodes.ExpenseNotDeleted, "Khoản chi này chưa bị xóa.");
+        }
+
+        expense.IsDeleted = false;
+        expense.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await WriteAuditLogAsync(group.Id, expense.Id, "Restored", caller.Id, null, ToDto(expense), cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return ToDto(expense);
+    }
+
     public async Task<ExpenseDto> UploadReceiptImageAsync(Guid callerUserId, Guid expenseId, Stream content, string fileName, string contentType, CancellationToken cancellationToken)
     {
         var expense = await LoadExpenseAsync(expenseId, cancellationToken);

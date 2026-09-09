@@ -308,6 +308,47 @@ public sealed class GroupServiceTests
         page.Items.Should().Contain(l => l.EntityType == "Expense" && l.Action == "Deleted" && l.Summary == "đã xóa khoản chi \"An toi\" (100.000đ)");
     }
 
+    // CLAUDE.md mục 24 — bug thật phát hiện qua verify sống: thiếu case ("Expense"/"Settlement",
+    // "Restored") trong BuildSummary khiến Timeline hiện nguyên văn "Restored Expense" (nhánh default
+    // $"{Action} {EntityType}") thay vì câu tiếng Việt như mọi hành động khác.
+    [Fact]
+    public async Task GetAuditLogsAsync_ExpenseRestored_SummaryIncludesTitleAndAmount()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var ownerMemberId = group.Members[0].Id;
+        var guest = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(null, "Binh"), CancellationToken.None);
+        var expense = await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "An toi", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 100_000)], "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guest.Id])), CancellationToken.None);
+        await harness.ExpenseService.DeleteAsync(ownerId, expense.Data.Id, CancellationToken.None);
+        await harness.ExpenseService.RestoreAsync(ownerId, expense.Data.Id, CancellationToken.None);
+
+        var page = await harness.GroupService.GetAuditLogsAsync(ownerId, group.Id, 1, 20, CancellationToken.None);
+
+        page.Items.Should().Contain(l => l.EntityType == "Expense" && l.Action == "Restored" && l.Summary == "đã khôi phục khoản chi \"An toi\" (100.000đ)");
+    }
+
+    [Fact]
+    public async Task GetAuditLogsAsync_SettlementRestored_SummaryIncludesAmountAndMembers()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var nam = group.Members[0];
+        var binh = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(null, "Binh"), CancellationToken.None);
+        var settlement = await harness.SettlementRecordService.CreateAsync(
+            ownerId, group.Id, new CreateSettlementRequest(binh.Id, nam.Id, 50_000), CancellationToken.None);
+        await harness.SettlementRecordService.DeleteAsync(ownerId, settlement.Id, CancellationToken.None);
+        await harness.SettlementRecordService.RestoreAsync(ownerId, settlement.Id, CancellationToken.None);
+
+        var page = await harness.GroupService.GetAuditLogsAsync(ownerId, group.Id, 1, 20, CancellationToken.None);
+
+        page.Items.Should().Contain(l => l.EntityType == "Settlement" && l.Action == "Restored" && l.Summary == "đã khôi phục khoản thanh toán 50.000đ (từ Binh đến Nam)");
+    }
+
     [Fact]
     public async Task GetAuditLogsAsync_SettlementConfirmed_SummaryDescribesConfirmation()
     {

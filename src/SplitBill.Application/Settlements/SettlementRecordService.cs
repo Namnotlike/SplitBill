@@ -166,6 +166,43 @@ public sealed class SettlementRecordService : ISettlementRecordService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<SettlementDto>> GetDeletedAsync(Guid callerUserId, Guid groupId, CancellationToken cancellationToken)
+    {
+        var group = await LoadGroupAsync(groupId, cancellationToken);
+        ResolveCallerMember(group, callerUserId);
+
+        var settlements = await _settlementRepository.GetDeletedByGroupIdAsync(groupId, cancellationToken);
+        return settlements.Select(ToDto).ToList();
+    }
+
+    // CLAUDE.md mục 24 — khôi phục settlement đã xóa. Quyền hạn mirror đúng DeleteAsync (chỉ người ghi
+    // nhận hoặc Owner) — chỉ Settlement đang Pending mới xóa được (xem DeleteAsync ở trên), nên Status
+    // vẫn còn nguyên giá trị Pending sau khi khôi phục, không cần gán lại.
+    public async Task<SettlementDto> RestoreAsync(Guid callerUserId, Guid settlementId, CancellationToken cancellationToken)
+    {
+        var settlement = await _settlementRepository.GetByIdIncludingDeletedAsync(settlementId, cancellationToken)
+            ?? throw new DomainException(ErrorCodes.MemberNotFound, "Không tìm thấy settlement.");
+        var group = await LoadGroupAsync(settlement.GroupId, cancellationToken);
+        var caller = ResolveCallerMember(group, callerUserId);
+
+        if (!settlement.IsDeleted)
+        {
+            throw new DomainException(ErrorCodes.SettlementNotDeleted, "Settlement này chưa bị xóa.");
+        }
+
+        if (caller.Id != settlement.RecordedByMemberId && caller.Role != GroupMemberRole.Owner)
+        {
+            throw new DomainException(ErrorCodes.InsufficientRole, "Chỉ người ghi nhận hoặc Owner mới được khôi phục.");
+        }
+
+        settlement.IsDeleted = false;
+
+        await WriteAuditLogAsync(group.Id, settlement.Id, "Restored", caller.Id, null, ToDto(settlement), cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return ToDto(settlement);
+    }
+
     public async Task<IReadOnlyList<SettlementDto>> GetByGroupAsync(Guid callerUserId, Guid groupId, CancellationToken cancellationToken)
     {
         var group = await LoadGroupAsync(groupId, cancellationToken);

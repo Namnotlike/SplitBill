@@ -2292,3 +2292,79 @@ SplitBill.sln --configuration Release`: 0 warning, 0 error. `dotnet test SplitBi
 Release`: **240/240 pass** (69 UnitTests + 25 Web.Tests + 142 IntegrationTests + 4 E2ETests —
 không có test cũ nào bị ảnh hưởng bởi việc thêm `public partial class Program;` vào `SplitBill.Web/
 Program.cs`).
+
+---
+
+## 25. Danh sách tính năng bổ sung ngoài kế hoạch — bổ sung 2026-09-09
+
+Sau khi CI/CD, i18n, PWA và E2E test (mục 24) đều đã hoàn thành, người dùng yêu cầu gợi ý tiếp các tính
+năng "ngoài kế hoạch" (khác hẳn danh sách mục 15, vốn do chính người dùng liệt kê trước khi hỏi ý kiến
+— lần này ngược lại: người dùng hỏi AI gợi ý). Đã đề xuất 9 hạng mục, người dùng chốt **"Làm hết"**
+(cùng tinh thần mục 15 — làm toàn bộ, từ dễ đến khó, mỗi hạng mục build + test + verify sống + commit
+riêng). 3 hạng mục cần thêm NuGet package (Đăng nhập Google, Web Push, 2FA/TOTP) sẽ hỏi lại người dùng
+trước khi thêm dependency, đúng CLAUDE.md mục 2 — "Làm hết" chỉ phê duyệt phạm vi tính năng, không tự
+động phê duyệt từng NuGet package cụ thể bên trong.
+
+### 25.1 Khôi phục khoản chi/thanh toán đã xóa (hạng mục 1/9)
+
+Soft-delete (`Expense.IsDeleted`/`Settlement.IsDeleted`) đã có sẵn từ M1 (mục 1 "Không xóa cứng dữ liệu
+tài chính, chỉ soft delete + audit log") nhưng trước tính năng này không có cách nào **xem lại/khôi
+phục** qua UI hay API — dữ liệu vẫn còn nguyên trong DB (ẩn sau global query filter `!IsDeleted`, mục
+4.3) nhưng "biến mất" khỏi mọi trang, xóa nhầm 1 khoản chi/thanh toán trước đây là vĩnh viễn về mặt
+thao tác (dù kỹ thuật viên có thể sửa DB trực tiếp).
+
+**API mới** (`ExpensesController`/`SettlementsController`):
+
+```
+GET  /api/v1/groups/{groupId}/deleted-expenses      Danh sách khoản chi ĐÃ xóa của nhóm
+POST /api/v1/expenses/{expenseId}/restore           Khôi phục — 400 EXPENSE_NOT_DELETED nếu chưa xóa
+GET  /api/v1/groups/{groupId}/deleted-settlements    Danh sách settlement ĐÃ xóa của nhóm
+POST /api/v1/settlements/{settlementId}/restore      Khôi phục — 400 SETTLEMENT_NOT_DELETED nếu chưa xóa
+```
+
+- Repository thêm `GetByIdIncludingDeletedAsync`/`GetDeletedByGroupIdAsync` (cả `IExpenseRepository`
+  và `ISettlementRepository`), cài đặt bằng `.IgnoreQueryFilters()` — bản ghi cần đọc lại chính là bản
+  ghi có `IsDeleted = true` nên phương thức `GetByIdAsync` hiện có (đi qua global query filter) sẽ
+  luôn trả `null`.
+- **Quyền hạn khôi phục Expense**: cố tình KHÔNG hạn chế hơn quyền Xóa (mục 4.4: "Tạo/sửa/xóa
+  Expense... Owner ✅ Member ✅") — mọi thành viên active đều xóa được nên cũng khôi phục được, giữ đối
+  xứng thay vì tự thêm ràng buộc mới ngoài bảng phân quyền gốc. Khôi phục KHÔNG re-validate "Payers/
+  Splits còn active" (mục 5.4) — không đổi Payers/Splits, cùng nguyên tắc miễn trừ đã áp dụng cho sửa
+  1 khoản chi lịch sử.
+- **Quyền hạn khôi phục Settlement**: mirror đúng `DeleteAsync` — chỉ người ghi nhận
+  (`RecordedByMemberId`) hoặc Owner. Settlement chỉ xóa được khi đang `Pending` (xem mục 8), nên
+  `Status` giữ nguyên `Pending` sau khi khôi phục, không cần gán lại.
+- Audit log dùng Action `"Restored"` (từ vựng đã có sẵn từ mục 15.6, `"Created"|"Updated"|"Deleted"|
+  "Restored"`), `AfterJson` = snapshot sau khi khôi phục — để Timeline (mục 15.5) hiển thị đủ tên/số
+  tiền, không chỉ "có 1 bản ghi được khôi phục".
+
+**Web**: trang mới `Groups/RecentlyDeleted.cshtml` (nút "♻️ Đã xóa gần đây" trên `Groups/Details`) —
+2 danh sách (khoản chi đã xóa / settlement đã xóa), mỗi dòng có nút "♻️ Khôi phục" (POST form, không
+`window.confirm()` — hành động này không phá hủy gì thêm, khớp nguyên tắc đã chọn ở mục 18 cho "Nhân
+bản nhóm": chỉ dùng confirm cho hành động THẬT SỰ không hoàn tác được).
+
+> ⚠️ **Bug thật phát hiện lúc verify sống (không phải qua test — kiến trúc test hiện tại của
+> `SplitBill.IntegrationTests` gọi thẳng service, không render UI/Timeline qua HTTP thật):** sau khi
+> khôi phục 1 khoản chi, trang Timeline (mục 15.5, `GroupService.BuildSummary`) hiện nguyên văn
+> **"Restored Expense"** (tiếng Anh, không dịch) thay vì câu tiếng Việt như mọi hành động khác —
+> `BuildSummary` switch theo `(EntityType, Action)` chưa có case nào khớp `("Expense", "Restored")`
+> hay `("Settlement", "Restored")`, nên rơi vào nhánh `default: return $"{log.Action} {log.EntityType}"`
+> (dòng dự phòng cuối cùng, vốn chỉ nhằm không bao giờ throw chứ không nhằm hiển thị cho người dùng
+> thật). Đúng lớp lỗi mà mục 15.6 từng gặp khi thêm Action `"Restored"` cho `GroupMember` (rejoin qua
+> link chia sẻ): mỗi lần thêm 1 giá trị Action mới vào từ vựng AuditLog, phải nhớ thêm case tương ứng
+> trong `BuildSummary`, nếu không Timeline âm thầm hiện chuỗi kỹ thuật thay vì câu tiếng Việt — không
+> có compiler nào bắt được thiếu sót này vì `switch` trên tuple `(string, string)` không exhaustive.
+> Đã sửa: thêm `case ("Expense", "Restored")` và `case ("Settlement", "Restored")`, parse `AfterJson`
+> giống hệt mẫu case `"Created"` của cùng entity. Verify lại: Timeline hiện đúng "đã khôi phục khoản
+> chi "X" (100.000đ)" / "đã khôi phục khoản thanh toán 10.000đ (từ A đến B)". Test hồi quy:
+> `GetAuditLogsAsync_ExpenseRestored_SummaryIncludesTitleAndAmount`,
+> `GetAuditLogsAsync_SettlementRestored_SummaryIncludesAmountAndMembers` (`GroupServiceTests`).
+
+Đã verify sống trên trình duyệt (luồng đầy đủ, không chỉ đọc code): tạo khoản chi 100.000đ → xóa → mở
+"Đã xóa gần đây" → đúng hiện khoản chi vừa xóa kèm số tiền/ngày → bấm Khôi phục → quay lại đúng danh
+sách Khoản chi, khoản chi đã trở lại; lặp lại tương tự với 1 settlement Pending (ghi nhận → xóa → xem
+"Đã xóa gần đây" → khôi phục) → `Lịch sử ghi nhận` ở trang Kế hoạch thanh toán hiện lại đúng dòng
+Pending đó. Cả 2 luồng đều xác nhận Timeline hiện đúng dòng "đã khôi phục..." bằng tiếng Việt (sau khi
+sửa bug ở trên). `dotnet build`: 0 warning, 0 error. `dotnet test`: **249/249 pass** (69 UnitTests + 25
+Web.Tests + 151 IntegrationTests + 4 E2ETests — 9 test mới: 3 `ExpenseServiceTests`, 5
+`SettlementRecordServiceTests`, 2 `GroupServiceTests`; không có test cũ nào bị ảnh hưởng).

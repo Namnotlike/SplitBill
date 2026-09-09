@@ -35,4 +35,7 @@ public static class ErrorCodes
     public const string ExpenseCommentNotFound = "EXPENSE_COMMENT_NOT_FOUND";
     // Preset cách chia (CLAUDE.md mục 21, bổ sung 2026-09-07).
     public const string SplitPresetNotFound = "SPLIT_PRESET_NOT_FOUND";
+    // Khôi phục khoản chi/thanh toán đã xóa (CLAUDE.md mục 24, bổ sung 2026-09-09).
+    public const string ExpenseNotDeleted = "EXPENSE_NOT_DELETED";
+    public const string SettlementNotDeleted = "SETTLEMENT_NOT_DELETED";
 }

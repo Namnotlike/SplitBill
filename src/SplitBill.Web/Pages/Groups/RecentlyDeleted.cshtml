@@ -1,0 +1,77 @@
+@page "{id:guid}"
+@model SplitBill.Web.Pages.Groups.RecentlyDeletedModel
+@{
+    ViewData["Title"] = "Đã xóa gần đây";
+}
+
+<a asp-page="/Groups/Details" asp-route-id="@Model.Group.Id" class="text-muted small">← @Localizer["Về nhóm"]</a>
+<h1 class="mt-1 mb-4">@Localizer["Đã xóa gần đây"] — @Model.Group.Name</h1>
+
+@if (TempData["SuccessMessage"] is string ok)
+{
+    <div class="alert alert-success">✅ @ok</div>
+}
+@if (TempData["ErrorMessage"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+<h2 class="h5 mt-4">🧾 @Localizer["Khoản chi đã xóa"]</h2>
+@if (Model.DeletedExpenses.Count == 0)
+{
+    <p class="text-muted">@Localizer["Không có khoản chi nào đã xóa."]</p>
+}
+else
+{
+    <div class="card mb-4">
+        <div class="card-body p-0">
+            <ul class="list-group list-group-flush">
+                @foreach (var expense in Model.DeletedExpenses)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                        <div>
+                            <div class="fw-600">@expense.Title</div>
+                            <div class="small text-muted">
+                                @SupportedCurrencies.Format(expense.TotalAmount, Model.Group.Currency)
+                                · @expense.OccurredAt.ToLocalTime().ToString("dd/MM/yyyy")
+                            </div>
+                        </div>
+                        <form method="post" asp-page-handler="RestoreExpense" asp-route-id="@Model.Group.Id" asp-route-expenseId="@expense.Id">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">♻️ @Localizer["Khôi phục"]</button>
+                        </form>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+}
+
+<h2 class="h5 mt-4">💸 @Localizer["Thanh toán đã xóa"]</h2>
+@if (Model.DeletedSettlements.Count == 0)
+{
+    <p class="text-muted">@Localizer["Không có thanh toán nào đã xóa."]</p>
+}
+else
+{
+    <div class="card mb-4">
+        <div class="card-body p-0">
+            <ul class="list-group list-group-flush">
+                @foreach (var settlement in Model.DeletedSettlements)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                        <div>
+                            <div class="fw-600">@Model.MemberName(settlement.FromMemberId) → @Model.MemberName(settlement.ToMemberId)</div>
+                            <div class="small text-muted">
+                                @SupportedCurrencies.Format(settlement.Amount, Model.Group.Currency)
+                                · @settlement.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy")
+                            </div>
+                        </div>
+                        <form method="post" asp-page-handler="RestoreSettlement" asp-route-id="@Model.Group.Id" asp-route-settlementId="@settlement.Id">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">♻️ @Localizer["Khôi phục"]</button>
+                        </form>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+}

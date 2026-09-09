@@ -120,6 +120,66 @@ public sealed class SettlementRecordServiceTests
         remaining.Should().BeEmpty();
     }
 
+    // CLAUDE.md mục 24 — khôi phục settlement đã xóa.
+    [Fact]
+    public async Task RestoreAsync_UndeletesSettlement_ReappearsInGetByGroup()
+    {
+        var (harness, ownerId, _, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        var settlement = await harness.SettlementRecordService.CreateAsync(
+            ownerId, group.Id, new CreateSettlementRequest(guestMemberId, ownerMemberId, 50_000), CancellationToken.None);
+        await harness.SettlementRecordService.DeleteAsync(ownerId, settlement.Id, CancellationToken.None);
+
+        var restored = await harness.SettlementRecordService.RestoreAsync(ownerId, settlement.Id, CancellationToken.None);
+
+        restored.Status.Should().Be("Pending");
+        var remaining = await harness.SettlementRecordService.GetByGroupAsync(ownerId, group.Id, CancellationToken.None);
+        remaining.Should().ContainSingle(s => s.Id == settlement.Id);
+    }
+
+    [Fact]
+    public async Task RestoreAsync_NotDeleted_ThrowsSettlementNotDeleted()
+    {
+        var (harness, ownerId, _, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        var settlement = await harness.SettlementRecordService.CreateAsync(
+            ownerId, group.Id, new CreateSettlementRequest(guestMemberId, ownerMemberId, 50_000), CancellationToken.None);
+
+        var act = () => harness.SettlementRecordService.RestoreAsync(ownerId, settlement.Id, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.SettlementNotDeleted);
+    }
+
+    [Fact]
+    public async Task RestoreAsync_ByNeitherRecorderNorOwner_ThrowsInsufficientRole()
+    {
+        var (harness, ownerId, _, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        // Owner ghi nhận -> chỉ Owner (người ghi nhận) hoặc 1 Owner khác được khôi phục. Guest không
+        // phải người ghi nhận và không phải Owner -> phải bị chặn.
+        var settlement = await harness.SettlementRecordService.CreateAsync(
+            ownerId, group.Id, new CreateSettlementRequest(guestMemberId, ownerMemberId, 50_000), CancellationToken.None);
+        await harness.SettlementRecordService.DeleteAsync(ownerId, settlement.Id, CancellationToken.None);
+        var guestUserId = harness.DbContext.Users.Single(u => u.Email == "b@example.com").Id;
+
+        var act = () => harness.SettlementRecordService.RestoreAsync(guestUserId, settlement.Id, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.InsufficientRole);
+    }
+
+    [Fact]
+    public async Task GetDeletedAsync_ReturnsOnlyDeletedSettlements()
+    {
+        var (harness, ownerId, _, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        var kept = await harness.SettlementRecordService.CreateAsync(
+            ownerId, group.Id, new CreateSettlementRequest(guestMemberId, ownerMemberId, 10_000), CancellationToken.None);
+        var deleted = await harness.SettlementRecordService.CreateAsync(
+            ownerId, group.Id, new CreateSettlementRequest(guestMemberId, ownerMemberId, 20_000), CancellationToken.None);
+        await harness.SettlementRecordService.DeleteAsync(ownerId, deleted.Id, CancellationToken.None);
+
+        var deletedList = await harness.SettlementRecordService.GetDeletedAsync(ownerId, group.Id, CancellationToken.None);
+
+        deletedList.Should().ContainSingle(s => s.Id == deleted.Id);
+        deletedList.Should().NotContain(s => s.Id == kept.Id);
+    }
+
     [Fact]
     public async Task GetByGroupAsync_ListsAllStatuses()
     {

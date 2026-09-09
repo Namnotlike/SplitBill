@@ -21,6 +21,22 @@ public sealed class ExpenseRepository : IExpenseRepository
             .Include(e => e.Splits)
             .FirstOrDefaultAsync(e => e.Id == expenseId, cancellationToken);
 
+    public Task<Expense?> GetByIdIncludingDeletedAsync(Guid expenseId, CancellationToken cancellationToken) =>
+        _dbContext.Expenses
+            .IgnoreQueryFilters()
+            .Include(e => e.Payers)
+            .Include(e => e.Splits)
+            .FirstOrDefaultAsync(e => e.Id == expenseId, cancellationToken);
+
+    public Task<List<Expense>> GetDeletedByGroupIdAsync(Guid groupId, CancellationToken cancellationToken) =>
+        _dbContext.Expenses
+            .IgnoreQueryFilters()
+            .Where(e => e.GroupId == groupId && e.IsDeleted)
+            .Include(e => e.Payers)
+            .Include(e => e.Splits)
+            .OrderByDescending(e => e.UpdatedAt)
+            .ToListAsync(cancellationToken);
+
     public async Task<(IReadOnlyList<Expense> Items, int TotalCount)> GetPagedAsync(
         Guid groupId, int page, int pageSize, ExpenseFilter filter, CancellationToken cancellationToken)
     {

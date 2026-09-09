@@ -84,6 +84,21 @@ public sealed class ExpensesController : ControllerBase
         return NoContent();
     }
 
+    // CLAUDE.md mục 24 — khôi phục khoản chi/thanh toán đã xóa.
+    [HttpGet("/api/v1/groups/{groupId:guid}/deleted-expenses")]
+    public async Task<ActionResult<IReadOnlyList<ExpenseDto>>> GetDeletedAsync(Guid groupId, CancellationToken cancellationToken)
+    {
+        var expenses = await _expenseService.GetDeletedAsync(User.GetUserId(), groupId, cancellationToken);
+        return Ok(expenses);
+    }
+
+    [HttpPost("/api/v1/expenses/{expenseId:guid}/restore")]
+    public async Task<ActionResult<ExpenseDto>> RestoreAsync(Guid expenseId, CancellationToken cancellationToken)
+    {
+        var expense = await _expenseService.RestoreAsync(User.GetUserId(), expenseId, cancellationToken);
+        return Ok(expense);
+    }
+
     private static readonly HashSet<string> AllowedReceiptExtensions = new(StringComparer.OrdinalIgnoreCase) { ".jpg", ".jpeg", ".png", ".webp" };
     // ⚠️ Bổ sung khi rà soát 2026-09-04: trước đây chỉ kiểm tra ĐUÔI file, không kiểm tra Content-Type
     // client gửi lên. Vì ContentType này được lưu thẳng và trả lại nguyên văn ở GET bên dưới, một

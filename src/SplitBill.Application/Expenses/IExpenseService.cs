@@ -11,6 +11,13 @@ public interface IExpenseService
     Task<ExpenseResult> UpdateAsync(Guid callerUserId, Guid expenseId, UpdateExpenseRequest request, CancellationToken cancellationToken);
     Task DeleteAsync(Guid callerUserId, Guid expenseId, CancellationToken cancellationToken);
 
+    /// <summary>Danh sách khoản chi ĐÃ xóa (soft-delete) của nhóm — CLAUDE.md mục 24.</summary>
+    Task<IReadOnlyList<ExpenseDto>> GetDeletedAsync(Guid callerUserId, Guid groupId, CancellationToken cancellationToken);
+
+    /// <summary>Khôi phục 1 khoản chi đã xóa — CLAUDE.md mục 24. Ném <c>EXPENSE_NOT_DELETED</c> nếu
+    /// khoản chi hiện KHÔNG ở trạng thái đã xóa.</summary>
+    Task<ExpenseDto> RestoreAsync(Guid callerUserId, Guid expenseId, CancellationToken cancellationToken);
+
     /// <summary>Upload ảnh hóa đơn, trả về ExpenseDto với ReceiptImageUrl đã cập nhật (CLAUDE.md mục 8, M5).</summary>
     Task<ExpenseDto> UploadReceiptImageAsync(Guid callerUserId, Guid expenseId, Stream content, string fileName, string contentType, CancellationToken cancellationToken);
 

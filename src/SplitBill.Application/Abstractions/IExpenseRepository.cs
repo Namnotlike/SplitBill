@@ -8,6 +8,15 @@ public interface IExpenseRepository
     /// <summary>Nạp Expense kèm Payers/Splits (chỉ expense chưa xóa).</summary>
     Task<Expense?> GetByIdAsync(Guid expenseId, CancellationToken cancellationToken);
 
+    /// <summary>Nạp Expense kèm Payers/Splits BẤT KỂ đã xóa hay chưa (dùng <c>IgnoreQueryFilters</c>) —
+    /// dùng cho tính năng khôi phục (CLAUDE.md mục 24), nơi chính bản ghi cần đọc lại đã có
+    /// <c>IsDeleted = true</c> nên global query filter sẽ ẩn nó nếu dùng <see cref="GetByIdAsync"/>.</summary>
+    Task<Expense?> GetByIdIncludingDeletedAsync(Guid expenseId, CancellationToken cancellationToken);
+
+    /// <summary>Toàn bộ expense ĐÃ xóa của nhóm (IsDeleted = true), kèm Payers/Splits — dùng cho màn
+    /// hình "Đã xóa gần đây" (CLAUDE.md mục 24).</summary>
+    Task<List<Expense>> GetDeletedByGroupIdAsync(Guid groupId, CancellationToken cancellationToken);
+
     /// <summary><paramref name="filter"/> áp dụng trước khi phân trang — CLAUDE.md mục 15.2.</summary>
     Task<(IReadOnlyList<Expense> Items, int TotalCount)> GetPagedAsync(
         Guid groupId, int page, int pageSize, ExpenseFilter filter, CancellationToken cancellationToken);

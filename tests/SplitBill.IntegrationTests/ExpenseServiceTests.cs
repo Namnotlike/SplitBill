@@ -207,6 +207,61 @@ public sealed class ExpenseServiceTests
         (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.ExpenseNotFound);
     }
 
+    // CLAUDE.md mục 24 — khôi phục khoản chi đã xóa.
+    [Fact]
+    public async Task RestoreAsync_UndeletesExpense_GetByIdWorksAgain()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        var created = await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "An toi", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 100_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId])), CancellationToken.None);
+        await harness.ExpenseService.DeleteAsync(ownerId, created.Data.Id, CancellationToken.None);
+
+        var restored = await harness.ExpenseService.RestoreAsync(ownerId, created.Data.Id, CancellationToken.None);
+
+        restored.Title.Should().Be("An toi");
+        var fetched = await harness.ExpenseService.GetByIdAsync(ownerId, created.Data.Id, CancellationToken.None);
+        fetched.Id.Should().Be(created.Data.Id);
+    }
+
+    [Fact]
+    public async Task RestoreAsync_ExpenseNotDeleted_ThrowsExpenseNotDeleted()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        var created = await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "An toi", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 100_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId])), CancellationToken.None);
+
+        var act = () => harness.ExpenseService.RestoreAsync(ownerId, created.Data.Id, CancellationToken.None);
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.ExpenseNotDeleted);
+    }
+
+    [Fact]
+    public async Task GetDeletedAsync_ReturnsOnlyDeletedExpenses()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        var kept = await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "Con lai", 50_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 50_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId])), CancellationToken.None);
+        var deleted = await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "Da xoa", 30_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(ownerMemberId, 30_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [ownerMemberId, guestMemberId])), CancellationToken.None);
+        await harness.ExpenseService.DeleteAsync(ownerId, deleted.Data.Id, CancellationToken.None);
+
+        var deletedList = await harness.ExpenseService.GetDeletedAsync(ownerId, group.Id, CancellationToken.None);
+
+        deletedList.Should().ContainSingle(e => e.Id == deleted.Data.Id);
+        deletedList.Should().NotContain(e => e.Id == kept.Data.Id);
+    }
+
     [Fact]
     public void PreviewSplit_IsPureAndDeterministicForShares()
     {

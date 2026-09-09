@@ -74,4 +74,19 @@ public sealed class SettlementsController : ControllerBase
         await _settlementService.DeleteAsync(User.GetUserId(), settlementId, cancellationToken);
         return NoContent();
     }
+
+    // CLAUDE.md mục 24 — khôi phục khoản chi/thanh toán đã xóa.
+    [HttpGet("/api/v1/groups/{groupId:guid}/deleted-settlements")]
+    public async Task<ActionResult<IReadOnlyList<SettlementDto>>> GetDeletedAsync(Guid groupId, CancellationToken cancellationToken)
+    {
+        var settlements = await _settlementService.GetDeletedAsync(User.GetUserId(), groupId, cancellationToken);
+        return Ok(settlements);
+    }
+
+    [HttpPost("/api/v1/settlements/{settlementId:guid}/restore")]
+    public async Task<ActionResult<SettlementDto>> RestoreAsync(Guid settlementId, CancellationToken cancellationToken)
+    {
+        var settlement = await _settlementService.RestoreAsync(User.GetUserId(), settlementId, cancellationToken);
+        return Ok(settlement);
+    }
 }
