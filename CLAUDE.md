@@ -2437,8 +2437,41 @@ test mới: `WaiveAsync_ByCreditor_CreatesConfirmedWaivedSettlement`,
 (`BalanceServiceTests`), `GetAuditLogsAsync_SettlementWaived_SummaryDescribesWaive`
 (`GroupServiceTests`)).
 
-> **Ghi chú vận hành (không phải bug):** lần chạy `dotnet test tests/SplitBill.E2ETests` đầu tiên sau
-> khi thêm migration mới thất bại toàn bộ 8/8 với lỗi `TestServer.get_Application()` "server has not
-> been started" — đúng loại flaky đã ghi nhận trước đó ở mục 24 (một lần local port/process contention,
-> không tái lập được). Chạy lại ngay sau đó (không sửa gì) → 4/4 pass sạch, xác nhận lại đúng tính chất
-> transient của lớp lỗi này trên máy dev hiện tại — không liên quan gì tới thay đổi Miễn nợ.
+> **Ghi chú vận hành — đã điều tra kỹ trên CI thật, không phải suy đoán (2026-09-09):** lần chạy
+> `dotnet test tests/SplitBill.E2ETests` cục bộ đầu tiên sau khi thêm migration mới thất bại toàn bộ
+> 8/8 với lỗi `TestServer.get_Application()` "server has not been started" — đúng loại flaky đã ghi
+> nhận trước đó ở mục 24. Chạy lại ngay sau đó (không sửa gì) → 4/4 pass sạch cục bộ, nên đã push với
+> giả định đây chỉ là flaky cục bộ, không liên quan Miễn nợ. Nhưng CI (`commit ad9c190`) sau đó **fail
+> 2 lần liên tiếp trên 2 lượt chạy runner độc lập** (lần đầu + 1 lần "Re-run failed jobs"), cùng hệt 1
+> chữ ký lỗi — khác hẳn tính chất "chạy lại cục bộ là qua" đã thấy trước đó, nên đã điều tra thay vì tin
+> luôn là flaky:
+> 1. `git diff 955e6d4..HEAD -- tests/SplitBill.E2ETests/` (955e6d4 là commit ngay trước, CI xanh
+>    240/240) **rỗng tuyệt đối** — `KestrelWebApplicationFactory.cs`/`E2EFixture.cs`/`WebTestFactory.cs`/
+>    `ApiTestFactory.cs` giống hệt byte-for-byte với lần CI xanh gần nhất. Loại trừ hoàn toàn khả năng
+>    đây là hồi quy do code Miễn nợ gây ra (mọi file Miễn nợ đụng tới đều thuộc Settlement/Application/
+>    Web-page, không nằm trên đường host-startup nào).
+> 2. Đọc trực tiếp log CI (không phải màn hình rút gọn) của lần fail: cả 2 dòng `Now listening on: ...`
+>    (Api VÀ Web) đều xuất hiện — nghĩa là **cả 2 Kestrel host thật đều khởi động thành công**. Lỗi
+>    `TestServer.get_Application()` xảy ra ở đúng bước `testHost.Start()`/`CreateClient()` của "vỏ"
+>    `TestServer` (kỹ thuật build-2-lần trong `KestrelWebApplicationFactory.CreateHost`, xem mục 24.1) —
+>    tức là bug (nếu có) nằm ở chính kỹ thuật né `InvalidCastException` bằng cách gọi `IHostBuilder.
+>    Build()` 2 lần trên cùng 1 builder, không nằm ở `Program.cs` của `SplitBill.Web`/`SplitBill.Api`.
+> 3. Bấm "Re-run failed jobs" lần 2 (kèm bật "Enable debug logging") trên ĐÚNG commit `ad9c190`, không
+>    sửa 1 dòng code nào → **lần này pass sạch, 254/254, ~1 phút 27 giây** (đúng thời lượng 1 lần chạy
+>    đầy đủ, khác hẳn 9-21 giây của 2 lần fail trước — dấu hiệu cho thấy 2 lần fail trước "chết sớm" chứ
+>    không phải chạy hết rồi mới fail).
+>
+> **Kết luận, dựa trên bằng chứng thu thập được (không phải suy đoán từ trí nhớ)**: đây là 1 race
+> condition/nhạy thời gian có sẵn từ trước trong chính kỹ thuật build-host-2-lần của
+> `KestrelWebApplicationFactory` (bản thân code đã ghi chú đây là 1 "hack" né hạn chế của .NET 9, không
+> phải API được hỗ trợ chính thức) — biểu hiện ra dưới tải/tài nguyên hạn chế của runner CI (2 vCPU dùng
+> chung) thường xuyên hơn hẳn so với máy dev cục bộ, KHÔNG phải do thay đổi Miễn nợ (đã loại trừ bằng
+> diff ở bước 1) và KHÔNG phải do bug trong `Program.cs` của Api/Web (đã loại trừ bằng bước 2 — cả 2 host
+> thật đều lên được). Tỉ lệ fail quan sát được trên CI lần này (2/3 lượt chạy) cao hơn hẳn kỳ vọng —
+> **chưa sửa tận gốc** (chưa rõ chính xác dòng nào trong kỹ thuật 2-lần-Build gây race), ghi nhận đây là
+> nợ kỹ thuật thật cần theo dõi tiếp, không đóng án bằng cách coi là "chạy lại là qua" nữa. Nếu tái diễn
+> ở tính năng sau, ưu tiên điều tra hướng: `IHostBuilder.Build()` gọi 2 lần trên cùng 1 builder có phải
+> luôn an toàn/idempotent hay không đối với kiểu `IHostBuilder` mà `WebApplicationFactory` cấp cho
+> `CreateHost` khi entry point dùng `WebApplication.CreateBuilder` (minimal hosting) — chưa verify được
+> trong phiên này, chỉ mới verify được TRIỆU CHỨNG (cả 2 real host start ok, testHost mới là nơi hỏng)
+> chứ chưa verify được NGUYÊN NHÂN gốc bên trong runtime.

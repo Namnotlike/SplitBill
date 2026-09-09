@@ -157,5 +157,12 @@ settlement (mục 6.4), đa ngôn ngữ VI/EN (mục 22), PWA (mục 23) đều 
   nếu cần cho production.
 - **API `/auth/*` giới hạn 10 request/phút theo IP** (chống brute-force) — có thể gây `429` nếu test
   thủ công gọi liên tục nhiều lần trong 1 phút.
+- **`SplitBill.E2ETests` thỉnh thoảng fail trên CI với lỗi `TestServer.get_Application()` "server has
+  not been started"** — đã điều tra kỹ (2026-09-09, xem CLAUDE.md mục 25.2): không phải hồi quy code
+  (diff harness rỗng giữa lần CI xanh gần nhất và lần fail), không phải lỗi `Program.cs` (cả 2 Kestrel
+  host thật đều start thành công), mà là 1 race condition có sẵn trong kỹ thuật build-host-2-lần của
+  `KestrelWebApplicationFactory` (mục 24.1) — biểu hiện thường xuyên hơn dưới tải CI. Chạy lại
+  ("Re-run failed jobs") luôn qua được cho tới nay, nhưng **chưa sửa tận gốc**, chỉ mới xác nhận
+  triệu chứng, không phải lỗi tính năng nào.
 
 Xem `CLAUDE.md` để biết đầy đủ quyết định thiết kế và các lỗi đã phát hiện + sửa qua từng tính năng.
