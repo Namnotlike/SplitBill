@@ -2312,7 +2312,8 @@ Tiến độ: 1. Khôi phục khoản chi/thanh toán đã xóa — đã làm (m
 25.4, không cần NuGet mới). 5. Dashboard cá nhân nâng cao — đã làm (mục 25.5, không cần NuGet mới).
 6. Mẫu nhóm tái sử dụng — đã làm (mục 25.6, không cần NuGet mới). 7. Thông báo đẩy trình duyệt (Web
 Push) — đã làm (mục 25.7, người dùng đã đồng ý thêm package `WebPush`). 8. Tìm kiếm xuyên nhóm — đã
-làm (mục 25.8, không cần NuGet mới).
+làm (mục 25.8, không cần NuGet mới). 9. Đăng nhập 2 lớp / TOTP — đã làm (mục 25.9, verify trước rồi
+xác nhận KHÔNG cần NuGet mới — chỉ cần BCL). **Toàn bộ 9/9 hạng mục đã hoàn thành.**
 
 ### 25.1 Khôi phục khoản chi/thanh toán đã xóa (hạng mục 1/9)
 
@@ -2923,3 +2924,146 @@ thấy kết quả nào cho...".
 + 4 E2E — 4 test integration mới: `SearchAsync_EmptyQuery_ReturnsEmptyResult_NoDbScan`,
 `SearchAsync_MatchesGroupNameCaseInsensitive`, `SearchAsync_MatchesExpenseTitleAcrossMultipleGroups`,
 `SearchAsync_OnlyIncludesGroupsCallerIsActiveMemberOf` (`GlobalSearchServiceTests`)).
+
+### 25.9 Đăng nhập 2 lớp / TOTP (hạng mục 9/9 — HOÀN THÀNH TOÀN BỘ danh sách mục 25)
+
+Hạng mục thứ 3 cần cân nhắc NuGet package — nhưng **KHÔNG cần thêm gì cả**, đã verify TRƯỚC KHI triển
+khai: TOTP (RFC 6238) chỉ cần `System.Security.Cryptography.HMACSHA1` (BCL thuần), nên chạy 5 test
+vector chính thức của RFC 6238 Phụ lục B (HMAC-SHA1, secret ASCII "12345678901234567890", X=30, T0=0)
+qua 1 script console throwaway — **cả 5 đều khớp** (`94287082` ở Time=59, v.v.) — trước khi viết code
+thật, không suy đoán rồi tin luôn. Base32 (mã hóa secret để hiển thị/QR) cũng chỉ là RFC 4648, tự viết
+encoder/decoder ~30 dòng, verify round-trip qua cùng script. Mã hóa secret tại rest dùng
+`System.Security.Cryptography.AesGcm` (cũng thuần BCL) — không dùng ASP.NET Core Data Protection vì
+`SplitBill.Application` là `Sdk="Microsoft.NET.Sdk"` (thư viện thuần, không phải Web SDK) nên
+`Microsoft.AspNetCore.DataProtection.Abstractions` sẽ là 1 NuGet package MỚI phải hỏi — tự viết AES-GCM
+trực tiếp (cùng mẫu `InternalSecretComparer` mục 25.3: crypto thuần BCL ngay trong Application layer)
+tránh được hoàn toàn nhu cầu đó.
+
+**4 điểm thiết kế bắt buộc phải chốt trước khi viết code (rà soát chủ động trước khi bắt tay vào, không
+phải phát hiện muộn qua bug):**
+
+1. **Đường lùi khi mất điện thoại** — nếu chỉ cho tắt 2FA bằng mã TOTP, người mất điện thoại sẽ khóa
+   tài khoản VĨNH VIỄN (đúng kịch bản support-ticket phổ biến nhất của mọi hệ thống 2FA thật). Đã quyết
+   định: sinh 10 **mã dự phòng** lúc bật 2FA (`TwoFactorRecoveryCode`, chỉ lưu hash SHA-256 — cùng mẫu
+   `RefreshToken`/`PasswordResetToken`), mỗi mã dùng được đúng 1 lần; `DisableAsync` VÀ luồng hoàn tất
+   đăng nhập (`/auth/login/2fa`) chấp nhận CẢ mã TOTP lẫn mã dự phòng, còn `EnableAsync`/
+   `RegenerateRecoveryCodesAsync` chỉ chấp nhận TOTP (phải còn quyền truy cập app xác thực).
+2. **6 chữ số, KHÔNG PHẢI 8** — RFC 6238 Phụ lục B dùng 8 số chỉ để ví dụ trong spec không mơ hồ; MỌI
+   app xác thực thật (Google/Microsoft Authenticator, Authy) mặc định 6 số. `TotpService` ép cứng
+   `Digits = 6` (`% 1_000_000`, không phải `% 10^8`) và `otpauth://` URI ghi tường minh `digits=6` —
+   sai chỗ này sẽ khiến MỌI thiết bị thật thất bại 100% mà không lộ ra qua bất kỳ unit test tự viết nào
+   (test tự viết luôn tự nhất quán với chính nó).
+3. **2FA phải áp dụng cho CẢ đăng nhập qua Google** (mục 25.3) — nếu `GoogleLoginAsync` bỏ qua cổng
+   2FA, tính năng vô nghĩa với user đã liên kết cả 2 cách đăng nhập. Cả `LoginAsync` và `GoogleLoginAsync`
+   đều đi qua đúng 1 điểm hội tụ `AuthService.CompleteLoginAsync` (private) — không có đường tắt nào
+   bỏ qua kiểm tra `user.TwoFactorEnabled`. Test riêng `GoogleLoginAsync_TwoFactorEnabled_ReturnsChallenge_NotBypassed`
+   khóa lại đúng bất biến này.
+4. **Rate limit cho `/auth/login/2fa`** — endpoint này là bề mặt brute-force rõ ràng nhất (đoán 1 trong
+   1 triệu tổ hợp 6 số). Đặt trong `AuthController` (đã có `[EnableRateLimiting("auth")]` ở mức class,
+   xem mục 10b) nên tự động thừa hưởng đúng giới hạn 10 request/phút/IP — đã xác nhận bằng cách đọc lại
+   code (`[EnableRateLimiting]` ở class áp dụng cho MỌI action, không cần lặp lại per-action), không suy
+   đoán suông.
+
+**Mô hình dữ liệu**: `User` thêm `TwoFactorEnabled`, `TwoFactorSecretEncrypted` (Base64 AES-GCM,
+`null` nếu chưa từng thiết lập — CÓ THỂ khác null dù `TwoFactorEnabled=false`, nghĩa là "đang thiết lập
+chưa xác nhận"), `TwoFactorLastUsedTimeStep` (chống replay — dùng lại đúng 1 mã trong cùng cửa sổ ±1
+bước 30s). `TwoFactorRecoveryCode` (soft, không có `ExpiresAt` — chỉ hết hiệu lực khi `UsedAt` hoặc bị
+thay bộ mới). `TwoFactorChallenge` — "vé tạm" sau khi qua được bước mật khẩu/Google nhưng CHƯA hoàn tất
+đăng nhập, cùng mẫu thiết kế `PasswordResetToken` (chỉ lưu hash, thời hạn ngắn mặc định 5 phút, dùng 1
+lần). Migration `AddTwoFactorAuth`.
+
+> ⚠️ **Quyết định kỹ thuật — KHÔNG unique index trên `TwoFactorRecoveryCode.CodeHash`/`TwoFactorChallenge.
+> TokenHash` theo kiểu filtered như `Email`/`GoogleId`** — 2 bảng này đã unique toàn phần (không có giá
+> trị NULL để cần filter), cùng mẫu `PasswordResetToken.TokenHash`/`RefreshToken.TokenHash` có sẵn.
+
+**Kiến trúc — điểm hội tụ duy nhất**: `AuthService.CompleteLoginAsync` (private) là nơi DUY NHẤT quyết
+định "phát token thật ngay" hay "trả về challenge chờ mã 2FA" — cả `LoginAsync` (sau khi verify mật
+khẩu) và `GoogleLoginAsync` (sau khi resolve/tạo User) đều gọi đúng hàm này, không tự ý quyết định
+riêng. `ITwoFactorService` (setup/enable/disable/regenerate + `VerifyCodeOrRecoveryAsync` dùng chung
+bởi cả `DisableAsync` lẫn `AuthService.CompleteTwoFactorLoginAsync`) tách biệt hoàn toàn khỏi
+`AuthService` — đúng mẫu `NotificationService`/`ExpenseCommentService` đã áp dụng cho các concern có
+thể tách rời từ service lớn hơn.
+
+**API**:
+```
+POST /api/v1/auth/login/2fa                       Hoàn tất đăng nhập — { challengeToken, code } -> AuthTokens
+GET  /api/v1/users/me/2fa/status                   { enabled }
+POST /api/v1/users/me/2fa/setup                    Sinh secret mới (CHƯA bật) -> { secretBase32, otpAuthUri }
+POST /api/v1/users/me/2fa/enable                   { code } -> 10 mã dự phòng (plaintext, CHỈ 1 lần)
+POST /api/v1/users/me/2fa/disable                  { code } — chấp nhận TOTP HOẶC mã dự phòng
+POST /api/v1/users/me/2fa/recovery-codes/regenerate { code } — CHỈ chấp nhận TOTP -> 10 mã dự phòng MỚI
+```
+
+**Web**: `Account/TwoFactor.cshtml` (trang cài đặt, link từ `Account/Profile`) — 3 ô nhập mã
+(Enable/Disable/Regenerate) CỐ TÌNH là `string` thuần không `[Required]`, validate thủ công trong từng
+handler — bài học trực tiếp từ mục 25.2 (`[BindProperty]` áp dụng validation cho MỌI POST của trang bất
+kể handler nào chạy). QR vẽ bằng `qrcodejs` (CDN, cùng thư viện đã dùng cho VietQR mục 9), payload
+`otpauth://` giữ nguyên qua TempData (`Peek`, không phải indexer — sống sót qua nhiều lượt gõ sai mã
+mà không phải gọi lại `/2fa/setup`, vì gọi lại sẽ sinh secret MỚI làm vô hiệu QR vừa quét).
+
+`Account/TwoFactorChallenge.cshtml` (bước 2 của đăng nhập) — challenge token chuyển từ `LoginModel`/
+`GoogleCallbackModel` sang trang này qua **TempData, KHÔNG qua query string** (tránh lộ qua URL/lịch sử
+trình duyệt/referrer header). `LoginModel.OnPostAsync`/`GoogleCallbackModel.OnGetAsync` đều kiểm tra
+`LoginResult.RequiresTwoFactor` trước khi gọi `SignInHelper.SignInAsync` — chỉ đăng nhập cookie thật khi
+đã có `AuthTokens` thật (`RequiresTwoFactor=false` hoặc đã qua bước 2 thành công).
+
+Đã verify sống đầy đủ, kể cả tính TOÁN THẬT mã 6 số bằng cùng thuật toán RFC 6238 (không phải mock)
+qua 1 script console throwaway thứ 2 (nhận `secret` làm arg, in ra mã hiện tại — dùng để lái toàn bộ
+kịch bản curl bên dưới, không lưu lại trong repo):
+1. `curl` thẳng Api (không qua Web): đăng ký → status `enabled:false` → `/2fa/setup` trả đúng
+   `otpauth://...&digits=6&period=30` → `/2fa/enable` với mã thật → nhận đúng 10 mã dự phòng → status
+   `enabled:true` → `/auth/login` giờ trả `requiresTwoFactor:true` (không có `tokens`) → mã sai bị
+   `401 INVALID_TWO_FACTOR_CODE` → mã đúng hoàn tất đăng nhập, nhận `AuthTokens` thật → đăng nhập LẦN 2
+   dùng 1 MÃ DỰ PHÒNG thay vì TOTP → thành công → dùng LẠI đúng mã dự phòng đó lần 2 → đúng `401` (đã
+   tiêu thụ) → `/2fa/disable` bằng mã dự phòng còn lại → status về `enabled:false` → `/auth/login` giờ
+   trả thẳng `AuthTokens`, không còn `requiresTwoFactor`.
+2. Đi ĐÚNG qua Web BFF thật (cookie + antiforgery, không gọi thẳng Api — cùng phương pháp mục 25.6/
+   25.7): đăng ký qua form thật → trang `/Account/TwoFactor` đúng "Đang tắt" → bấm "Bật xác thực 2 lớp"
+   → reload đúng hiện QR + secret (đọc lại từ TempData) → xác nhận bằng mã thật → đúng "Đang bật" +
+   10 mã dự phòng hiển thị → đăng xuất → đăng nhập lại bằng mật khẩu → redirect đúng
+   `/Account/TwoFactorChallenge` (CHƯA đăng nhập, cookie chưa có claim) → nhập mã thật → redirect đúng
+   `/Groups/Index`, navbar hiện đúng tên tài khoản — xác nhận toàn bộ vòng đời qua đúng luồng trình
+   duyệt thật sẽ đi (không chỉ gọi API).
+
+**Chưa verify được** (giới hạn thành thật, cùng lý do mục 25.6/25.7): không có kết nối Chrome extension
+trong phiên này nên chưa xác nhận trực tiếp bằng mắt việc quét QR bằng 1 app xác thực THẬT (Google
+Authenticator...) — đã verify gián tiếp đầy đủ bằng cách tính đúng mã TOTP từ CHÍNH secret trong QR đó
+bằng thuật toán RFC 6238 đã verify khớp test vector chính thức, và xác nhận Api chấp nhận đúng mã đó.
+
+> ⚠️ **Rủi ro vận hành phát hiện qua rà soát chủ động (advisor, trước khi commit — không phải bug đã
+> xảy ra thật), đã vá 1 phần:** `TwoFactor:EncryptionKey` (khóa AES-GCM mã hóa `TwoFactorSecretEncrypted`
+> — mục "Mô hình dữ liệu" ở trên) nếu bị đổi SAU KHI user đã bật 2FA sẽ làm `AesGcm.Decrypt` ném
+> `CryptographicException` (tag mismatch) — khác `Jwt:SigningKey` (JWT ngắn hạn, đổi key chỉ buộc đăng
+> nhập lại, dự án đã chấp nhận đánh đổi này từ đầu), `TwoFactorSecretEncrypted` sống lâu dài, không có
+> "tự làm mới" nào tương đương.
+> - **`VerifyCodeOrRecoveryAsync`** (dùng chung bởi `DisableAsync` VÀ luồng hoàn tất đăng nhập
+>   `/auth/login/2fa`) đã được vá: giải mã lỗi ở nhánh TOTP giờ bị bắt (`catch (CryptographicException)`)
+>   và rơi êm xuống thử **mã dự phòng** thay vì để lỗi lọt ra ngoài chặn đứng luôn cả đường thoát hiểm đó
+>   — nếu không vá, đúng cái an toàn dựng riêng cho tình huống "mất khả năng dùng TOTP" (điểm thiết kế
+>   #1 ở trên) sẽ bị chính lỗi hạ tầng này vô hiệu hóa theo, một mâu thuẫn thiết kế nghiêm trọng hơn cả
+>   lỗi gốc. Test: `VerifyCodeOrRecoveryAsync_SecretDecryptionFails_FallsBackToRecoveryCode`.
+> - **`EnableAsync`/`RegenerateRecoveryCodesAsync`** (không có mã dự phòng nào thay thế được — mã dự
+>   phòng chỉ được cấp SAU khi `EnableAsync` thành công) ném thẳng `DomainException` với errorCode mới
+>   `TWO_FACTOR_DECRYPTION_FAILED` (map `500`, `ExceptionHandlingMiddleware`) thay vì để
+>   `CryptographicException` lọt ra ngoài thành `500 INTERNAL_SERVER_ERROR` chung chung không rõ nguyên
+>   nhân. Test: `EnableAsync_SecretDecryptionFails_ThrowsTwoFactorDecryptionFailed`.
+> - **Vẫn CHƯA có đường tự phục hồi nào** cho đúng người dùng bị lỗi này (đã bật 2FA, secret không giải
+>   mã được, VÀ không còn mã dự phòng nào — ví dụ đã dùng hết) — trường hợp đó vẫn cần operator can thiệp
+>   DB thủ công (`UPDATE Users SET TwoFactorEnabled=0, TwoFactorSecretEncrypted=NULL WHERE Id=...`). Đây
+>   là giới hạn có chủ đích của MVP (đổi `EncryptionKey` sau khi đã có user bật 2FA là thao tác vận hành
+>   hiếm gặp, không đáng để xây hẳn 1 luồng migrate-secret phức tạp), ghi lại rõ ràng thay vì để ẩn.
+
+`dotnet build`: 0 warning, 0 error. `dotnet test`: **301/301 pass** (74 unit + 26 web + 197 integration
++ 4 E2E — 14 test integration mới: 9 trong `TwoFactorServiceTests` (7 gốc + 2 test hồi quy giải mã lỗi
+ở trên), 5 trong `AuthServiceTests`
+(`LoginAsync_TwoFactorEnabled_ReturnsChallengeInsteadOfTokens`,
+`CompleteTwoFactorLoginAsync_ValidChallengeAndCode_IssuesRealTokens`,
+`CompleteTwoFactorLoginAsync_WrongCode_ThrowsInvalidTwoFactorCode`,
+`CompleteTwoFactorLoginAsync_ChallengeAlreadyUsed_ThrowsInvalidTwoFactorChallenge`,
+`GoogleLoginAsync_TwoFactorEnabled_ReturnsChallenge_NotBypassed`); 1 test web mới
+(`OnPostAsync_RequiresTwoFactor_RedirectsToChallengePage_DoesNotSignIn` trong `LoginModelTests`, cộng
+2 test cũ sửa lại theo shape `LoginResult` mới).
+
+---
+
+**Toàn bộ 9 hạng mục trong danh sách bổ sung ngoài kế hoạch (mục 25) đã hoàn thành.**

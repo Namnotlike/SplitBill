@@ -60,8 +60,18 @@ public class GoogleCallbackModel : PageModel
 
         try
         {
-            var tokens = await _apiClient.GoogleLoginAsync(new GoogleLoginRequest(googleId, email, effectiveDisplayName), cancellationToken);
-            await SignInHelper.SignInAsync(HttpContext, _apiClient, tokens, effectiveDisplayName, cancellationToken);
+            var loginResult = await _apiClient.GoogleLoginAsync(new GoogleLoginRequest(googleId, email, effectiveDisplayName), cancellationToken);
+            if (loginResult.RequiresTwoFactor)
+            {
+                // 2FA áp dụng CẢ cho đăng nhập qua Google (CLAUDE.md mục 25.9) — không bỏ qua, nếu
+                // không 2FA sẽ vô nghĩa với người dùng đã liên kết cả 2 cách đăng nhập.
+                TempData["TwoFactorChallengeToken"] = loginResult.TwoFactorChallengeToken;
+                TempData["TwoFactorFallbackName"] = effectiveDisplayName;
+                TempData["TwoFactorReturnUrl"] = returnUrl;
+                return RedirectToPage("/Account/TwoFactorChallenge");
+            }
+
+            await SignInHelper.SignInAsync(HttpContext, _apiClient, loginResult.Tokens!, effectiveDisplayName, cancellationToken);
             return LocalRedirect(string.IsNullOrEmpty(returnUrl) ? "/Groups/Index" : returnUrl);
         }
         catch (ApiException ex)

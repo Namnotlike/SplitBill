@@ -37,8 +37,12 @@ public sealed class SplitBillApiClient
     public Task<AuthTokens> RegisterAsync(RegisterRequest request, CancellationToken ct) =>
         PostAsync<RegisterRequest, AuthTokens>("auth/register", request, ct);
 
-    public Task<AuthTokens> LoginAsync(LoginRequest request, CancellationToken ct) =>
-        PostAsync<LoginRequest, AuthTokens>("auth/login", request, ct);
+    public Task<LoginResult> LoginAsync(LoginRequest request, CancellationToken ct) =>
+        PostAsync<LoginRequest, LoginResult>("auth/login", request, ct);
+
+    // CLAUDE.md mục 25.9 — hoàn tất đăng nhập khi LoginAsync/GoogleLoginAsync trả về RequiresTwoFactor.
+    public Task<AuthTokens> CompleteTwoFactorLoginAsync(CompleteTwoFactorLoginRequest request, CancellationToken ct) =>
+        PostAsync<CompleteTwoFactorLoginRequest, AuthTokens>("auth/login/2fa", request, ct);
 
     public Task LogoutAsync(string refreshToken, CancellationToken ct) =>
         PostNoContentAsync("auth/logout", new { refreshToken }, ct);
@@ -52,7 +56,7 @@ public sealed class SplitBillApiClient
 
     /// <summary>Đăng nhập bằng Google (CLAUDE.md mục 25.3) — khác các call auth/* khác ở chỗ cần đính
     /// kèm header X-Internal-Secret nên không dùng được helper PostAsync chung.</summary>
-    public async Task<AuthTokens> GoogleLoginAsync(GoogleLoginRequest request, CancellationToken ct)
+    public async Task<LoginResult> GoogleLoginAsync(GoogleLoginRequest request, CancellationToken ct)
     {
         using var message = new HttpRequestMessage(HttpMethod.Post, "auth/google")
         {
@@ -61,7 +65,7 @@ public sealed class SplitBillApiClient
         message.Headers.Add("X-Internal-Secret", _googleAuthInternalSecret);
 
         var response = await _httpClient.SendAsync(message, ct);
-        return await ReadOrThrowAsync<AuthTokens>(response, ct);
+        return await ReadOrThrowAsync<LoginResult>(response, ct);
     }
 
     // ===== Users =====
@@ -324,6 +328,22 @@ public sealed class SplitBillApiClient
     // ===== Tìm kiếm xuyên nhóm (CLAUDE.md mục 25.8) =====
     public Task<GlobalSearchResultDto> GlobalSearchAsync(string query, CancellationToken ct) =>
         GetAsync<GlobalSearchResultDto>($"users/me/search?q={Uri.EscapeDataString(query)}", ct);
+
+    // ===== Xác thực 2 lớp / TOTP (CLAUDE.md mục 25.9) =====
+    public Task<TwoFactorStatusDto> GetTwoFactorStatusAsync(CancellationToken ct) =>
+        GetAsync<TwoFactorStatusDto>("users/me/2fa/status", ct);
+
+    public Task<TwoFactorSetupDto> SetupTwoFactorAsync(CancellationToken ct) =>
+        PostAsync<object?, TwoFactorSetupDto>("users/me/2fa/setup", null, ct);
+
+    public Task<RecoveryCodesDto> EnableTwoFactorAsync(EnableTwoFactorRequest request, CancellationToken ct) =>
+        PostAsync<EnableTwoFactorRequest, RecoveryCodesDto>("users/me/2fa/enable", request, ct);
+
+    public Task DisableTwoFactorAsync(DisableTwoFactorRequest request, CancellationToken ct) =>
+        PostNoContentAsync("users/me/2fa/disable", request, ct);
+
+    public Task<RecoveryCodesDto> RegenerateTwoFactorRecoveryCodesAsync(RegenerateRecoveryCodesRequest request, CancellationToken ct) =>
+        PostAsync<RegenerateRecoveryCodesRequest, RecoveryCodesDto>("users/me/2fa/recovery-codes/regenerate", request, ct);
 
     // ===== Helpers =====
     private async Task<TResponse> GetAsync<TResponse>(string path, CancellationToken ct)

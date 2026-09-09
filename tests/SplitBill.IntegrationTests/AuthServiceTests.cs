@@ -24,10 +24,11 @@ public sealed class AuthServiceTests
         using var harness = TestHarness.Create();
 
         await harness.AuthService.RegisterAsync(new RegisterRequest("a@example.com", "Passw0rd123", "A"), CancellationToken.None);
-        var tokens = await harness.AuthService.LoginAsync(new LoginRequest("a@example.com", "Passw0rd123"), CancellationToken.None);
+        var result = await harness.AuthService.LoginAsync(new LoginRequest("a@example.com", "Passw0rd123"), CancellationToken.None);
 
-        tokens.AccessToken.Should().NotBeNullOrEmpty();
-        tokens.RefreshToken.Should().NotBeNullOrEmpty();
+        result.RequiresTwoFactor.Should().BeFalse(); // chưa bật 2FA -> đăng nhập xong ngay, không qua challenge
+        result.Tokens!.AccessToken.Should().NotBeNullOrEmpty();
+        result.Tokens.RefreshToken.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
@@ -152,7 +153,7 @@ public sealed class AuthServiceTests
         var oldLogin = () => harness.AuthService.LoginAsync(new LoginRequest("a@example.com", "Passw0rd123"), CancellationToken.None);
         (await oldLogin.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvalidCredentials);
         var newLogin = await harness.AuthService.LoginAsync(new LoginRequest("a@example.com", "NewPassw0rd456"), CancellationToken.None);
-        newLogin.AccessToken.Should().NotBeNullOrEmpty();
+        newLogin.Tokens!.AccessToken.Should().NotBeNullOrEmpty();
 
         // RefreshToken phát hành TRƯỚC lúc đổi mật khẩu phải bị thu hồi (đăng xuất mọi phiên khác).
         var refreshOld = () => harness.AuthService.RefreshAsync(initial.RefreshToken, CancellationToken.None);
@@ -191,10 +192,10 @@ public sealed class AuthServiceTests
     {
         using var harness = TestHarness.Create();
 
-        var tokens = await harness.AuthService.GoogleLoginAsync(
+        var result = await harness.AuthService.GoogleLoginAsync(
             new GoogleLoginRequest("google-sub-1", "a@example.com", "Nam"), CancellationToken.None);
 
-        tokens.AccessToken.Should().NotBeNullOrEmpty();
+        result.Tokens!.AccessToken.Should().NotBeNullOrEmpty();
         var user = harness.DbContext.Set<User>().Single(u => u.Email == "a@example.com");
         user.GoogleId.Should().Be("google-sub-1");
         user.PasswordHash.Should().BeNull(); // chưa từng đặt mật khẩu — chỉ đăng nhập được qua Google
@@ -228,7 +229,7 @@ public sealed class AuthServiceTests
         user.PasswordHash.Should().NotBeNull(); // liên kết thêm, KHÔNG xóa mất khả năng đăng nhập cũ
         // Đăng nhập bằng mật khẩu cũ vẫn hoạt động sau khi đã liên kết Google.
         var passwordLogin = await harness.AuthService.LoginAsync(new LoginRequest("a@example.com", "Passw0rd123"), CancellationToken.None);
-        passwordLogin.AccessToken.Should().NotBeNullOrEmpty();
+        passwordLogin.Tokens!.AccessToken.Should().NotBeNullOrEmpty();
     }
 
     [Fact]
@@ -247,5 +248,130 @@ public sealed class AuthServiceTests
         var act = () => harness.AuthService.ResetPasswordAsync(new ResetPasswordRequest(token, "Passw0rd123"), CancellationToken.None);
 
         (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvalidResetToken);
+    }
+
+    // ===== Xác thực 2 lớp / TOTP (CLAUDE.md mục 25.9, bổ sung 2026-09-09) =====
+
+    private static string CurrentTotpCode(string secretBase32)
+    {
+        var key = Base32Decode(secretBase32);
+        var counter = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 30;
+        var counterBytes = BitConverter.GetBytes(counter);
+        if (BitConverter.IsLittleEndian) Array.Reverse(counterBytes);
+        using var hmac = new System.Security.Cryptography.HMACSHA1(key);
+        var hash = hmac.ComputeHash(counterBytes);
+        var offset = hash[^1] & 0x0F;
+        var binCode = ((hash[offset] & 0x7f) << 24) | ((hash[offset + 1] & 0xff) << 16) | ((hash[offset + 2] & 0xff) << 8) | (hash[offset + 3] & 0xff);
+        return (binCode % 1_000_000).ToString("D6");
+    }
+
+    private static byte[] Base32Decode(string s)
+    {
+        const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+        var bytes = new List<byte>();
+        int bits = 0, value = 0;
+        foreach (var c in s)
+        {
+            var idx = alphabet.IndexOf(char.ToUpperInvariant(c));
+            if (idx < 0) continue;
+            value = (value << 5) | idx;
+            bits += 5;
+            if (bits >= 8) { bytes.Add((byte)((value >> (bits - 8)) & 0xFF)); bits -= 8; }
+        }
+        return bytes.ToArray();
+    }
+
+    /// <summary>EnableAsync đã "tiêu thụ" time step hiện tại (chống replay, xem TwoFactorService) —
+    /// nếu 1 test cần verify LẠI mã ở đúng time step đó ngay sau Enable (thường xảy ra vì cả 2 bước
+    /// chạy trong cùng 1 giây), phải reset TwoFactorLastUsedTimeStep để mô phỏng "đã sang time step
+    /// mới" thay vì chờ thời gian thật trôi qua 30s.</summary>
+    private static async Task ResetTwoFactorReplayGuardAsync(TestHarness harness, Guid userId)
+    {
+        var user = harness.DbContext.Set<User>().Single(u => u.Id == userId);
+        user.TwoFactorLastUsedTimeStep = null;
+        await harness.DbContext.SaveChangesAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task LoginAsync_TwoFactorEnabled_ReturnsChallengeInsteadOfTokens()
+    {
+        using var harness = TestHarness.Create();
+        var userId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var setup = await harness.TwoFactorService.SetupAsync(userId, CancellationToken.None);
+        await harness.TwoFactorService.EnableAsync(userId, new EnableTwoFactorRequest(CurrentTotpCode(setup.SecretBase32)), CancellationToken.None);
+
+        var result = await harness.AuthService.LoginAsync(new LoginRequest("a@example.com", "Passw0rd123"), CancellationToken.None);
+
+        result.RequiresTwoFactor.Should().BeTrue();
+        result.Tokens.Should().BeNull();
+        result.TwoFactorChallengeToken.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task CompleteTwoFactorLoginAsync_ValidChallengeAndCode_IssuesRealTokens()
+    {
+        using var harness = TestHarness.Create();
+        var userId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var setup = await harness.TwoFactorService.SetupAsync(userId, CancellationToken.None);
+        await harness.TwoFactorService.EnableAsync(userId, new EnableTwoFactorRequest(CurrentTotpCode(setup.SecretBase32)), CancellationToken.None);
+        await ResetTwoFactorReplayGuardAsync(harness, userId);
+        var loginResult = await harness.AuthService.LoginAsync(new LoginRequest("a@example.com", "Passw0rd123"), CancellationToken.None);
+
+        var tokens = await harness.AuthService.CompleteTwoFactorLoginAsync(
+            new CompleteTwoFactorLoginRequest(loginResult.TwoFactorChallengeToken!, CurrentTotpCode(setup.SecretBase32)), CancellationToken.None);
+
+        tokens.AccessToken.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task CompleteTwoFactorLoginAsync_WrongCode_ThrowsInvalidTwoFactorCode()
+    {
+        using var harness = TestHarness.Create();
+        var userId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var setup = await harness.TwoFactorService.SetupAsync(userId, CancellationToken.None);
+        await harness.TwoFactorService.EnableAsync(userId, new EnableTwoFactorRequest(CurrentTotpCode(setup.SecretBase32)), CancellationToken.None);
+        var loginResult = await harness.AuthService.LoginAsync(new LoginRequest("a@example.com", "Passw0rd123"), CancellationToken.None);
+
+        var act = () => harness.AuthService.CompleteTwoFactorLoginAsync(
+            new CompleteTwoFactorLoginRequest(loginResult.TwoFactorChallengeToken!, "000000"), CancellationToken.None);
+
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvalidTwoFactorCode);
+    }
+
+    [Fact]
+    public async Task CompleteTwoFactorLoginAsync_ChallengeAlreadyUsed_ThrowsInvalidTwoFactorChallenge()
+    {
+        using var harness = TestHarness.Create();
+        var userId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var setup = await harness.TwoFactorService.SetupAsync(userId, CancellationToken.None);
+        await harness.TwoFactorService.EnableAsync(userId, new EnableTwoFactorRequest(CurrentTotpCode(setup.SecretBase32)), CancellationToken.None);
+        await ResetTwoFactorReplayGuardAsync(harness, userId);
+        var loginResult = await harness.AuthService.LoginAsync(new LoginRequest("a@example.com", "Passw0rd123"), CancellationToken.None);
+        await harness.AuthService.CompleteTwoFactorLoginAsync(
+            new CompleteTwoFactorLoginRequest(loginResult.TwoFactorChallengeToken!, CurrentTotpCode(setup.SecretBase32)), CancellationToken.None);
+
+        // Dùng lại đúng challenge token đó lần 2 — dù mã đúng, challenge đã UsedAt nên không dùng lại được.
+        var act = () => harness.AuthService.CompleteTwoFactorLoginAsync(
+            new CompleteTwoFactorLoginRequest(loginResult.TwoFactorChallengeToken!, CurrentTotpCode(setup.SecretBase32)), CancellationToken.None);
+
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvalidTwoFactorChallenge);
+    }
+
+    [Fact]
+    public async Task GoogleLoginAsync_TwoFactorEnabled_ReturnsChallenge_NotBypassed()
+    {
+        // Phòng lỗ hổng "2FA không áp dụng cho luồng Google" — nếu Google bỏ qua được cổng 2FA thì
+        // tính năng 2FA vô nghĩa với người dùng đã liên kết cả 2 cách đăng nhập.
+        using var harness = TestHarness.Create();
+        await harness.AuthService.RegisterAsync(new RegisterRequest("a@example.com", "Passw0rd123", "Nam"), CancellationToken.None);
+        var user = harness.DbContext.Set<User>().Single(u => u.Email == "a@example.com");
+        var setup = await harness.TwoFactorService.SetupAsync(user.Id, CancellationToken.None);
+        await harness.TwoFactorService.EnableAsync(user.Id, new EnableTwoFactorRequest(CurrentTotpCode(setup.SecretBase32)), CancellationToken.None);
+
+        var result = await harness.AuthService.GoogleLoginAsync(
+            new GoogleLoginRequest("google-sub-1", "a@example.com", "Nam"), CancellationToken.None);
+
+        result.RequiresTwoFactor.Should().BeTrue();
+        result.Tokens.Should().BeNull();
     }
 }

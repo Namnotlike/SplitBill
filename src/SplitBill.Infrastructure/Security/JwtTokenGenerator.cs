@@ -69,4 +69,13 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
 
         return (plaintext, HashRefreshToken(plaintext), expiresAt);
     }
+
+    public (string PlaintextToken, string Hash, DateTimeOffset ExpiresAt) GenerateTwoFactorChallengeToken()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(32);
+        var plaintext = Base64UrlEncoder.Encode(bytes);
+        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(_options.TwoFactorChallengeMinutes);
+
+        return (plaintext, HashRefreshToken(plaintext), expiresAt);
+    }
 }

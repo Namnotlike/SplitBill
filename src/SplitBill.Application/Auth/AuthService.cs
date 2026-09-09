@@ -15,6 +15,8 @@ public sealed class AuthService : IAuthService
     private readonly IUserRepository _userRepository;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IPasswordResetTokenRepository _passwordResetTokenRepository;
+    private readonly ITwoFactorChallengeRepository _twoFactorChallengeRepository;
+    private readonly ITwoFactorService _twoFactorService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
     private readonly IEmailSender _emailSender;
@@ -26,6 +28,8 @@ public sealed class AuthService : IAuthService
         IUserRepository userRepository,
         IRefreshTokenRepository refreshTokenRepository,
         IPasswordResetTokenRepository passwordResetTokenRepository,
+        ITwoFactorChallengeRepository twoFactorChallengeRepository,
+        ITwoFactorService twoFactorService,
         IUnitOfWork unitOfWork,
         IJwtTokenGenerator jwtTokenGenerator,
         IEmailSender emailSender,
@@ -35,6 +39,8 @@ public sealed class AuthService : IAuthService
         _userRepository = userRepository;
         _refreshTokenRepository = refreshTokenRepository;
         _passwordResetTokenRepository = passwordResetTokenRepository;
+        _twoFactorChallengeRepository = twoFactorChallengeRepository;
+        _twoFactorService = twoFactorService;
         _unitOfWork = unitOfWork;
         _jwtTokenGenerator = jwtTokenGenerator;
         _emailSender = emailSender;
@@ -64,7 +70,7 @@ public sealed class AuthService : IAuthService
         return await IssueTokensAsync(user, cancellationToken);
     }
 
-    public async Task<AuthTokens> LoginAsync(LoginRequest request, CancellationToken cancellationToken)
+    public async Task<LoginResult> LoginAsync(LoginRequest request, CancellationToken cancellationToken)
     {
         var user = await _userRepository.GetByEmailAsync(request.Email, cancellationToken);
         if (user?.PasswordHash is null)
@@ -79,7 +85,7 @@ public sealed class AuthService : IAuthService
             throw new DomainException(ErrorCodes.InvalidCredentials, "Email hoặc mật khẩu không đúng.");
         }
 
-        return await IssueTokensAsync(user, cancellationToken);
+        return await CompleteLoginAsync(user, cancellationToken);
     }
 
     public async Task<AuthTokens> RefreshAsync(string refreshToken, CancellationToken cancellationToken)
@@ -194,7 +200,7 @@ public sealed class AuthService : IAuthService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<AuthTokens> GoogleLoginAsync(GoogleLoginRequest request, CancellationToken cancellationToken)
+    public async Task<LoginResult> GoogleLoginAsync(GoogleLoginRequest request, CancellationToken cancellationToken)
     {
         var user = await _userRepository.GetByGoogleIdAsync(request.GoogleId, cancellationToken);
         if (user is null)
@@ -222,7 +228,54 @@ public sealed class AuthService : IAuthService
             }
         }
 
+        return await CompleteLoginAsync(user, cancellationToken);
+    }
+
+    public async Task<AuthTokens> CompleteTwoFactorLoginAsync(CompleteTwoFactorLoginRequest request, CancellationToken cancellationToken)
+    {
+        var hash = _jwtTokenGenerator.HashRefreshToken(request.ChallengeToken);
+        var challenge = await _twoFactorChallengeRepository.GetByHashAsync(hash, cancellationToken);
+        if (challenge is null || !challenge.IsUsable)
+        {
+            throw new DomainException(ErrorCodes.InvalidTwoFactorChallenge, "Yêu cầu đăng nhập đã hết hạn hoặc không hợp lệ, vui lòng đăng nhập lại.");
+        }
+
+        var user = await _userRepository.GetByIdAsync(challenge.UserId, cancellationToken)
+            ?? throw new DomainException(ErrorCodes.InvalidTwoFactorChallenge, "Tài khoản không tồn tại.");
+
+        var valid = await _twoFactorService.VerifyCodeOrRecoveryAsync(user, request.Code, cancellationToken);
+        if (!valid)
+        {
+            throw new DomainException(ErrorCodes.InvalidTwoFactorCode, "Mã xác thực không đúng.");
+        }
+
+        challenge.UsedAt = DateTimeOffset.UtcNow; // dùng 1 lần — dù còn hạn cũng không dùng lại được
         return await IssueTokensAsync(user, cancellationToken);
+    }
+
+    /// <summary>Điểm hội tụ DUY NHẤT cho mọi luồng đăng nhập (email/mật khẩu + Google, CLAUDE.md mục
+    /// 25.9) — kiểm tra 2FA rồi hoặc phát token thật ngay, hoặc trả về 1 challenge chờ mã 2FA. KHÔNG
+    /// dùng cho RefreshAsync (refresh token không phải "đăng nhập mới", không re-trigger 2FA).</summary>
+    private async Task<LoginResult> CompleteLoginAsync(User user, CancellationToken cancellationToken)
+    {
+        if (!user.TwoFactorEnabled)
+        {
+            var tokens = await IssueTokensAsync(user, cancellationToken);
+            return new LoginResult(false, tokens, null);
+        }
+
+        var (plaintext, hash, expiresAt) = _jwtTokenGenerator.GenerateTwoFactorChallengeToken();
+        await _twoFactorChallengeRepository.AddAsync(new TwoFactorChallenge
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            TokenHash = hash,
+            ExpiresAt = expiresAt,
+            CreatedAt = DateTimeOffset.UtcNow,
+        }, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return new LoginResult(true, null, plaintext);
     }
 
     private async Task<AuthTokens> IssueTokensAsync(User user, CancellationToken cancellationToken)

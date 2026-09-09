@@ -33,7 +33,12 @@ public sealed class LoginModelTests
         {
             object body = req.RequestUri!.AbsolutePath.EndsWith("users/me")
                 ? new { id = Guid.NewGuid(), email = "a@example.com", displayName = "Nam", bankAccountNumber = (string?)null, bankBin = (string?)null }
-                : new { accessToken = "at", accessTokenExpiresAt = DateTimeOffset.UtcNow.AddMinutes(30), refreshToken = "rt", refreshTokenExpiresAt = DateTimeOffset.UtcNow.AddDays(14) };
+                : new
+                {
+                    requiresTwoFactor = false,
+                    tokens = new { accessToken = "at", accessTokenExpiresAt = DateTimeOffset.UtcNow.AddMinutes(30), refreshToken = "rt", refreshTokenExpiresAt = DateTimeOffset.UtcNow.AddDays(14) },
+                    twoFactorChallengeToken = (string?)null,
+                };
 
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
@@ -59,7 +64,12 @@ public sealed class LoginModelTests
         {
             object body = req.RequestUri!.AbsolutePath.EndsWith("users/me")
                 ? new { } // thiếu hết field -> DisplayName sẽ null lúc deserialize
-                : new { accessToken = "at", accessTokenExpiresAt = DateTimeOffset.UtcNow.AddMinutes(30), refreshToken = "rt", refreshTokenExpiresAt = DateTimeOffset.UtcNow.AddDays(14) };
+                : new
+                {
+                    requiresTwoFactor = false,
+                    tokens = new { accessToken = "at", accessTokenExpiresAt = DateTimeOffset.UtcNow.AddMinutes(30), refreshToken = "rt", refreshTokenExpiresAt = DateTimeOffset.UtcNow.AddDays(14) },
+                    twoFactorChallengeToken = (string?)null,
+                };
 
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
@@ -73,6 +83,27 @@ public sealed class LoginModelTests
         result.Should().BeOfType<LocalRedirectResult>();
         model.HttpContext.User.Identity!.IsAuthenticated.Should().BeTrue();
         model.HttpContext.User.Identity.Name.Should().Be("a@example.com"); // tên fallback = email đã nhập
+    }
+
+    [Fact]
+    public async Task OnPostAsync_RequiresTwoFactor_RedirectsToChallengePage_DoesNotSignIn()
+    {
+        // CLAUDE.md mục 25.9 — LoginAsync trả RequiresTwoFactor=true (không có Tokens) khi tài khoản
+        // đã bật 2FA; LoginModel KHÔNG được gọi SignInHelper ở bước này (chưa đủ điều kiện đăng nhập).
+        var model = CreateModel(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                JsonSerializer.Serialize(new { requiresTwoFactor = true, tokens = (object?)null, twoFactorChallengeToken = "challenge-abc" }, JsonOptions),
+                Encoding.UTF8, "application/json"),
+        });
+        model.Input = new LoginModel.InputModel { Email = "a@example.com", Password = "Passw0rd123" };
+
+        var result = await model.OnPostAsync(CancellationToken.None);
+
+        result.Should().BeOfType<RedirectToPageResult>();
+        ((RedirectToPageResult)result).PageName.Should().Be("/Account/TwoFactorChallenge");
+        model.HttpContext.User.Identity!.IsAuthenticated.Should().BeFalse();
+        model.TempData["TwoFactorChallengeToken"].Should().Be("challenge-abc");
     }
 
     [Fact]

@@ -17,4 +17,8 @@ public interface IJwtTokenGenerator
     /// <summary>Sinh token đặt lại mật khẩu (CLAUDE.md mục 16) — cùng cơ chế random 256-bit +
     /// SHA-256 hash như RefreshToken, chỉ khác thời hạn ngắn hơn (<see cref="JwtOptions.PasswordResetTokenMinutes"/>).</summary>
     (string PlaintextToken, string Hash, DateTimeOffset ExpiresAt) GeneratePasswordResetToken();
+
+    /// <summary>Sinh "vé tạm" 2FA (CLAUDE.md mục 25.9) — cùng cơ chế random 256-bit + SHA-256 hash,
+    /// thời hạn <see cref="JwtOptions.TwoFactorChallengeMinutes"/>.</summary>
+    (string PlaintextToken, string Hash, DateTimeOffset ExpiresAt) GenerateTwoFactorChallengeToken();
 }

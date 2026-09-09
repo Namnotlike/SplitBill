@@ -80,6 +80,15 @@ dotnet user-secrets set "WebPush:VapidSubject" "mailto:<email liên hệ của b
 Chỉ Api cần cấu hình — Web tự lấy public key qua `GET /users/me/push-vapid-public-key`, không cần cấu
 hình riêng.
 
+**Tùy chọn — Đăng nhập 2 lớp (2FA/TOTP)** (CLAUDE.md mục 25.9): để trống thì `POST /users/me/2fa/setup`
+trả lỗi `TWO_FACTOR_NOT_CONFIGURED`. Muốn bật, chỉ cần 1 chuỗi bí mật bất kỳ (không cần sinh gì đặc
+biệt, khác VAPID — chuỗi này chỉ dùng để mã hóa secret TOTP tại rest):
+
+```powershell
+cd src/SplitBill.Api
+dotnet user-secrets set "TwoFactor:EncryptionKey" "<chuỗi random ít nhất 32 ký tự>"
+```
+
 ### 2. Tạo database + áp migration
 
 Connection string mặc định trong `src/SplitBill.Api/appsettings.json` trỏ tới SQL Server LocalDB
@@ -118,7 +127,7 @@ Swagger UI cho Api (chỉ bật ở Development): `http://localhost:5199/swagger
 dotnet test SplitBill.sln
 ```
 
-286 test (74 unit + 183 integration + 25 web + 4 E2E — xem mục "E2E test" dưới đây), toàn bộ chạy trên
+301 test (74 unit + 197 integration + 26 web + 4 E2E — xem mục "E2E test" dưới đây), toàn bộ chạy trên
 EF Core InMemory — không cần SQL Server thật để chạy test. Lần chạy đầu tiên có thể chậm hơn vì
 `SplitBill.E2ETests` tự tải trình duyệt Chromium (một lần duy nhất, xem mục "E2E test").
 

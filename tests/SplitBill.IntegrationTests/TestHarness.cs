@@ -45,6 +45,7 @@ public sealed class TestHarness : IDisposable
     public IGroupTemplateService GroupTemplateService { get; }
     public IUserDashboardService UserDashboardService { get; }
     public IGlobalSearchService GlobalSearchService { get; }
+    public ITwoFactorService TwoFactorService { get; }
     public FakeEmailSender EmailSender { get; }
     public FakeWebPushSender WebPushSender { get; }
 
@@ -97,9 +98,19 @@ public sealed class TestHarness : IDisposable
             notificationRepository, pushSubscriptionRepository, unitOfWork, EmailSender, WebPushSender,
             NullLogger<NotificationService>.Instance, webOptions, webPushOptions);
 
+        var twoFactorRecoveryCodeRepository = new TwoFactorRecoveryCodeRepository(dbContext);
+        var twoFactorChallengeRepository = new TwoFactorChallengeRepository(dbContext);
+        var totpService = new TotpService();
+        // EncryptionKey KHÔNG rỗng ở test harness — cùng lý do VapidPublicKey ở trên (khác mặc định
+        // rỗng thật ở appsettings.json), nếu không TwoFactorSecretProtector luôn ném
+        // TWO_FACTOR_NOT_CONFIGURED và mọi test 2FA fail ngay từ bước setup.
+        var twoFactorOptions = Options.Create(new TwoFactorOptions { EncryptionKey = "test-two-factor-encryption-key-32chars!" });
+        var twoFactorSecretProtector = new TwoFactorSecretProtector(twoFactorOptions);
+        TwoFactorService = new TwoFactorService(userRepository, twoFactorRecoveryCodeRepository, totpService, twoFactorSecretProtector, unitOfWork);
+
         AuthService = new AuthService(
-            userRepository, refreshTokenRepository, passwordResetTokenRepository, unitOfWork,
-            jwtTokenGenerator, EmailSender, webOptions, NullLogger<AuthService>.Instance);
+            userRepository, refreshTokenRepository, passwordResetTokenRepository, twoFactorChallengeRepository, TwoFactorService,
+            unitOfWork, jwtTokenGenerator, EmailSender, webOptions, NullLogger<AuthService>.Instance);
         UserService = new UserService(userRepository, unitOfWork);
         GroupService = new GroupService(
             groupRepository, userRepository, expenseRepository, settlementRepository,

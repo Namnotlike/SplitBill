@@ -15,4 +15,8 @@ public sealed class JwtOptions
     /// nhiều vì đây là "cửa sổ" gửi qua email công khai, chỉ cần đủ thời gian người dùng mở email
     /// và bấm link, không cần sống lâu như phiên đăng nhập.</summary>
     public int PasswordResetTokenMinutes { get; set; } = 30;
+
+    /// <summary>"Vé tạm" 2FA (CLAUDE.md mục 25.9, bổ sung 2026-09-09) — ngắn như PasswordResetToken vì
+    /// chỉ là cửa sổ để người dùng mở app xác thực và gõ mã, không phải phiên đăng nhập.</summary>
+    public int TwoFactorChallengeMinutes { get; set; } = 5;
 }

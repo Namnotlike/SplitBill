@@ -129,6 +129,8 @@ try
     builder.Services.AddScoped<IUserRepository, UserRepository>();
     builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
     builder.Services.AddScoped<IPasswordResetTokenRepository, PasswordResetTokenRepository>();
+    builder.Services.AddScoped<ITwoFactorRecoveryCodeRepository, TwoFactorRecoveryCodeRepository>();
+    builder.Services.AddScoped<ITwoFactorChallengeRepository, TwoFactorChallengeRepository>();
     builder.Services.AddScoped<IGroupRepository, GroupRepository>();
     builder.Services.AddScoped<IExpenseRepository, ExpenseRepository>();
     builder.Services.AddScoped<ISettlementRepository, SettlementRepository>();
@@ -174,6 +176,14 @@ try
     // trả rỗng (client không subscribe được) và NotificationService tự bỏ qua bước gửi push, không
     // chặn Api chạy.
     builder.Services.Configure<WebPushOptions>(builder.Configuration.GetSection(WebPushOptions.SectionName));
+
+    // ===== Xác thực 2 lớp / TOTP (CLAUDE.md mục 25.9) — cùng nguyên tắc không fail-fast như
+    // GoogleAuth/WebPush: thiếu TwoFactor:EncryptionKey chỉ khiến POST /users/me/2fa/setup từ chối
+    // (TWO_FACTOR_NOT_CONFIGURED), không chặn Api chạy.
+    builder.Services.Configure<TwoFactorOptions>(builder.Configuration.GetSection(TwoFactorOptions.SectionName));
+    builder.Services.AddSingleton<ITotpService, TotpService>();
+    builder.Services.AddSingleton<ITwoFactorSecretProtector, TwoFactorSecretProtector>();
+    builder.Services.AddScoped<ITwoFactorService, TwoFactorService>();
     builder.Services.AddSingleton<IWebPushSender, WebPushSender>();
 
     // ===== Application services (thuật toán thuần — có thể singleton) =====

@@ -26,6 +26,8 @@ public sealed class SplitBillDbContext : DbContext
     public DbSet<RecurringExpenseTemplate> RecurringExpenseTemplates => Set<RecurringExpenseTemplate>();
     public DbSet<GroupTemplate> GroupTemplates => Set<GroupTemplate>();
     public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
+    public DbSet<TwoFactorRecoveryCode> TwoFactorRecoveryCodes => Set<TwoFactorRecoveryCode>();
+    public DbSet<TwoFactorChallenge> TwoFactorChallenges => Set<TwoFactorChallenge>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

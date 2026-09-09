@@ -47,3 +47,37 @@ public sealed class GoogleLoginRequestValidator : AbstractValidator<GoogleLoginR
         RuleFor(x => x.DisplayName).NotEmpty().MaximumLength(100);
     }
 }
+
+// ===== Xác thực 2 lớp / TOTP (CLAUDE.md mục 25.9, bổ sung 2026-09-09) =====
+public sealed class CompleteTwoFactorLoginRequestValidator : AbstractValidator<CompleteTwoFactorLoginRequest>
+{
+    public CompleteTwoFactorLoginRequestValidator()
+    {
+        RuleFor(x => x.ChallengeToken).NotEmpty();
+        RuleFor(x => x.Code).NotEmpty();
+    }
+}
+
+public sealed class EnableTwoFactorRequestValidator : AbstractValidator<EnableTwoFactorRequest>
+{
+    public EnableTwoFactorRequestValidator()
+    {
+        RuleFor(x => x.Code).NotEmpty();
+    }
+}
+
+public sealed class DisableTwoFactorRequestValidator : AbstractValidator<DisableTwoFactorRequest>
+{
+    public DisableTwoFactorRequestValidator()
+    {
+        RuleFor(x => x.Code).NotEmpty();
+    }
+}
+
+public sealed class RegenerateRecoveryCodesRequestValidator : AbstractValidator<RegenerateRecoveryCodesRequest>
+{
+    public RegenerateRecoveryCodesRequestValidator()
+    {
+        RuleFor(x => x.Code).NotEmpty();
+    }
+}

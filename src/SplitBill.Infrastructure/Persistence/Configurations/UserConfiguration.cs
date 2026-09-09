@@ -14,6 +14,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.BankAccountNumber).HasMaxLength(50);
         builder.Property(u => u.BankBin).HasMaxLength(6);
         builder.Property(u => u.GoogleId).HasMaxLength(64);
+        builder.Property(u => u.TwoFactorSecretEncrypted).HasMaxLength(500);
 
         // Filtered unique index: nhiều User có thể có Email = NULL (không xảy ra thực tế vì
         // User luôn có email khi đăng ký, nhưng để nhất quán với việc khách vãng lai không có User record).

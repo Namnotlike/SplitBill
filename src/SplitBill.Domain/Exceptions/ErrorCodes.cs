@@ -42,4 +42,15 @@ public static class ErrorCodes
     public const string InvalidInternalSecret = "INVALID_INTERNAL_SECRET";
     // Mẫu nhóm tái sử dụng (CLAUDE.md mục 25.6, bổ sung 2026-09-09).
     public const string GroupTemplateNotFound = "GROUP_TEMPLATE_NOT_FOUND";
+    // Xác thực 2 lớp / TOTP (CLAUDE.md mục 25.9, bổ sung 2026-09-09).
+    public const string TwoFactorNotConfigured = "TWO_FACTOR_NOT_CONFIGURED";
+    public const string TwoFactorSetupRequired = "TWO_FACTOR_SETUP_REQUIRED";
+    public const string TwoFactorAlreadyEnabled = "TWO_FACTOR_ALREADY_ENABLED";
+    public const string TwoFactorNotEnabled = "TWO_FACTOR_NOT_ENABLED";
+    public const string InvalidTwoFactorCode = "INVALID_TWO_FACTOR_CODE";
+    public const string InvalidTwoFactorChallenge = "INVALID_TWO_FACTOR_CHALLENGE";
+    // Giải mã TwoFactorSecretEncrypted thất bại — gần như luôn do TwoFactor:EncryptionKey đã bị đổi
+    // SAU KHI người dùng đã bật 2FA (xem CLAUDE.md mục 25.9, khoảng "Giới hạn đã biết"). Không có
+    // đường tự phục hồi từ phía người dùng trong trường hợp này — cần operator can thiệp DB thủ công.
+    public const string TwoFactorDecryptionFailed = "TWO_FACTOR_DECRYPTION_FAILED";
 }

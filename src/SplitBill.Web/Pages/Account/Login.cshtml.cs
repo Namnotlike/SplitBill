@@ -51,8 +51,18 @@ public class LoginModel : PageModel
 
         try
         {
-            var tokens = await _apiClient.LoginAsync(new LoginRequest(Input.Email, Input.Password), cancellationToken);
-            await SignInHelper.SignInAsync(HttpContext, _apiClient, tokens, Input.Email, cancellationToken);
+            var result = await _apiClient.LoginAsync(new LoginRequest(Input.Email, Input.Password), cancellationToken);
+            if (result.RequiresTwoFactor)
+            {
+                // Chuyển tiếp challenge token qua TempData (KHÔNG qua query string — tránh lộ qua
+                // URL/lịch sử trình duyệt/referrer, xem TwoFactorChallengeModel).
+                TempData["TwoFactorChallengeToken"] = result.TwoFactorChallengeToken;
+                TempData["TwoFactorFallbackName"] = Input.Email;
+                TempData["TwoFactorReturnUrl"] = ReturnUrl;
+                return RedirectToPage("/Account/TwoFactorChallenge");
+            }
+
+            await SignInHelper.SignInAsync(HttpContext, _apiClient, result.Tokens!, Input.Email, cancellationToken);
             return LocalRedirect(string.IsNullOrEmpty(ReturnUrl) ? "/Groups/Index" : ReturnUrl);
         }
         catch (ApiException ex)

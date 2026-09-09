@@ -21,6 +21,7 @@ public sealed class AuthController : ControllerBase
     private readonly IValidator<ForgotPasswordRequest> _forgotPasswordValidator;
     private readonly IValidator<ResetPasswordRequest> _resetPasswordValidator;
     private readonly IValidator<GoogleLoginRequest> _googleLoginValidator;
+    private readonly IValidator<CompleteTwoFactorLoginRequest> _completeTwoFactorLoginValidator;
     private readonly GoogleAuthOptions _googleAuthOptions;
 
     public AuthController(
@@ -30,6 +31,7 @@ public sealed class AuthController : ControllerBase
         IValidator<ForgotPasswordRequest> forgotPasswordValidator,
         IValidator<ResetPasswordRequest> resetPasswordValidator,
         IValidator<GoogleLoginRequest> googleLoginValidator,
+        IValidator<CompleteTwoFactorLoginRequest> completeTwoFactorLoginValidator,
         IOptions<GoogleAuthOptions> googleAuthOptions)
     {
         _authService = authService;
@@ -38,6 +40,7 @@ public sealed class AuthController : ControllerBase
         _forgotPasswordValidator = forgotPasswordValidator;
         _resetPasswordValidator = resetPasswordValidator;
         _googleLoginValidator = googleLoginValidator;
+        _completeTwoFactorLoginValidator = completeTwoFactorLoginValidator;
         _googleAuthOptions = googleAuthOptions.Value;
     }
 
@@ -52,10 +55,21 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
-    public async Task<ActionResult<AuthTokens>> LoginAsync(LoginRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<LoginResult>> LoginAsync(LoginRequest request, CancellationToken cancellationToken)
     {
         _loginValidator.ValidateOrThrowDomainException(request);
-        var tokens = await _authService.LoginAsync(request, cancellationToken);
+        var result = await _authService.LoginAsync(request, cancellationToken);
+        return Ok(result);
+    }
+
+    // CLAUDE.md mục 25.9 — hoàn tất đăng nhập khi LoginAsync/GoogleLoginAsync trả về
+    // RequiresTwoFactor = true. Nằm trong AuthController nên tự động thừa hưởng [EnableRateLimiting("auth")]
+    // của class (10 request/phút/IP) — quan trọng để chặn brute-force 1 triệu tổ hợp mã 6 số.
+    [HttpPost("login/2fa")]
+    public async Task<ActionResult<AuthTokens>> CompleteTwoFactorLoginAsync(CompleteTwoFactorLoginRequest request, CancellationToken cancellationToken)
+    {
+        _completeTwoFactorLoginValidator.ValidateOrThrowDomainException(request);
+        var tokens = await _authService.CompleteTwoFactorLoginAsync(request, cancellationToken);
         return Ok(tokens);
     }
 
@@ -97,7 +111,7 @@ public sealed class AuthController : ControllerBase
     // chiếm tài khoản (ai cũng gọi thẳng được với 1 email tùy ý). Xem GoogleAuthOptions để biết đầy đủ
     // lý do thiết kế.
     [HttpPost("google")]
-    public async Task<ActionResult<AuthTokens>> GoogleLoginAsync(GoogleLoginRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<LoginResult>> GoogleLoginAsync(GoogleLoginRequest request, CancellationToken cancellationToken)
     {
         var providedSecret = Request.Headers["X-Internal-Secret"].ToString();
         if (!InternalSecretComparer.Matches(providedSecret, _googleAuthOptions.InternalSecret))
@@ -106,7 +120,7 @@ public sealed class AuthController : ControllerBase
         }
 
         _googleLoginValidator.ValidateOrThrowDomainException(request);
-        var tokens = await _authService.GoogleLoginAsync(request, cancellationToken);
-        return Ok(tokens);
+        var result = await _authService.GoogleLoginAsync(request, cancellationToken);
+        return Ok(result);
     }
 }

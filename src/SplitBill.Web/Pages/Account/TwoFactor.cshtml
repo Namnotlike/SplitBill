@@ -1,0 +1,118 @@
+@page
+@model TwoFactorModel
+@{
+    ViewData["Title"] = "Xác thực 2 lớp";
+}
+
+<h1 class="mb-4">🔐 Xác thực 2 lớp</h1>
+
+@if (Model.ErrorMessage is not null)
+{
+    <div class="alert alert-danger">@Model.ErrorMessage</div>
+}
+@if (Model.SuccessMessage is not null)
+{
+    <div class="alert alert-success">@Model.SuccessMessage</div>
+}
+
+@if (Model.RecoveryCodesToShow is not null)
+{
+    <div class="card mb-4 border-warning">
+        <div class="card-body">
+            <h5 class="card-title">⚠️ Mã dự phòng — lưu lại ngay</h5>
+            <p class="text-muted">Mỗi mã dùng được 1 lần, thay thế cho mã xác thực nếu bạn mất điện thoại. Trang này sẽ KHÔNG hiển thị lại các mã này lần nữa.</p>
+            <div class="row row-cols-2 row-cols-md-5 g-2">
+                @foreach (var code in Model.RecoveryCodesToShow)
+                {
+                    <div class="col"><code class="d-block p-2 bg-body-tertiary rounded text-center">@code</code></div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@if (Model.Enabled)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <p class="mb-3"><span class="badge bg-success">Đang bật</span> Tài khoản của bạn được bảo vệ bằng xác thực 2 lớp.</p>
+
+            <h6>Tắt xác thực 2 lớp</h6>
+            <form method="post" asp-page-handler="Disable" class="row g-2 align-items-end mb-4">
+                <div class="col-auto">
+                    <input asp-for="DisableCode" class="form-control" placeholder="Mã xác thực hoặc mã dự phòng" />
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-outline-danger">Tắt 2FA</button>
+                </div>
+            </form>
+
+            <h6>Sinh lại bộ mã dự phòng</h6>
+            <p class="text-muted small">Dùng khi đã dùng gần hết mã dự phòng cũ — bộ cũ sẽ bị vô hiệu hóa ngay khi bộ mới được sinh.</p>
+            <form method="post" asp-page-handler="Regenerate" class="row g-2 align-items-end">
+                <div class="col-auto">
+                    <input asp-for="RegenerateCode" class="form-control" placeholder="Mã xác thực" />
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-outline-secondary">Sinh mã mới</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+else if (Model.PendingSecret is not null)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <p><span class="badge bg-secondary">Đang thiết lập</span></p>
+            <p>Quét mã QR bằng app xác thực (Google Authenticator, Microsoft Authenticator, Authy...), hoặc nhập tay mã bên dưới nếu không quét được.</p>
+            <div class="d-flex flex-wrap gap-4 align-items-start mb-3">
+                <div class="qr-canvas" data-payload="@Model.PendingOtpAuthUri"></div>
+                <div>
+                    <div class="text-muted small mb-1">Mã thiết lập (nhập tay)</div>
+                    <code>@Model.PendingSecret</code>
+                </div>
+            </div>
+
+            <form method="post" asp-page-handler="ConfirmEnable" class="row g-2 align-items-end">
+                <div class="col-auto">
+                    <label asp-for="EnableCode" class="form-label">Nhập mã 6 chữ số hiện tại để xác nhận</label>
+                    <input asp-for="EnableCode" class="form-control" inputmode="numeric" autocomplete="one-time-code" placeholder="000000" />
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary">Xác nhận &amp; bật 2FA</button>
+                </div>
+            </form>
+            <form method="post" asp-page-handler="CancelSetup" class="mt-2">
+                <button type="submit" class="btn btn-link btn-sm text-muted p-0">Hủy thiết lập</button>
+            </form>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <p class="mb-3"><span class="badge bg-secondary">Đang tắt</span> Tài khoản của bạn hiện chưa bật xác thực 2 lớp.</p>
+            <form method="post" asp-page-handler="StartSetup">
+                <button type="submit" class="btn btn-primary">Bật xác thực 2 lớp</button>
+            </form>
+        </div>
+    </div>
+}
+
+<a asp-page="/Account/Profile" class="text-muted">← Quay lại hồ sơ</a>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+        document.querySelectorAll('.qr-canvas').forEach(function (el) {
+            try {
+                new QRCode(el, { text: el.dataset.payload, width: 180, height: 180 });
+            } catch (e) {
+                el.textContent = 'Không tải được mã QR.';
+                console.error(e);
+            }
+        });
+    </script>
+}

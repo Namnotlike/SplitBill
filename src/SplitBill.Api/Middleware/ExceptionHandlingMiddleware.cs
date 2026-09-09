@@ -54,6 +54,8 @@ public sealed class ExceptionHandlingMiddleware
         ErrorCodes.InvalidCredentials => StatusCodes.Status401Unauthorized,
         ErrorCodes.InvalidRefreshToken => StatusCodes.Status401Unauthorized,
         ErrorCodes.InvalidInternalSecret => StatusCodes.Status401Unauthorized,
+        ErrorCodes.InvalidTwoFactorCode => StatusCodes.Status401Unauthorized,
+        ErrorCodes.InvalidTwoFactorChallenge => StatusCodes.Status401Unauthorized,
         ErrorCodes.InsufficientRole => StatusCodes.Status403Forbidden,
         ErrorCodes.MemberNotInGroup => StatusCodes.Status403Forbidden,
         ErrorCodes.GroupNotFound => StatusCodes.Status404NotFound,
@@ -65,6 +67,10 @@ public sealed class ExceptionHandlingMiddleware
         ErrorCodes.MemberHasOutstandingBalance => StatusCodes.Status409Conflict,
         ErrorCodes.LastOwnerCannotBeRemoved => StatusCodes.Status409Conflict,
         ErrorCodes.SettlementNotPending => StatusCodes.Status409Conflict,
+        // Không phải lỗi người dùng có thể tự sửa bằng cách thử lại — luôn do cấu hình máy chủ
+        // (TwoFactor:EncryptionKey đã đổi sau khi user bật 2FA, xem CLAUDE.md mục 25.9), nên 500 thay
+        // vì 400, nhưng vẫn có errorCode riêng để phân biệt với lỗi máy chủ chung chung.
+        ErrorCodes.TwoFactorDecryptionFailed => StatusCodes.Status500InternalServerError,
         _ => StatusCodes.Status400BadRequest,
     };
 

@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SplitBill.Api.Auth;
+using SplitBill.Application.Auth;
 using SplitBill.Application.Common;
 using SplitBill.Application.Notifications;
 using SplitBill.Application.Settlements;
@@ -19,7 +20,11 @@ public sealed class UsersController : ControllerBase
     private readonly IUserDashboardService _dashboardService;
     private readonly INotificationService _notificationService;
     private readonly IGlobalSearchService _searchService;
+    private readonly ITwoFactorService _twoFactorService;
     private readonly IValidator<CreatePushSubscriptionRequest> _pushSubscriptionValidator;
+    private readonly IValidator<EnableTwoFactorRequest> _enableTwoFactorValidator;
+    private readonly IValidator<DisableTwoFactorRequest> _disableTwoFactorValidator;
+    private readonly IValidator<RegenerateRecoveryCodesRequest> _regenerateRecoveryCodesValidator;
 
     public UsersController(
         IUserService userService,
@@ -27,14 +32,22 @@ public sealed class UsersController : ControllerBase
         IUserDashboardService dashboardService,
         INotificationService notificationService,
         IGlobalSearchService searchService,
-        IValidator<CreatePushSubscriptionRequest> pushSubscriptionValidator)
+        ITwoFactorService twoFactorService,
+        IValidator<CreatePushSubscriptionRequest> pushSubscriptionValidator,
+        IValidator<EnableTwoFactorRequest> enableTwoFactorValidator,
+        IValidator<DisableTwoFactorRequest> disableTwoFactorValidator,
+        IValidator<RegenerateRecoveryCodesRequest> regenerateRecoveryCodesValidator)
     {
         _userService = userService;
         _balanceService = balanceService;
         _dashboardService = dashboardService;
         _notificationService = notificationService;
         _searchService = searchService;
+        _twoFactorService = twoFactorService;
         _pushSubscriptionValidator = pushSubscriptionValidator;
+        _enableTwoFactorValidator = enableTwoFactorValidator;
+        _disableTwoFactorValidator = disableTwoFactorValidator;
+        _regenerateRecoveryCodesValidator = regenerateRecoveryCodesValidator;
     }
 
     [HttpGet("me")]
@@ -107,6 +120,46 @@ public sealed class UsersController : ControllerBase
     public async Task<ActionResult<GlobalSearchResultDto>> SearchAsync([FromQuery] string? q, CancellationToken cancellationToken)
     {
         var result = await _searchService.SearchAsync(User.GetUserId(), q, cancellationToken);
+        return Ok(result);
+    }
+
+    // ===== Xác thực 2 lớp / TOTP (CLAUDE.md mục 25.9) =====
+
+    [HttpGet("me/2fa/status")]
+    public async Task<ActionResult<TwoFactorStatusDto>> GetTwoFactorStatusAsync(CancellationToken cancellationToken)
+    {
+        var status = await _twoFactorService.GetStatusAsync(User.GetUserId(), cancellationToken);
+        return Ok(status);
+    }
+
+    [HttpPost("me/2fa/setup")]
+    public async Task<ActionResult<TwoFactorSetupDto>> SetupTwoFactorAsync(CancellationToken cancellationToken)
+    {
+        var setup = await _twoFactorService.SetupAsync(User.GetUserId(), cancellationToken);
+        return Ok(setup);
+    }
+
+    [HttpPost("me/2fa/enable")]
+    public async Task<ActionResult<RecoveryCodesDto>> EnableTwoFactorAsync(EnableTwoFactorRequest request, CancellationToken cancellationToken)
+    {
+        _enableTwoFactorValidator.ValidateOrThrowDomainException(request);
+        var result = await _twoFactorService.EnableAsync(User.GetUserId(), request, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("me/2fa/disable")]
+    public async Task<IActionResult> DisableTwoFactorAsync(DisableTwoFactorRequest request, CancellationToken cancellationToken)
+    {
+        _disableTwoFactorValidator.ValidateOrThrowDomainException(request);
+        await _twoFactorService.DisableAsync(User.GetUserId(), request, cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("me/2fa/recovery-codes/regenerate")]
+    public async Task<ActionResult<RecoveryCodesDto>> RegenerateTwoFactorRecoveryCodesAsync(RegenerateRecoveryCodesRequest request, CancellationToken cancellationToken)
+    {
+        _regenerateRecoveryCodesValidator.ValidateOrThrowDomainException(request);
+        var result = await _twoFactorService.RegenerateRecoveryCodesAsync(User.GetUserId(), request, cancellationToken);
         return Ok(result);
     }
 }
