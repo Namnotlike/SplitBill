@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using SplitBill.Application.Abstractions;
 using SplitBill.Domain.Entities;
 using SplitBill.Domain.Exceptions;
@@ -16,19 +17,22 @@ public sealed class TwoFactorService : ITwoFactorService
     private readonly ITotpService _totpService;
     private readonly ITwoFactorSecretProtector _secretProtector;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<TwoFactorService> _logger;
 
     public TwoFactorService(
         IUserRepository userRepository,
         ITwoFactorRecoveryCodeRepository recoveryCodeRepository,
         ITotpService totpService,
         ITwoFactorSecretProtector secretProtector,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        ILogger<TwoFactorService> logger)
     {
         _userRepository = userRepository;
         _recoveryCodeRepository = recoveryCodeRepository;
         _totpService = totpService;
         _secretProtector = secretProtector;
         _unitOfWork = unitOfWork;
+        _logger = logger;
     }
 
     public async Task<TwoFactorStatusDto> GetStatusAsync(Guid userId, CancellationToken cancellationToken)
@@ -149,7 +153,14 @@ public sealed class TwoFactorService : ITwoFactorService
             }
             catch (CryptographicException)
             {
-                // Bỏ qua nhánh TOTP, thử mã dự phòng bên dưới — xem lý do ở comment trên.
+                // Bỏ qua nhánh TOTP, thử mã dự phòng bên dưới — xem lý do ở comment trên. VẪN log lại
+                // (khác EnableAsync/RegenerateRecoveryCodesAsync, vốn báo lỗi thẳng cho client) vì
+                // nhánh này rơi êm về "sai mã" (401 thông thường) — nếu không log, operator không có
+                // cách nào phân biệt "user gõ sai mã" với "TwoFactor:EncryptionKey đã bị đổi" khi có
+                // báo cáo hàng loạt user không đăng nhập được (CLAUDE.md mục 25.9).
+                _logger.LogWarning(
+                    "Không giải mã được TwoFactorSecretEncrypted của user {UserId} — có thể TwoFactor:EncryptionKey đã thay đổi. Đã rơi về thử mã dự phòng.",
+                    user.Id);
             }
         }
 

@@ -3041,7 +3041,12 @@ bằng thuật toán RFC 6238 đã verify khớp test vector chính thức, và 
 >   và rơi êm xuống thử **mã dự phòng** thay vì để lỗi lọt ra ngoài chặn đứng luôn cả đường thoát hiểm đó
 >   — nếu không vá, đúng cái an toàn dựng riêng cho tình huống "mất khả năng dùng TOTP" (điểm thiết kế
 >   #1 ở trên) sẽ bị chính lỗi hạ tầng này vô hiệu hóa theo, một mâu thuẫn thiết kế nghiêm trọng hơn cả
->   lỗi gốc. Test: `VerifyCodeOrRecoveryAsync_SecretDecryptionFails_FallsBackToRecoveryCode`.
+>   lỗi gốc. Test: `VerifyCodeOrRecoveryAsync_SecretDecryptionFails_FallsBackToRecoveryCode`. Vì nhánh
+>   này rơi êm về `401 INVALID_TWO_FACTOR_CODE` thông thường (không tự báo lỗi hạ tầng cho client như
+>   `EnableAsync`), đã thêm `_logger.LogWarning(...)` (`ILogger<TwoFactorService>`, tiêm qua DI như mọi
+>   service khác — không cần sửa `Program.cs` vì `AddScoped<ITwoFactorService, TwoFactorService>()` tự
+>   resolve) — nếu không log, operator không có cách nào phân biệt "user gõ sai mã" với
+>   "`TwoFactor:EncryptionKey` đã bị đổi" khi nhận báo cáo hàng loạt user không đăng nhập được.
 > - **`EnableAsync`/`RegenerateRecoveryCodesAsync`** (không có mã dự phòng nào thay thế được — mã dự
 >   phòng chỉ được cấp SAU khi `EnableAsync` thành công) ném thẳng `DomainException` với errorCode mới
 >   `TWO_FACTOR_DECRYPTION_FAILED` (map `500`, `ExceptionHandlingMiddleware`) thay vì để

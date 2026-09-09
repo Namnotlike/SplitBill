@@ -106,7 +106,7 @@ public sealed class TestHarness : IDisposable
         // TWO_FACTOR_NOT_CONFIGURED và mọi test 2FA fail ngay từ bước setup.
         var twoFactorOptions = Options.Create(new TwoFactorOptions { EncryptionKey = "test-two-factor-encryption-key-32chars!" });
         var twoFactorSecretProtector = new TwoFactorSecretProtector(twoFactorOptions);
-        TwoFactorService = new TwoFactorService(userRepository, twoFactorRecoveryCodeRepository, totpService, twoFactorSecretProtector, unitOfWork);
+        TwoFactorService = new TwoFactorService(userRepository, twoFactorRecoveryCodeRepository, totpService, twoFactorSecretProtector, unitOfWork, NullLogger<TwoFactorService>.Instance);
 
         AuthService = new AuthService(
             userRepository, refreshTokenRepository, passwordResetTokenRepository, twoFactorChallengeRepository, TwoFactorService,
