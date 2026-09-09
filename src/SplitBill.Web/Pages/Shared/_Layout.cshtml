@@ -52,11 +52,19 @@
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
+                    <ul class="navbar-nav flex-grow-1 align-items-sm-center">
                         @if (User.Identity?.IsAuthenticated == true)
                         {
                             <li class="nav-item">
                                 <a class="nav-link" asp-area="" asp-page="/Groups/Index">@SharedLocalizer["Nhóm của tôi"]</a>
+                            </li>
+                            <li class="nav-item">
+                                @* Tìm kiếm xuyên nhóm (CLAUDE.md mục 25.8) — form GET, không phải fetch(),
+                                   khớp quy ước "không fetch()" của toàn dự án. *@
+                                <form method="get" asp-page="/Search" class="d-flex" role="search">
+                                    <input type="search" name="q" class="form-control form-control-sm" style="max-width: 220px;"
+                                           placeholder="@SharedLocalizer["Tìm kiếm..."]" aria-label="@SharedLocalizer["Tìm kiếm..."]" />
+                                </form>
                             </li>
                         }
                     </ul>

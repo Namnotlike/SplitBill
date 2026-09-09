@@ -118,7 +118,7 @@ Swagger UI cho Api (chỉ bật ở Development): `http://localhost:5199/swagger
 dotnet test SplitBill.sln
 ```
 
-282 test (74 unit + 179 integration + 25 web + 4 E2E — xem mục "E2E test" dưới đây), toàn bộ chạy trên
+286 test (74 unit + 183 integration + 25 web + 4 E2E — xem mục "E2E test" dưới đây), toàn bộ chạy trên
 EF Core InMemory — không cần SQL Server thật để chạy test. Lần chạy đầu tiên có thể chậm hơn vì
 `SplitBill.E2ETests` tự tải trình duyệt Chromium (một lần duy nhất, xem mục "E2E test").
 

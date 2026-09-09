@@ -18,6 +18,7 @@ public sealed class UsersController : ControllerBase
     private readonly IBalanceService _balanceService;
     private readonly IUserDashboardService _dashboardService;
     private readonly INotificationService _notificationService;
+    private readonly IGlobalSearchService _searchService;
     private readonly IValidator<CreatePushSubscriptionRequest> _pushSubscriptionValidator;
 
     public UsersController(
@@ -25,12 +26,14 @@ public sealed class UsersController : ControllerBase
         IBalanceService balanceService,
         IUserDashboardService dashboardService,
         INotificationService notificationService,
+        IGlobalSearchService searchService,
         IValidator<CreatePushSubscriptionRequest> pushSubscriptionValidator)
     {
         _userService = userService;
         _balanceService = balanceService;
         _dashboardService = dashboardService;
         _notificationService = notificationService;
+        _searchService = searchService;
         _pushSubscriptionValidator = pushSubscriptionValidator;
     }
 
@@ -96,5 +99,14 @@ public sealed class UsersController : ControllerBase
     {
         await _notificationService.UnsubscribeFromPushAsync(User.GetUserId(), endpoint, cancellationToken);
         return NoContent();
+    }
+
+    /// <summary>Tìm kiếm xuyên nhóm (CLAUDE.md mục 25.8) — khớp tên nhóm + tiêu đề khoản chi trên
+    /// TOÀN BỘ nhóm caller đang tham gia. Query rỗng/thiếu trả về 2 danh sách rỗng, không phải lỗi.</summary>
+    [HttpGet("me/search")]
+    public async Task<ActionResult<GlobalSearchResultDto>> SearchAsync([FromQuery] string? q, CancellationToken cancellationToken)
+    {
+        var result = await _searchService.SearchAsync(User.GetUserId(), q, cancellationToken);
+        return Ok(result);
     }
 }

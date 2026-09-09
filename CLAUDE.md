@@ -2311,7 +2311,8 @@ Tiến độ: 1. Khôi phục khoản chi/thanh toán đã xóa — đã làm (m
 `Microsoft.AspNetCore.Authentication.Google`). 4. Xuất/backup dữ liệu nhóm dạng JSON — đã làm (mục
 25.4, không cần NuGet mới). 5. Dashboard cá nhân nâng cao — đã làm (mục 25.5, không cần NuGet mới).
 6. Mẫu nhóm tái sử dụng — đã làm (mục 25.6, không cần NuGet mới). 7. Thông báo đẩy trình duyệt (Web
-Push) — đã làm (mục 25.7, người dùng đã đồng ý thêm package `WebPush`).
+Push) — đã làm (mục 25.7, người dùng đã đồng ý thêm package `WebPush`). 8. Tìm kiếm xuyên nhóm — đã
+làm (mục 25.8, không cần NuGet mới).
 
 ### 25.1 Khôi phục khoản chi/thanh toán đã xóa (hạng mục 1/9)
 
@@ -2874,3 +2875,51 @@ HTML/service-worker render đúng, chưa phải click thật. Cần verify sốn
 `NotifyAsync_SubscriptionGone_SelfHeals_RemovesSubscriptionFromDb`,
 `UnsubscribeFromPushAsync_RemovesSubscription_NoLongerReceivesPush`,
 `UnsubscribeFromPushAsync_ByOtherUser_DoesNothing_Idempotent` (`NotificationServiceTests`)).
+
+### 25.8 Tìm kiếm xuyên nhóm (hạng mục 8/9)
+
+Không cần NuGet mới. Khác tính năng "Tìm kiếm/lọc khoản chi" đã có (mục 15.2, `GET /groups/{id}/
+expenses?title=...`) — chỉ tìm trong ĐÚNG 1 nhóm đang xem — tính năng này quét TOÀN BỘ nhóm caller
+đang tham gia cùng lúc, khớp cả **tên nhóm** lẫn **tiêu đề khoản chi**, phù hợp khi không nhớ khoản chi
+đó nằm ở nhóm nào.
+
+**Kiến trúc — không viết lại logic đọc dữ liệu nào mới**, thuần orchestrate 2 thứ đã có sẵn (cùng
+nguyên tắc Export mục 25.4/Dashboard mục 25.5/Mẫu nhóm mục 25.6): `IGroupRepository.GetByUserIdAsync`
+(đã lọc đúng nhóm caller đang active, cùng vòng lặp mẫu `UserDashboardService`/`BalanceService.
+GetCounterpartyBalancesAsync`) để lấy danh sách nhóm + khớp tên; `IExpenseService.GetPagedAsync` với
+`ExpenseFilter(Title: query)` (đã có sẵn từ mục 15.2 — "chứa, không phân biệt hoa thường") gọi **cho
+từng nhóm** để đẩy việc lọc tiêu đề xuống tận DB, không tự tải hết khoản chi rồi lọc ở C#.
+
+Giới hạn kết quả (tránh 1 lượt tìm kiếm trả về hàng trăm dòng nếu user có rất nhiều nhóm/khoản chi):
+tối đa 10 khoản chi khớp mỗi nhóm, gộp lại rồi chỉ giữ 30 dòng mới nhất trên TOÀN BỘ kết quả — cùng
+mẫu `RecentActivityPerGroupPageSize`/`RecentActivityLimit` của `UserDashboardService` (mục 25.5).
+Query rỗng/chỉ có khoảng trắng trả về 2 danh sách rỗng NGAY, không quét DB nào cả — tránh 1 lượt "tìm
+kiếm mọi thứ" vô nghĩa.
+
+**API**: `GET /api/v1/users/me/search?q=...` (`UsersController`, cùng chỗ 3 API cá nhân xuyên-nhóm
+khác — mục 15.4/20/25.5).
+
+**Web**: ô tìm kiếm đặt thẳng trên navbar (`_Layout.cshtml`) — chỉ hiện khi đã đăng nhập, vì tìm kiếm
+quét toàn bộ nhóm CỦA NGƯỜI ĐANG ĐĂNG NHẬP. Cố tình dùng `<form method="get">` (không phải `fetch()`),
+submit trực tiếp tới trang mới `Pages/Search.cshtml` — khớp quy ước "không fetch()" nhất quán của
+toàn dự án (đã nêu lại ở mục 25.7), và cho phép kết quả tìm kiếm có URL riêng
+(`/Search?q=...`), bookmark/chia sẻ được, giống thiết kế filter khoản chi ở mục 15.2. Trang `Search`
+đặt ở gốc `Pages/` (không phải dưới `Groups/`) — cùng lý do đã dùng cho `GroupTemplates` (mục 25.6):
+không thuộc về 1 nhóm cụ thể nào.
+
+Đã verify sống đầy đủ, không chỉ `dotnet test`: `curl` thẳng Api — tạo nhóm "Du lich Da Lat" + 1 khoản
+chi "An pho bo Da Lat" (cả 2 đều đặt tên KHÔNG dấu, chỉ khác hoa/thường) → `GET /users/me/search?
+q=da%20lat` trả đúng CẢ nhóm lẫn khoản chi với query viết HOA "DA LAT" → xác nhận đúng
+`OrdinalIgnoreCase` hoạt động (không phân biệt hoa/thường). **Chưa verify khớp không dấu** (vd gõ "da
+lat" tìm ra tên nhóm có dấu "Đà Lạt") — `OrdinalIgnoreCase` chỉ xử lý hoa/thường, KHÔNG tự bỏ dấu tiếng
+Việt; đây là giới hạn thật của cài đặt hiện tại (không phải đã kiểm chứng rồi bỏ qua), ghi nhận để
+không phóng đại phạm vi đã test. Tiếp tục: đăng nhập qua Web BFF thật (cookie + antiforgery) → xác
+nhận navbar có ô tìm kiếm → `GET /Search?q=pho` (route thật, không gọi thẳng Api) render đúng cả tên
+khoản chi, tên nhóm, và số tiền định dạng đúng "150.000"; test thêm 2 trạng thái biên qua cùng phiên
+đăng nhập: query rỗng → đúng câu hướng dẫn "Nhập từ khóa..."; query không khớp gì → đúng "Không tìm
+thấy kết quả nào cho...".
+
+`dotnet build`: 0 warning, 0 error. `dotnet test`: **286/286 pass** (74 unit + 25 web + 183 integration
++ 4 E2E — 4 test integration mới: `SearchAsync_EmptyQuery_ReturnsEmptyResult_NoDbScan`,
+`SearchAsync_MatchesGroupNameCaseInsensitive`, `SearchAsync_MatchesExpenseTitleAcrossMultipleGroups`,
+`SearchAsync_OnlyIncludesGroupsCallerIsActiveMemberOf` (`GlobalSearchServiceTests`)).

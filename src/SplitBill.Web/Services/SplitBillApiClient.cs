@@ -321,6 +321,10 @@ public sealed class SplitBillApiClient
     public Task UnsubscribeFromPushAsync(string endpoint, CancellationToken ct) =>
         DeleteAsync($"users/me/push-subscriptions?endpoint={Uri.EscapeDataString(endpoint)}", ct);
 
+    // ===== Tìm kiếm xuyên nhóm (CLAUDE.md mục 25.8) =====
+    public Task<GlobalSearchResultDto> GlobalSearchAsync(string query, CancellationToken ct) =>
+        GetAsync<GlobalSearchResultDto>($"users/me/search?q={Uri.EscapeDataString(query)}", ct);
+
     // ===== Helpers =====
     private async Task<TResponse> GetAsync<TResponse>(string path, CancellationToken ct)
     {

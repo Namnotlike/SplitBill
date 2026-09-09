@@ -1,0 +1,75 @@
+@page
+@model SearchModel
+@{
+    ViewData["Title"] = "Tìm kiếm";
+}
+
+<h1 class="mb-4">🔍 @Localizer["Tìm kiếm xuyên nhóm"]</h1>
+
+<form method="get" class="mb-4">
+    <div class="input-group">
+        <input type="search" name="q" value="@Model.Query" class="form-control" placeholder="@Localizer["Tên nhóm hoặc tiêu đề khoản chi..."]" autofocus />
+        <button type="submit" class="btn btn-primary">@Localizer["Tìm"]</button>
+    </div>
+</form>
+
+@if (Model.ErrorMessage is not null)
+{
+    <div class="alert alert-danger">@Model.ErrorMessage</div>
+}
+else if (string.IsNullOrWhiteSpace(Model.Query))
+{
+    <p class="text-muted">@Localizer["Nhập từ khóa để tìm kiếm trên toàn bộ nhóm bạn đang tham gia."]</p>
+}
+else if (Model.Result.Groups.Count == 0 && Model.Result.Expenses.Count == 0)
+{
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <div class="fs-1 mb-2">🔍</div>
+            <p class="text-muted mb-0">@Localizer["Không tìm thấy kết quả nào cho"] "@Model.Query"</p>
+        </div>
+    </div>
+}
+else
+{
+    @if (Model.Result.Groups.Count > 0)
+    {
+        <h5 class="mb-2">@Localizer["Nhóm"]</h5>
+        <div class="row g-3 mb-4">
+            @foreach (var g in Model.Result.Groups)
+            {
+                <div class="col-md-6">
+                    <a asp-page="/Groups/Details" asp-route-id="@g.GroupId" class="card h-100 text-decoration-none">
+                        <div class="card-body">
+                            <h6 class="card-title mb-1 text-body">@g.GroupName</h6>
+                            <span class="badge bg-secondary">@g.Currency</span>
+                        </div>
+                    </a>
+                </div>
+            }
+        </div>
+    }
+
+    @if (Model.Result.Expenses.Count > 0)
+    {
+        <h5 class="mb-2">@Localizer["Khoản chi"]</h5>
+        <div class="card">
+            <div class="card-body p-0">
+                <table class="table mb-0">
+                    <tbody>
+                        @foreach (var e in Model.Result.Expenses)
+                        {
+                            <tr>
+                                <td>
+                                    <a asp-page="/Expenses/Edit" asp-route-expenseId="@e.ExpenseId" class="fw-600 text-decoration-none">@e.Title</a>
+                                    <div class="text-muted small">@e.GroupName — @e.OccurredAt.ToLocalTime().ToString("dd/MM/yyyy")</div>
+                                </td>
+                                <td class="text-end fw-600">@SupportedCurrencies.Format(e.TotalAmount, e.Currency)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+}

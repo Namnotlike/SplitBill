@@ -44,6 +44,7 @@ public sealed class TestHarness : IDisposable
     public ISplitPresetService SplitPresetService { get; }
     public IGroupTemplateService GroupTemplateService { get; }
     public IUserDashboardService UserDashboardService { get; }
+    public IGlobalSearchService GlobalSearchService { get; }
     public FakeEmailSender EmailSender { get; }
     public FakeWebPushSender WebPushSender { get; }
 
@@ -109,6 +110,7 @@ public sealed class TestHarness : IDisposable
         SettlementRecordService = new SettlementRecordService(groupRepository, settlementRepository, auditLogRepository, unitOfWork, NotificationService);
         ExportService = new ExportService(ExpenseService, GroupService, BalanceService, SettlementRecordService);
         UserDashboardService = new UserDashboardService(groupRepository, GroupService, ExpenseService, SettlementRecordService);
+        GlobalSearchService = new GlobalSearchService(groupRepository, ExpenseService);
         RecurringExpenseService = new RecurringExpenseService(recurringExpenseRepository, groupRepository, splitCalculator, unitOfWork);
         RecurringExpenseRunner = new RecurringExpenseRunner(
             recurringExpenseRepository, groupRepository, expenseRepository, auditLogRepository,
