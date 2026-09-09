@@ -2626,6 +2626,16 @@ file; đăng nhập bằng trình duyệt thật, vào đúng nhóm đó, bấm 
 + Web request thật sự đi qua (không phải chỉ UI hiện nút) — response `200`, `2368` byte, khớp chính
 xác với kết quả `curl` trực tiếp trước đó.
 
-`dotnet build`: 0 warning, 0 error. `dotnet test`: **264/264 pass** (74 + 25 + 161 + 4 — 2 test mới:
+> ⚠️ **Rà soát bảo mật chủ động (không phải bug thật, xác nhận qua test)**: cùng lớp lỗi đã sửa ở mục
+> 5.4/15.6 ("không lọc `GroupMember.IsActive`") — kiểm tra lại xem 1 thành viên đã rời nhóm có còn tải
+> được `backup.json` của nhóm đó không. `ExportGroupBackupAsync` gọi `GroupService.GetByIdAsync`, vốn
+> đã dùng `ResolveCallerMember` lọc đúng `IsActive` từ trước (không phải code mới viết trong tính năng
+> này) — nên KHÔNG có lỗ hổng thật ở đây, nhưng thêm hẳn 1 test tường minh
+> (`ExportGroupBackupAsync_CallerLeftGroup_ThrowsMemberNotInGroup`) để xác nhận + chặn hồi quy nếu
+> `ResolveCallerMember` bị sửa sai trong tương lai — đúng tinh thần "review chủ động thay vì chỉ tin
+> code cũ đã đúng" khi thêm 1 endpoint mới dùng lại code path nhạy cảm về quyền hạn.
+
+`dotnet build`: 0 warning, 0 error. `dotnet test`: **265/265 pass** (74 + 25 + 162 + 4 — 3 test mới:
 `ExportGroupBackupAsync_IncludesGroupMembersExpensesAndSettlements`,
-`ExportGroupBackupAsync_CallerNotMember_ThrowsMemberNotInGroup` (`ExportServiceTests`)).
+`ExportGroupBackupAsync_CallerNotMember_ThrowsMemberNotInGroup`,
+`ExportGroupBackupAsync_CallerLeftGroup_ThrowsMemberNotInGroup` (`ExportServiceTests`)).

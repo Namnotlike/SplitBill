@@ -92,4 +92,24 @@ public sealed class ExportServiceTests
 
         await act.Should().ThrowAsync<DomainException>();
     }
+
+    [Fact]
+    public async Task ExportGroupBackupAsync_CallerLeftGroup_ThrowsMemberNotInGroup()
+    {
+        // Cùng lớp lỗi đã sửa ở CLAUDE.md mục 5.4/15.6 (không lọc GroupMember.IsActive) — thành viên
+        // đã rời nhóm không được phép tiếp tục tải backup dữ liệu của nhóm đó. GroupService.
+        // ResolveCallerMember (dùng bởi GetByIdAsync, mà ExportGroupBackupAsync gọi qua) đã lọc
+        // IsActive từ trước, test này chỉ để xác nhận tường minh + chặn hồi quy trong tương lai.
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var memberUserId = await harness.RegisterUserAsync("b@example.com", "Binh");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var member = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(memberUserId, "Binh"), CancellationToken.None);
+        // Rời nhóm chỉ được phép khi net == 0 — không có expense/settlement nào nên hợp lệ ngay.
+        await harness.GroupService.RemoveMemberAsync(ownerId, group.Id, member.Id, CancellationToken.None);
+
+        var act = () => harness.ExportService.ExportGroupBackupAsync(memberUserId, group.Id, CancellationToken.None);
+
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.MemberNotInGroup);
+    }
 }
