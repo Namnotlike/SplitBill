@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Localization;
 using SplitBill.Web.Services;
 
@@ -29,7 +30,14 @@ builder.Services.AddTransient<BearerTokenHandler>();
 builder.Services.AddHttpClient<SplitBillApiClient>(client => client.BaseAddress = new Uri(apiBaseUrl))
     .AddHttpMessageHandler<BearerTokenHandler>();
 
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+// ===== Đăng nhập bằng Google (CLAUDE.md mục 25.3, bổ sung 2026-09-09) =====
+// "External" là 1 cookie TẠM riêng, chỉ sống trong đúng luồng handshake OAuth (Challenge ->
+// Google -> callback đọc claim -> SignOutAsync("External")) — KHÔNG phải cookie đăng nhập chính của
+// app (đó vẫn là CookieAuthenticationDefaults.AuthenticationScheme, không đổi). Tách riêng để
+// GoogleCallback đọc được claim thô từ Google (sub/email/name) TRƯỚC khi tự quyết định gọi Api và
+// build lại principal/token thật qua SignInHelper — không để middleware Google tự ý sign-in thẳng
+// vào cookie chính bằng claim chưa qua Api.
+var authenticationBuilder = builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
         options.LoginPath = "/Account/Login";
@@ -38,6 +46,30 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.ExpireTimeSpan = TimeSpan.FromDays(14); // khớp RefreshTokenDays mặc định ở Api
         options.SlidingExpiration = true;
     });
+
+var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
+var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
+// ⚠️ CHỈ đăng ký scheme Google khi đã có ClientId/ClientSecret thật — KHÔNG đăng ký với chuỗi rỗng
+// rồi trông chờ handler "im lặng" khi chưa cấu hình. Đã verify bằng chạy thực tế: đăng ký AddGoogle()
+// với ClientId rỗng làm SẬP 500 MỌI trang trên Web, không riêng gì trang đăng nhập — vì
+// GoogleHandler triển khai IAuthenticationRequestHandler (để tự nhận diện CallbackPath /signin-google),
+// nên AuthenticationMiddleware gọi initialize handler đó trên MỌI request để kiểm tra path, và
+// RemoteAuthenticationOptions.Validate() ném ArgumentException("ClientId") ngay khi options rỗng —
+// hoàn toàn không liên quan gì tới việc người dùng có bấm nút "Đăng nhập bằng Google" hay không. Ẩn
+// nút ở LoginModel/RegisterModel (dựa vào đúng 2 biến bên dưới) là không đủ — phải không đăng ký
+// scheme luôn thì mới an toàn.
+if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret))
+{
+    authenticationBuilder
+        .AddCookie("External")
+        .AddGoogle(options =>
+        {
+            options.SignInScheme = "External";
+            options.ClientId = googleClientId;
+            options.ClientSecret = googleClientSecret;
+        });
+}
+
 builder.Services.AddAuthorization();
 
 var app = builder.Build();

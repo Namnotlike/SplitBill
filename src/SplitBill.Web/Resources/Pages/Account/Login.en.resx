@@ -36,4 +36,10 @@
   <data name="Đăng ký ngay" xml:space="preserve">
     <value>Sign up now</value>
   </data>
+  <data name="hoặc" xml:space="preserve">
+    <value>or</value>
+  </data>
+  <data name="Đăng nhập bằng Google" xml:space="preserve">
+    <value>Sign in with Google</value>
+  </data>
 </root>

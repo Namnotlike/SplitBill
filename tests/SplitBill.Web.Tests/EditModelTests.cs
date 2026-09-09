@@ -56,7 +56,7 @@ public sealed class EditModelTests
             };
         });
         var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost/api/v1/") };
-        var apiClient = new SplitBillApiClient(httpClient);
+        var apiClient = new SplitBillApiClient(httpClient, WebTestHelpers.EmptyConfiguration());
 
         var model = new EditModel(apiClient) { ExpenseId = ExpenseId };
         var httpContext = WebTestHelpers.CreateHttpContext();

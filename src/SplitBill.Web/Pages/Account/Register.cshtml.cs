@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Configuration;
 using SplitBill.Application.Auth;
 using SplitBill.Web.Services;
 
@@ -10,10 +11,13 @@ public class RegisterModel : PageModel
 {
     private readonly SplitBillApiClient _apiClient;
 
-    public RegisterModel(SplitBillApiClient apiClient)
+    public RegisterModel(SplitBillApiClient apiClient, IConfiguration configuration)
     {
         _apiClient = apiClient;
+        GoogleLoginEnabled = !string.IsNullOrWhiteSpace(configuration["Authentication:Google:ClientId"]);
     }
+
+    public bool GoogleLoginEnabled { get; }
 
     [BindProperty]
     public InputModel Input { get; set; } = new();

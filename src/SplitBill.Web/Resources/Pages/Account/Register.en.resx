@@ -39,4 +39,10 @@
   <data name="Đăng nhập" xml:space="preserve">
     <value>Log in</value>
   </data>
+  <data name="hoặc" xml:space="preserve">
+    <value>or</value>
+  </data>
+  <data name="Đăng nhập bằng Google" xml:space="preserve">
+    <value>Sign in with Google</value>
+  </data>
 </root>

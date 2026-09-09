@@ -37,3 +37,13 @@ public sealed class ResetPasswordRequestValidator : AbstractValidator<ResetPassw
         RuleFor(x => x.NewPassword).NotEmpty().MinimumLength(8).WithMessage("Mật khẩu phải từ 8 ký tự.");
     }
 }
+
+public sealed class GoogleLoginRequestValidator : AbstractValidator<GoogleLoginRequest>
+{
+    public GoogleLoginRequestValidator()
+    {
+        RuleFor(x => x.GoogleId).NotEmpty();
+        RuleFor(x => x.Email).NotEmpty().EmailAddress().WithMessage("Email không hợp lệ.");
+        RuleFor(x => x.DisplayName).NotEmpty().MaximumLength(100);
+    }
+}

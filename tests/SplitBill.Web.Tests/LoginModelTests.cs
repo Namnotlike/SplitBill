@@ -18,9 +18,9 @@ public sealed class LoginModelTests
     {
         var handler = new FakeHttpMessageHandler(responder);
         var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost/api/v1/") };
-        var apiClient = new SplitBillApiClient(httpClient);
+        var apiClient = new SplitBillApiClient(httpClient, WebTestHelpers.EmptyConfiguration());
 
-        var model = new LoginModel(apiClient);
+        var model = new LoginModel(apiClient, WebTestHelpers.EmptyConfiguration());
         var httpContext = WebTestHelpers.CreateHttpContext();
         WebTestHelpers.AttachPageContext(model, httpContext);
         return model;

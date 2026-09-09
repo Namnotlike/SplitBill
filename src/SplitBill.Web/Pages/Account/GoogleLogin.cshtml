@@ -1,0 +1,7 @@
+@page
+@model SplitBill.Web.Pages.Account.GoogleLoginModel
+@{
+    // OnGet() luôn trả về Challenge (redirect tới Google) trước khi trang này render — nội dung dưới
+    // đây chỉ là lưới an toàn nếu vì lý do nào đó request không bị chuyển hướng.
+}
+<p>@Localizer["Đang chuyển tới Google..."]</p>

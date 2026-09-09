@@ -184,6 +184,53 @@ public sealed class AuthServiceTests
         (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvalidResetToken);
     }
 
+    // ===== Đăng nhập bằng Google (CLAUDE.md mục 25.3, bổ sung 2026-09-09) =====
+
+    [Fact]
+    public async Task GoogleLoginAsync_NewGoogleId_CreatesUserWithNullPasswordHash()
+    {
+        using var harness = TestHarness.Create();
+
+        var tokens = await harness.AuthService.GoogleLoginAsync(
+            new GoogleLoginRequest("google-sub-1", "a@example.com", "Nam"), CancellationToken.None);
+
+        tokens.AccessToken.Should().NotBeNullOrEmpty();
+        var user = harness.DbContext.Set<User>().Single(u => u.Email == "a@example.com");
+        user.GoogleId.Should().Be("google-sub-1");
+        user.PasswordHash.Should().BeNull(); // chưa từng đặt mật khẩu — chỉ đăng nhập được qua Google
+        user.DisplayName.Should().Be("Nam");
+    }
+
+    [Fact]
+    public async Task GoogleLoginAsync_SameGoogleIdTwice_ReturnsSameUser_DoesNotDuplicate()
+    {
+        using var harness = TestHarness.Create();
+        await harness.AuthService.GoogleLoginAsync(
+            new GoogleLoginRequest("google-sub-1", "a@example.com", "Nam"), CancellationToken.None);
+
+        await harness.AuthService.GoogleLoginAsync(
+            new GoogleLoginRequest("google-sub-1", "a@example.com", "Nam"), CancellationToken.None);
+
+        harness.DbContext.Set<User>().Count(u => u.GoogleId == "google-sub-1").Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GoogleLoginAsync_EmailAlreadyRegisteredWithPassword_LinksGoogleId_KeepsPasswordLogin()
+    {
+        using var harness = TestHarness.Create();
+        await harness.AuthService.RegisterAsync(new RegisterRequest("a@example.com", "Passw0rd123", "Nam"), CancellationToken.None);
+
+        await harness.AuthService.GoogleLoginAsync(
+            new GoogleLoginRequest("google-sub-1", "a@example.com", "Nam Khac Ten"), CancellationToken.None);
+
+        var user = harness.DbContext.Set<User>().Single(u => u.Email == "a@example.com");
+        user.GoogleId.Should().Be("google-sub-1");
+        user.PasswordHash.Should().NotBeNull(); // liên kết thêm, KHÔNG xóa mất khả năng đăng nhập cũ
+        // Đăng nhập bằng mật khẩu cũ vẫn hoạt động sau khi đã liên kết Google.
+        var passwordLogin = await harness.AuthService.LoginAsync(new LoginRequest("a@example.com", "Passw0rd123"), CancellationToken.None);
+        passwordLogin.AccessToken.Should().NotBeNullOrEmpty();
+    }
+
     [Fact]
     public async Task ResetPasswordAsync_ExpiredToken_ThrowsInvalidResetToken()
     {

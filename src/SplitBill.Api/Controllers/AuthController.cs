@@ -2,8 +2,10 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using SplitBill.Application.Auth;
 using SplitBill.Application.Common;
+using SplitBill.Domain.Exceptions;
 
 namespace SplitBill.Api.Controllers;
 
@@ -18,19 +20,25 @@ public sealed class AuthController : ControllerBase
     private readonly IValidator<LoginRequest> _loginValidator;
     private readonly IValidator<ForgotPasswordRequest> _forgotPasswordValidator;
     private readonly IValidator<ResetPasswordRequest> _resetPasswordValidator;
+    private readonly IValidator<GoogleLoginRequest> _googleLoginValidator;
+    private readonly GoogleAuthOptions _googleAuthOptions;
 
     public AuthController(
         IAuthService authService,
         IValidator<RegisterRequest> registerValidator,
         IValidator<LoginRequest> loginValidator,
         IValidator<ForgotPasswordRequest> forgotPasswordValidator,
-        IValidator<ResetPasswordRequest> resetPasswordValidator)
+        IValidator<ResetPasswordRequest> resetPasswordValidator,
+        IValidator<GoogleLoginRequest> googleLoginValidator,
+        IOptions<GoogleAuthOptions> googleAuthOptions)
     {
         _authService = authService;
         _registerValidator = registerValidator;
         _loginValidator = loginValidator;
         _forgotPasswordValidator = forgotPasswordValidator;
         _resetPasswordValidator = resetPasswordValidator;
+        _googleLoginValidator = googleLoginValidator;
+        _googleAuthOptions = googleAuthOptions.Value;
     }
 
     public sealed record RefreshRequest(string RefreshToken);
@@ -81,5 +89,24 @@ public sealed class AuthController : ControllerBase
         _resetPasswordValidator.ValidateOrThrowDomainException(request);
         await _authService.ResetPasswordAsync(request, cancellationToken);
         return NoContent();
+    }
+
+    // CLAUDE.md mục 25.3 — Đăng nhập bằng Google (bổ sung 2026-09-09). CHỈ được gọi từ SplitBill.Web
+    // (đã tự xác thực toàn bộ luồng OAuth với Google TRƯỚC khi gọi tới đây) — bắt buộc header
+    // X-Internal-Secret khớp GoogleAuthOptions.InternalSecret, nếu không endpoint này sẽ là 1 lỗ hổng
+    // chiếm tài khoản (ai cũng gọi thẳng được với 1 email tùy ý). Xem GoogleAuthOptions để biết đầy đủ
+    // lý do thiết kế.
+    [HttpPost("google")]
+    public async Task<ActionResult<AuthTokens>> GoogleLoginAsync(GoogleLoginRequest request, CancellationToken cancellationToken)
+    {
+        var providedSecret = Request.Headers["X-Internal-Secret"].ToString();
+        if (!InternalSecretComparer.Matches(providedSecret, _googleAuthOptions.InternalSecret))
+        {
+            throw new DomainException(ErrorCodes.InvalidInternalSecret, "Không xác thực được nguồn gọi.");
+        }
+
+        _googleLoginValidator.ValidateOrThrowDomainException(request);
+        var tokens = await _authService.GoogleLoginAsync(request, cancellationToken);
+        return Ok(tokens);
     }
 }

@@ -4,10 +4,15 @@
     <ProjectReference Include="..\SplitBill.Application\SplitBill.Application.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="9.0.9" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>b4ee3d50-a05d-46d8-abd3-7ad4525a2d14</UserSecretsId>
   </PropertyGroup>
 
 </Project>

@@ -38,4 +38,6 @@ public static class ErrorCodes
     // Khôi phục khoản chi/thanh toán đã xóa (CLAUDE.md mục 24, bổ sung 2026-09-09).
     public const string ExpenseNotDeleted = "EXPENSE_NOT_DELETED";
     public const string SettlementNotDeleted = "SETTLEMENT_NOT_DELETED";
+    // Đăng nhập bằng Google (CLAUDE.md mục 25.3, bổ sung 2026-09-09).
+    public const string InvalidInternalSecret = "INVALID_INTERNAL_SECRET";
 }

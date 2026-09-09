@@ -21,7 +21,7 @@ public sealed class IndexModelTests
     {
         var handler = new FakeHttpMessageHandler(responder);
         var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost/api/v1/") };
-        var apiClient = new SplitBillApiClient(httpClient);
+        var apiClient = new SplitBillApiClient(httpClient, WebTestHelpers.EmptyConfiguration());
 
         var model = new IndexModel(apiClient);
         var httpContext = WebTestHelpers.CreateHttpContext();

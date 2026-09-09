@@ -29,6 +29,13 @@
                 <a asp-page="/Account/ForgotPassword" class="text-muted">@Localizer["Quên mật khẩu?"]</a>
             </p>
             <button type="submit" class="btn btn-primary w-100 mb-3">@Localizer["Đăng nhập"]</button>
+            @if (Model.GoogleLoginEnabled)
+            {
+                <div class="text-center text-muted mb-3">@Localizer["hoặc"]</div>
+                <a asp-page="/Account/GoogleLogin" asp-route-returnUrl="@Model.ReturnUrl" class="btn btn-outline-secondary w-100 mb-3">
+                    @Localizer["Đăng nhập bằng Google"]
+                </a>
+            }
             <p class="text-center text-muted mb-0">
                 @Localizer["Chưa có tài khoản?"] <a asp-page="/Account/Register" asp-route-returnUrl="@Model.ReturnUrl">@Localizer["Đăng ký ngay"]</a>
             </p>

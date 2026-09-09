@@ -17,4 +17,10 @@ public interface IAuthService
     /// RefreshToken hiện có của user (đổi mật khẩu = đăng xuất mọi phiên khác, phòng trường hợp mật
     /// khẩu cũ đã bị lộ).</summary>
     Task ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken);
+
+    /// <summary>Đăng nhập/đăng ký qua Google (CLAUDE.md mục 25.3). Tìm theo GoogleId trước; nếu chưa
+    /// liên kết nhưng Email đã có tài khoản (đăng ký bằng mật khẩu từ trước) thì tự liên kết (Google
+    /// đã xác thực chủ sở hữu email); nếu chưa từng tồn tại thì tạo User mới với PasswordHash null
+    /// (chỉ đăng nhập được qua Google, không có mật khẩu).</summary>
+    Task<AuthTokens> GoogleLoginAsync(GoogleLoginRequest request, CancellationToken cancellationToken);
 }

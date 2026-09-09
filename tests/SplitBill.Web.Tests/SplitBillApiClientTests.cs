@@ -17,7 +17,7 @@ public sealed class SplitBillApiClientTests
     {
         var handler = new FakeHttpMessageHandler(responder);
         var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost/api/v1/") };
-        return (new SplitBillApiClient(httpClient), handler);
+        return (new SplitBillApiClient(httpClient, WebTestHelpers.EmptyConfiguration()), handler);
     }
 
     private static HttpResponseMessage JsonResponse(HttpStatusCode status, object body) => new(status)

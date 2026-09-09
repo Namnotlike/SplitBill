@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Configuration;
 using SplitBill.Application.Auth;
 using SplitBill.Web.Services;
 
@@ -10,10 +11,15 @@ public class LoginModel : PageModel
 {
     private readonly SplitBillApiClient _apiClient;
 
-    public LoginModel(SplitBillApiClient apiClient)
+    public LoginModel(SplitBillApiClient apiClient, IConfiguration configuration)
     {
         _apiClient = apiClient;
+        // Chỉ hiện nút "Đăng nhập bằng Google" khi đã cấu hình ClientId thật (CLAUDE.md mục 25.3) —
+        // tránh dẫn người dùng vào 1 luồng chắc chắn lỗi (Google từ chối client_id rỗng).
+        GoogleLoginEnabled = !string.IsNullOrWhiteSpace(configuration["Authentication:Google:ClientId"]);
     }
+
+    public bool GoogleLoginEnabled { get; }
 
     [BindProperty]
     public InputModel Input { get; set; } = new();

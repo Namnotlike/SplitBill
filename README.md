@@ -26,8 +26,9 @@ SplitBill.sln
 ```
 
 **Tech stack**: .NET 9 · ASP.NET Core Web API + Razor Pages · EF Core 9 (Code-First) · SQL Server ·
-JWT Bearer + refresh-token rotation · FluentValidation · Serilog · Swashbuckle · MailKit (gửi email) ·
-xUnit + FluentAssertions · Microsoft.Playwright (E2E).
+JWT Bearer + refresh-token rotation · Đăng nhập Google (OAuth, `Microsoft.AspNetCore.Authentication.Google`)
+· FluentValidation · Serilog · Swashbuckle · MailKit (gửi email) · xUnit + FluentAssertions ·
+Microsoft.Playwright (E2E).
 
 ## Yêu cầu
 
@@ -46,6 +47,23 @@ dotnet user-secrets set "Jwt:SigningKey" "<chuỗi random ít nhất 32 ký tự
 ```
 
 Không đặt giá trị thật vào `appsettings.json` — xem CLAUDE.md mục "Production-hardening" để biết lý do.
+
+**Tùy chọn — Đăng nhập bằng Google** (CLAUDE.md mục 25.3): để trống thì nút "Đăng nhập bằng Google" tự
+ẩn trên Web, không ảnh hưởng gì tới phần còn lại của app. Muốn bật:
+
+```powershell
+cd src/SplitBill.Api
+dotnet user-secrets set "GoogleAuth:InternalSecret" "<chuỗi random bất kỳ>"
+cd ../SplitBill.Web
+dotnet user-secrets set "GoogleAuth:InternalSecret" "<CÙNG chuỗi random ở trên>"
+dotnet user-secrets set "Authentication:Google:ClientId" "<Client ID thật từ Google Cloud Console>"
+dotnet user-secrets set "Authentication:Google:ClientSecret" "<Client Secret thật>"
+```
+
+`GoogleAuth:InternalSecret` phải giống hệt nhau ở cả 2 project (bí mật dùng chung bảo vệ
+`POST /auth/google`, xem CLAUDE.md mục 25.3) — Client ID/Secret thật thì phải tự tạo trên [Google Cloud
+Console](https://console.cloud.google.com/apis/credentials) (loại "OAuth client ID", Web application,
+Authorized redirect URI = `http://localhost:5103/signin-google`).
 
 ### 2. Tạo database + áp migration
 
@@ -85,7 +103,7 @@ Swagger UI cho Api (chỉ bật ở Development): `http://localhost:5199/swagger
 dotnet test SplitBill.sln
 ```
 
-254 test (69 unit + 156 integration + 25 web + 4 E2E — xem mục "E2E test" dưới đây), toàn bộ chạy trên
+262 test (74 unit + 159 integration + 25 web + 4 E2E — xem mục "E2E test" dưới đây), toàn bộ chạy trên
 EF Core InMemory — không cần SQL Server thật để chạy test. Lần chạy đầu tiên có thể chậm hơn vì
 `SplitBill.E2ETests` tự tải trình duyệt Chromium (một lần duy nhất, xem mục "E2E test").
 

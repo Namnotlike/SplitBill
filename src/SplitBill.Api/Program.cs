@@ -146,6 +146,12 @@ try
     // mật, không có default an toàn nào).
     builder.Services.Configure<WebOptions>(builder.Configuration.GetSection(WebOptions.SectionName));
 
+    // ===== Đăng nhập bằng Google (CLAUDE.md mục 25.3) — bí mật dùng chung với SplitBill.Web bảo vệ
+    // POST /auth/google. Không fail-fast nếu thiếu (khác Jwt:SigningKey) — Google OAuth là tính năng
+    // tùy chọn, để trống chỉ khiến riêng endpoint đó luôn từ chối (fail closed, xem
+    // InternalSecretComparer), không chặn toàn bộ Api chạy.
+    builder.Services.Configure<GoogleAuthOptions>(builder.Configuration.GetSection(GoogleAuthOptions.SectionName));
+
     // ===== Email (CLAUDE.md mục 13.3) =====
     // Chưa cấu hình SMTP (Smtp:Host rỗng) -> dùng ConsoleEmailSender (chỉ log), không fail-fast như
     // Jwt:SigningKey — quyết định người dùng 2026-09-05, môi trường dev/test chưa có SMTP thật.

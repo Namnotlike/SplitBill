@@ -194,6 +194,37 @@ public sealed class AuthService : IAuthService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<AuthTokens> GoogleLoginAsync(GoogleLoginRequest request, CancellationToken cancellationToken)
+    {
+        var user = await _userRepository.GetByGoogleIdAsync(request.GoogleId, cancellationToken);
+        if (user is null)
+        {
+            user = await _userRepository.GetByEmailAsync(request.Email, cancellationToken);
+            if (user is not null)
+            {
+                // Email này đã có tài khoản (đăng ký bằng mật khẩu từ trước) — Google đã xác thực
+                // chủ sở hữu email này (OAuth) nên tự liên kết an toàn, không tạo User trùng lặp. Từ
+                // đây user có thể đăng nhập bằng CẢ HAI cách (mật khẩu cũ hoặc Google).
+                user.GoogleId = request.GoogleId;
+            }
+            else
+            {
+                user = new User
+                {
+                    Id = Guid.NewGuid(),
+                    Email = request.Email,
+                    DisplayName = request.DisplayName,
+                    GoogleId = request.GoogleId,
+                    PasswordHash = null, // chỉ đăng nhập được qua Google, chưa từng đặt mật khẩu
+                    CreatedAt = DateTimeOffset.UtcNow,
+                };
+                await _userRepository.AddAsync(user, cancellationToken);
+            }
+        }
+
+        return await IssueTokensAsync(user, cancellationToken);
+    }
+
     private async Task<AuthTokens> IssueTokensAsync(User user, CancellationToken cancellationToken)
     {
         var (accessToken, accessExpiresAt) = _jwtTokenGenerator.GenerateAccessToken(user);

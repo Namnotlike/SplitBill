@@ -53,6 +53,7 @@ public sealed class ExceptionHandlingMiddleware
     {
         ErrorCodes.InvalidCredentials => StatusCodes.Status401Unauthorized,
         ErrorCodes.InvalidRefreshToken => StatusCodes.Status401Unauthorized,
+        ErrorCodes.InvalidInternalSecret => StatusCodes.Status401Unauthorized,
         ErrorCodes.InsufficientRole => StatusCodes.Status403Forbidden,
         ErrorCodes.MemberNotInGroup => StatusCodes.Status403Forbidden,
         ErrorCodes.GroupNotFound => StatusCodes.Status404NotFound,

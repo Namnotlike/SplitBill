@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 using SplitBill.Application.Auth;
 using SplitBill.Application.Expenses;
 using SplitBill.Application.Groups;
@@ -21,10 +22,15 @@ public sealed class SplitBillApiClient
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly HttpClient _httpClient;
+    private readonly string _googleAuthInternalSecret;
 
-    public SplitBillApiClient(HttpClient httpClient)
+    public SplitBillApiClient(HttpClient httpClient, IConfiguration configuration)
     {
         _httpClient = httpClient;
+        // Bí mật dùng chung bảo vệ POST /auth/google (CLAUDE.md mục 25.3) — phải khớp
+        // GoogleAuth:InternalSecret bên SplitBill.Api, đọc thẳng qua IConfiguration (không cần
+        // strongly-typed options riêng cho 1 giá trị đơn lẻ dùng ở đúng 1 chỗ).
+        _googleAuthInternalSecret = configuration["GoogleAuth:InternalSecret"] ?? string.Empty;
     }
 
     // ===== Auth =====
@@ -43,6 +49,20 @@ public sealed class SplitBillApiClient
 
     public Task ResetPasswordAsync(ResetPasswordRequest request, CancellationToken ct) =>
         PostNoContentAsync("auth/reset-password", request, ct);
+
+    /// <summary>Đăng nhập bằng Google (CLAUDE.md mục 25.3) — khác các call auth/* khác ở chỗ cần đính
+    /// kèm header X-Internal-Secret nên không dùng được helper PostAsync chung.</summary>
+    public async Task<AuthTokens> GoogleLoginAsync(GoogleLoginRequest request, CancellationToken ct)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Post, "auth/google")
+        {
+            Content = JsonContent.Create(request, options: JsonOptions),
+        };
+        message.Headers.Add("X-Internal-Secret", _googleAuthInternalSecret);
+
+        var response = await _httpClient.SendAsync(message, ct);
+        return await ReadOrThrowAsync<AuthTokens>(response, ct);
+    }
 
     // ===== Users =====
     public Task<UserProfileDto> GetMeAsync(CancellationToken ct) => GetAsync<UserProfileDto>("users/me", ct);

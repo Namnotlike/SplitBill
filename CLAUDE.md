@@ -2305,6 +2305,10 @@ riêng). 3 hạng mục cần thêm NuGet package (Đăng nhập Google, Web Pus
 trước khi thêm dependency, đúng CLAUDE.md mục 2 — "Làm hết" chỉ phê duyệt phạm vi tính năng, không tự
 động phê duyệt từng NuGet package cụ thể bên trong.
 
+Tiến độ: 1. Khôi phục khoản chi/thanh toán đã xóa — đã làm (mục 25.1). 2. Miễn nợ — đã làm (mục 25.2).
+3. Đăng nhập bằng Google — đã làm (mục 25.3, người dùng đã đồng ý thêm
+`Microsoft.AspNetCore.Authentication.Google`).
+
 ### 25.1 Khôi phục khoản chi/thanh toán đã xóa (hạng mục 1/9)
 
 Soft-delete (`Expense.IsDeleted`/`Settlement.IsDeleted`) đã có sẵn từ M1 (mục 1 "Không xóa cứng dữ liệu
@@ -2475,3 +2479,111 @@ test mới: `WaiveAsync_ByCreditor_CreatesConfirmedWaivedSettlement`,
 > `CreateHost` khi entry point dùng `WebApplication.CreateBuilder` (minimal hosting) — chưa verify được
 > trong phiên này, chỉ mới verify được TRIỆU CHỨNG (cả 2 real host start ok, testHost mới là nơi hỏng)
 > chứ chưa verify được NGUYÊN NHÂN gốc bên trong runtime.
+
+### 25.3 Đăng nhập bằng Google (hạng mục 3/9)
+
+Tính năng đầu tiên trong danh sách mục 25 cần thêm NuGet package — đã hỏi lại người dùng trước khi
+thêm (đúng CLAUDE.md mục 2 và tinh thần đã ghi ở đầu mục 25). Người dùng đồng ý thêm
+`Microsoft.AspNetCore.Authentication.Google` (9.0.9, khớp version `Microsoft.AspNetCore.Authentication.JwtBearer`
+đã dùng ở Api) và tự chịu trách nhiệm tạo Google Cloud OAuth Client ID/Secret thật sau (việc này chỉ
+người dùng làm được, không phải việc AI tự làm thay).
+
+**Kiến trúc — luồng xác thực nằm ở Web, Api chỉ nhận claim đã qua kiểm chứng:**
+
+`SplitBill.Web` (không phải `SplitBill.Api`) đăng ký `Microsoft.AspNetCore.Authentication.Google` và
+tự chạy toàn bộ luồng OAuth Authorization Code (Web giữ ClientSecret, tự trao đổi code lấy token với
+Google) — khớp đúng kiến trúc BFF sẵn có (mục 10b, trình duyệt không bao giờ thấy JWT thật). Sau khi
+Web đã tự xác thực xong với Google, Web gọi `POST /api/v1/auth/google` (Api) để đổi thành `User`/JWT
+thật của hệ thống — tái dùng đúng `IssueTokensAsync` sẵn có trong `AuthService` (không viết lại logic
+phát token).
+
+**Vấn đề bảo mật cốt lõi phải giải quyết trước khi viết code**: `POST /auth/google` (như mọi endpoint
+`/auth/*` khác) là `[AllowAnonymous]` — nếu để nó tin thẳng `{ GoogleId, Email, DisplayName }` trong
+request body mà không kiểm tra gì, BẤT KỲ AI cũng gọi thẳng được endpoint này với 1 email tùy ý để
+chiếm tài khoản người khác (không cần biết mật khẩu, không cần thật sự đăng nhập Google). Cân nhắc
+dùng `Google.Apis.Auth` để Api tự verify ID token (JWT ký bởi Google) — nhưng chọn phương án ĐƠN GIẢN
+HƠN, không cần thêm NuGet package thứ 2: Web (đã tự xác thực với Google bằng ClientSecret, nên
+`HttpContext.User` claims sau OAuth callback đã đáng tin) đính kèm header `X-Internal-Secret` khớp 1
+bí mật dùng chung (`GoogleAuthOptions.InternalSecret`, cấu hình qua `GoogleAuth:InternalSecret` ở CẢ
+Api lẫn Web, cùng mẫu `user-secrets`/biến môi trường như `Jwt:SigningKey` — nhưng KHÔNG fail-fast lúc
+khởi động, vì đây là tính năng tùy chọn: thiếu cấu hình chỉ khiến riêng endpoint này luôn từ chối, "fail
+closed", không chặn Api chạy). So sánh secret bằng `CryptographicOperations.FixedTimeEquals` (qua
+`InternalSecretComparer`, có unit test riêng) — thời gian cố định, tránh side-channel, cùng mức cẩn
+trọng đã áp dụng cho `ForgotPasswordAsync` (mục 16.2).
+
+**Liên kết tài khoản**: `AuthService.GoogleLoginAsync` tìm theo `User.GoogleId` trước; nếu chưa liên
+kết nhưng `Email` đã có tài khoản (đăng ký bằng mật khẩu từ trước) thì TỰ liên kết (`user.GoogleId =
+request.GoogleId`) — an toàn vì Google đã xác thực chủ sở hữu email đó qua OAuth, từ đây user đăng
+nhập được bằng CẢ HAI cách; nếu chưa từng tồn tại thì tạo `User` mới với `PasswordHash = null` (chỉ
+đăng nhập được qua Google — ca ĐẦU TIÊN trong dự án có `User.PasswordHash` null, trước đó luôn giả
+định mọi `User` đều có mật khẩu). `User.GoogleId` có unique index lọc `WHERE [GoogleId] IS NOT NULL`
+(cùng mẫu `Email`, migration `AddUserGoogleId`).
+
+**UI**: nút "Đăng nhập bằng Google" trên `Account/Login.cshtml` và `Account/Register.cshtml` (cùng 1
+nút, vì đăng nhập Google luôn tự tạo tài khoản nếu chưa có — không cần trang riêng) — CHỈ hiện khi
+`Authentication:Google:ClientId` đã cấu hình thật (`LoginModel`/`RegisterModel.GoogleLoginEnabled`),
+tránh dẫn người dùng vào 1 luồng chắc chắn lỗi khi Google chưa được thiết lập. Bấm nút → GET
+`/Account/GoogleLogin` (chỉ để `Challenge()` tới Google) → Google → callback về
+`/Account/GoogleCallback` (đọc claim từ 1 cookie "External" TẠM — tách riêng khỏi cookie đăng nhập
+chính, để tự kiểm soát việc gọi Api rồi mới `SignInHelper.SignInAsync` build lại principal/token thật,
+không để middleware Google tự ý sign-in thẳng bằng claim chưa qua Api).
+
+> ⚠️ **Bug thật nghiêm trọng phát hiện qua `dotnet test` (không phải qua verify sống — lộ ra ngay từ
+> lần chạy E2ETests đầu tiên sau khi thêm code):** đăng ký `.AddGoogle(options => { options.ClientId =
+> "" ...})` với `ClientId` RỖNG (mặc định khi người dùng chưa kịp cấu hình Google Cloud — đúng trạng
+> thái mặc định của mọi máy dev/CI) làm SẬP 500 **MỌI TRANG** trên `SplitBill.Web`, không riêng gì
+> trang đăng nhập — cả 4 test `SplitBill.E2ETests` (vốn không đụng gì tới Google) đều fail đồng loạt
+> với `System.ArgumentException: The value cannot be an empty string. (Parameter 'ClientId')` ném từ
+> `OAuthOptions.Validate()`. Nguyên nhân: `GoogleHandler` triển khai `IAuthenticationRequestHandler` (để
+> tự nhận diện `CallbackPath` mặc định `/signin-google`), nên `AuthenticationMiddleware` gọi khởi tạo
+> handler đó trên **MỌI request** (để kiểm tra path có khớp callback không) — hoàn toàn không liên
+> quan gì tới việc người dùng có bấm nút "Đăng nhập bằng Google" hay không, và việc ẩn nút ở
+> `LoginModel`/`RegisterModel` (chỉ là UI, không ngăn middleware chạy) là KHÔNG ĐỦ để tránh lỗi này. Đã
+> sửa bằng cách **không đăng ký scheme Google luôn** (bỏ hẳn `.AddCookie("External").AddGoogle(...)`
+> ra khỏi pipeline) khi `Authentication:Google:ClientId`/`ClientSecret` rỗng — chỉ khi CẢ HAI đã cấu
+> hình thật thì mới gọi `AddGoogle`. `GoogleLoginModel`/`GoogleCallbackModel` được thêm lưới an toàn
+> tương ứng (`IAuthenticationSchemeProvider.GetSchemeAsync`/bắt `InvalidOperationException` quanh
+> `AuthenticateAsync`) để không sập 500 nếu ai đó vẫn cố tình gõ thẳng URL `/Account/GoogleLogin`/
+> `/Account/GoogleCallback` trước khi scheme được đăng ký. Rút kinh nghiệm quan trọng cho các provider
+> `IAuthenticationRequestHandler` khác (Facebook, Microsoft...) nếu thêm sau này: KHÔNG BAO GIỜ đăng ký
+> 1 remote-auth scheme với ClientId/Secret rỗng "cho chắc rồi tính sau" — phải đăng ký CÓ ĐIỀU KIỆN dựa
+> trên việc credential đã sẵn sàng hay chưa.
+>
+> ⚠️ **Bug thứ 2, nhỏ hơn, phát hiện lúc verify sống bằng curl trực tiếp vào `/auth/google`:** endpoint
+> trả `500 Invalid column name 'GoogleId'` — không phải lỗi code, mà vì migration `AddUserGoogleId` mới
+> viết ra chưa từng được áp (`dotnet ef database update`) vào LocalDB thật đang dùng để chạy server dev
+> (khác hẳn `dotnet test`, luôn tự tạo schema mới từ EF Core InMemory nên không bao giờ lộ loại lỗi
+> này) — một lời nhắc rằng `dotnet test` xanh không chứng minh migration đã được áp đúng vào 1 DB thật;
+> luôn phải tự `dotnet ef database update` trước khi verify sống lần đầu sau khi thêm migration mới.
+
+**Đã verify sống, đầy đủ 3 lớp** (không chỉ `dotnet test`, vì `SplitBill.E2ETests` cố tình KHÔNG kiểm
+Google thật — xem lý do bên dưới):
+1. `curl` thẳng vào `POST /auth/google` (Api thật, LocalDB thật): thiếu header → `401
+   INVALID_INTERNAL_SECRET`; header sai → `401` (cùng lỗi, không phân biệt "sai" khỏi "thiếu" để không
+   lộ thêm thông tin); header đúng → `200` kèm token thật, gọi lại đúng `GoogleId` lần 2 → cùng 1
+   `sub` trong JWT (không tạo `User` trùng).
+2. `SplitBill.Web` thật (chưa cấu hình `Authentication:Google:ClientId`) — trang Login/Register KHÔNG
+   hiện nút Google (đúng thiết kế); cố tình gõ thẳng `/Account/GoogleLogin` → redirect êm về
+   `/Account/Login`, không sập 500 (xác nhận bug #1 ở trên đã sửa đúng, không chỉ ẩn nút mà còn thật
+   sự an toàn ở tầng middleware).
+3. Cấu hình tạm 1 Client ID/Secret GIẢ (`123456-fake.apps.googleusercontent.com`, chỉ để verify luồng
+   redirect, không phải credential thật) → nút Google hiện đúng → bấm → trình duyệt redirect THẬT sang
+   `accounts.google.com`, Google trả về đúng lỗi `Error 401: invalid_client` (vì client giả không tồn
+   tại) — xác nhận `Challenge()`/`GoogleHandler` build đúng request OAuth thật, chỉ riêng bước xác thực
+   ở phía Google mới cần credential thật của người dùng. Đã xóa Client ID/Secret giả này khỏi
+   user-secrets sau khi verify xong, không để lại trong máy.
+
+**Cố tình KHÔNG viết E2E test (Playwright) cho luồng Google thật** — khác mọi tính năng auth khác đã
+có E2E (mục 24.5): việc này đòi hỏi 1 tài khoản Google test thật + Client ID/Secret thật, cả hai đều
+không có sẵn trong môi trường CI/dev hiện tại, và tự động hóa việc đăng nhập qua trang thật của Google
+(có CAPTCHA/2FA/consent screen thay đổi liên tục) vốn không phải việc CI nên làm. Bù lại:
+`AuthService.GoogleLoginAsync` có 3 integration test (tạo mới, gọi lại không trùng, liên kết tài khoản
+có sẵn) và `InternalSecretComparer` có 5 unit test — đủ phủ toàn bộ logic C# tự viết; phần duy nhất
+chưa được test tự động là chính luồng OAuth với Google thật, đã bù bằng verify sống thủ công ở trên.
+
+`dotnet build`: 0 warning, 0 error. `dotnet test`: **262/262 pass** (74 UnitTests + 25 Web.Tests + 159
+IntegrationTests + 4 E2ETests — 8 test mới: `InternalSecretComparerTests` (5, UnitTests),
+`GoogleLoginAsync_NewGoogleId_CreatesUserWithNullPasswordHash`,
+`GoogleLoginAsync_SameGoogleIdTwice_ReturnsSameUser_DoesNotDuplicate`,
+`GoogleLoginAsync_EmailAlreadyRegisteredWithPassword_LinksGoogleId_KeepsPasswordLogin` (3,
+`AuthServiceTests`)).

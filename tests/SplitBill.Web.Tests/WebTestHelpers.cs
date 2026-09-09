@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace SplitBill.Web.Tests;
@@ -10,6 +11,11 @@ namespace SplitBill.Web.Tests;
 /// <summary>Dựng HttpContext/PageContext tối giản để test PageModel mà không cần chạy cả host.</summary>
 public static class WebTestHelpers
 {
+    /// <summary>IConfiguration rỗng — đủ dùng cho SplitBillApiClient/LoginModel/RegisterModel (chỉ
+    /// đọc vài key tùy chọn như Authentication:Google:ClientId/GoogleAuth:InternalSecret, tất cả đều
+    /// coi null/rỗng là "chưa cấu hình" một cách an toàn, không throw — CLAUDE.md mục 25.3).</summary>
+    public static IConfiguration EmptyConfiguration() => new ConfigurationBuilder().Build();
+
     public static DefaultHttpContext CreateHttpContext()
     {
         var services = new ServiceCollection();
