@@ -2309,6 +2309,7 @@ Tiến độ: 1. Khôi phục khoản chi/thanh toán đã xóa — đã làm (m
 3. Đăng nhập bằng Google — đã làm (mục 25.3, người dùng đã đồng ý thêm
 `Microsoft.AspNetCore.Authentication.Google`). 4. Xuất/backup dữ liệu nhóm dạng JSON — đã làm (mục
 25.4, không cần NuGet mới). 5. Dashboard cá nhân nâng cao — đã làm (mục 25.5, không cần NuGet mới).
+6. Mẫu nhóm tái sử dụng — đã làm (mục 25.6, không cần NuGet mới).
 
 ### 25.1 Khôi phục khoản chi/thanh toán đã xóa (hạng mục 1/9)
 
@@ -2688,3 +2689,70 @@ không có lỗi console nào.
 `GetDashboardAsync_UserWithNoGroups_ReturnsEmptyDashboard` (`UserDashboardServiceTests`) — Web.Tests
 không tăng số lượng, chỉ mở rộng 2 test sẵn có trong `IndexModelTests` thêm assertion cho
 `Dashboard.Should().BeNull()`).
+
+### 25.6 Mẫu nhóm tái sử dụng (hạng mục 6/9)
+
+Không cần NuGet mới. Lưu sẵn 1 "khung" nhóm (loại, tiền tệ, `SimplifyDebts`, danh sách tên khách vãng
+lai hay đi cùng) để tạo nhóm mới trong 1 lượt, không phải thêm lại từng thành viên mỗi lần.
+
+**Khác "Nhân bản nhóm" (mục 18)**: mục 18 cần 1 Group NGUỒN đang tồn tại, copy nguyên `GroupMember`
+thật (kể cả người có tài khoản) từ nhóm đó. Mẫu nhóm (mục này) là tài nguyên **CỦA RIÊNG 1 User**,
+hoàn toàn không tham chiếu tới bất kỳ Group cụ thể nào — chỉ lưu TÊN các khách vãng lai (không lưu
+`GroupMemberId`/`UserId`) — nên vẫn dùng lại được bình thường dù nhóm mà người dùng "lấy cảm hứng" lúc
+đầu đã bị xóa từ lâu (đã có test tường minh cho đúng tình huống này,
+`DeleteAsync_TemplateStillDeletedAfterSourceGroupDeleted_UnrelatedToAnyGroupLifecycle`).
+
+**Mô hình dữ liệu**: `GroupTemplate { Id, CreatedByUserId, Name, Description?, Type, Currency,
+SimplifyDebts, MemberNamesJson (JSON string[]), IsDeleted, CreatedAt }`. Soft-delete + query filter,
+cùng quy ước `ExpenseComment`/`SplitPreset` (mục 19/21). Migration `AddGroupTemplate`.
+
+**Quyền hạn — đơn giản hơn hẳn các tài nguyên theo Group khác**: không có khái niệm `GroupMemberRole`
+vì mẫu không thuộc về 1 Group nào — chỉ so khớp `GroupTemplate.CreatedByUserId == callerUserId`.
+`LoadOwnedTemplateAsync` cố tình **không phân biệt "không tồn tại" với "tồn tại nhưng của người
+khác"** — cả 2 đều ném chung 1 lỗi `GROUP_TEMPLATE_NOT_FOUND` (fail closed, không lộ thêm thông tin,
+cùng nguyên tắc `INVALID_CREDENTIALS` ở mục 8 không tiết lộ email có tồn tại hay không).
+
+**Tạo Group từ mẫu — KHÔNG viết lại logic tạo nhóm/thêm thành viên nào**, gọi thẳng lại
+`IGroupService` đã có (đúng nguyên tắc "orchestrate service có sẵn" đã áp dụng cho Export mục 25.4 và
+Dashboard mục 25.5):
+```
+1. IGroupService.CreateAsync(...) — GroupName rỗng/null thì dùng nguyên Name của mẫu.
+2. Nếu mẫu tắt SimplifyDebts (CreateAsync luôn khởi tạo true) -> gọi thêm IGroupService.UpdateAsync
+   để tắt. Chỉ gọi khi cần, tránh 1 lượt ghi + audit log "Updated" thừa cho trường hợp phổ biến hơn
+   (giữ mặc định true).
+3. Với mỗi tên trong MemberNamesJson -> IGroupService.AddMemberAsync(..., new AddMemberRequest(null, name))
+   (khách vãng lai, UserId null).
+4. Đọc lại GetByIdAsync để trả về đúng Members đầy đủ (group ở bước 1 chưa có members mới thêm).
+```
+
+**API**: `GET/POST /api/v1/group-templates`, `DELETE /api/v1/group-templates/{id}`,
+`POST /api/v1/group-templates/{id}/create-group` (body `{ groupName }`, rỗng/null dùng tên mẫu).
+
+**Web**: trang mới `Groups/Templates.cshtml` (không đặt dưới `Groups/Details` vì không thuộc 1 Group
+cụ thể nào — đặt cạnh `Groups/Index`, có nút "🗂️ Mẫu nhóm của tôi" trên trang đó dẫn sang). Danh sách
+khách vãng lai nhập qua `<textarea>` mỗi dòng 1 tên (`TemplatesModel.BuildMemberNames` tách theo `\n`,
+bỏ dòng rỗng) — đơn giản hơn hẳn UI Itemized/SplitPreset (mục 21) vì đây chỉ là danh sách tên phẳng,
+không có cấu trúc lồng nhau nào cần JS động.
+
+> **Lưu ý quy trình cho phiên này**: không có kết nối tới Chrome extension (`claude-in-chrome` báo
+> "Browser extension is not connected") nên không thực hiện được click-through bằng automation trình
+> duyệt như các tính năng trước. Đã bù bằng verify sống qua `curl` **đi đúng qua Web BFF thật** (không
+> chỉ gọi thẳng Api) — đăng nhập lấy cookie thật (`POST /Account/Login` kèm antiforgery token đọc từ
+> HTML), sau đó `POST /Groups/Templates?handler=Create/CreateGroup/Delete` với antiforgery token đọc
+> lại từ mỗi lần render — xác nhận đúng luồng cookie auth + CSRF token mà trình duyệt thật sẽ đi qua,
+> chỉ khác là không có screenshot. Kết quả: tạo mẫu "Nhom karaoke" → hiện đúng trong danh sách kèm
+> banner thành công → bấm "+ Tạo nhóm" (không nhập tên override) → redirect đúng
+> `/Groups/Details/{id mới}` → trang Details hiện đúng tên nhóm + Owner; tạo lần 2 với mẫu USD/
+> `SimplifyDebts=false`/2 khách "Binh","Cuong" qua API trực tiếp → `GroupDto` trả về đúng
+> `currency=USD`, `simplifyDebts=false`, đúng 3 members (Owner + 2 khách, role/userId đúng); người
+> lạ gọi `DELETE`/`create-group` trên mẫu không phải của mình → đúng `400 GROUP_TEMPLATE_NOT_FOUND`
+> cho cả 2 endpoint; xóa mẫu qua form Web → danh sách rỗng trở lại đúng thông báo trống.
+
+`dotnet build`: 0 warning, 0 error. `dotnet test`: **277/277 pass** (74 unit + 25 web + 174 integration
++ 4 E2E — 8 test integration mới: `CreateAsync_PersistsTemplate_WithMemberNames`,
+`GetMyTemplatesAsync_OnlyReturnsCallersOwnTemplates`,
+`CreateGroupFromTemplateAsync_CreatesGroupWithGuestMembersAndSettings`,
+`CreateGroupFromTemplateAsync_WithOverrideName_UsesOverride`,
+`DeleteAsync_TemplateStillDeletedAfterSourceGroupDeleted_UnrelatedToAnyGroupLifecycle`,
+`DeleteAsync_ByOwner_RemovesFromList`, `DeleteAsync_ByOtherUser_ThrowsGroupTemplateNotFound`,
+`CreateGroupFromTemplateAsync_ByOtherUser_ThrowsGroupTemplateNotFound` (`GroupTemplateServiceTests`)).

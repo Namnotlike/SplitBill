@@ -42,6 +42,7 @@ public sealed class TestHarness : IDisposable
     public IDebtReminderRunner DebtReminderRunner { get; }
     public IExpenseCommentService ExpenseCommentService { get; }
     public ISplitPresetService SplitPresetService { get; }
+    public IGroupTemplateService GroupTemplateService { get; }
     public IUserDashboardService UserDashboardService { get; }
     public FakeEmailSender EmailSender { get; }
 
@@ -104,6 +105,8 @@ public sealed class TestHarness : IDisposable
         ExpenseCommentService = new ExpenseCommentService(expenseCommentRepository, expenseRepository, groupRepository, unitOfWork);
         var splitPresetRepository = new SplitPresetRepository(dbContext);
         SplitPresetService = new SplitPresetService(splitPresetRepository, groupRepository, unitOfWork);
+        var groupTemplateRepository = new GroupTemplateRepository(dbContext);
+        GroupTemplateService = new GroupTemplateService(groupTemplateRepository, GroupService, unitOfWork);
     }
 
     public static TestHarness Create()

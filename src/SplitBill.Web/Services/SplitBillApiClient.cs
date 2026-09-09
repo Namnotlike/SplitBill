@@ -190,6 +190,19 @@ public sealed class SplitBillApiClient
     public Task<PreviewSplitResult> PreviewSplitAsync(PreviewSplitRequest request, CancellationToken ct) =>
         PostAsync<PreviewSplitRequest, PreviewSplitResult>("expenses/preview-split", request, ct);
 
+    // ===== Mẫu nhóm tái sử dụng (CLAUDE.md mục 25.6) =====
+    public Task<IReadOnlyList<GroupTemplateDto>> GetMyGroupTemplatesAsync(CancellationToken ct) =>
+        GetAsync<IReadOnlyList<GroupTemplateDto>>("group-templates", ct);
+
+    public Task<GroupTemplateDto> CreateGroupTemplateAsync(CreateGroupTemplateRequest request, CancellationToken ct) =>
+        PostAsync<CreateGroupTemplateRequest, GroupTemplateDto>("group-templates", request, ct);
+
+    public Task DeleteGroupTemplateAsync(Guid templateId, CancellationToken ct) =>
+        DeleteAsync($"group-templates/{templateId}", ct);
+
+    public Task<GroupDto> CreateGroupFromTemplateAsync(Guid templateId, CreateGroupFromTemplateRequest request, CancellationToken ct) =>
+        PostAsync<CreateGroupFromTemplateRequest, GroupDto>($"group-templates/{templateId}/create-group", request, ct);
+
     // ===== Khoản chi định kỳ (CLAUDE.md mục 15.7) =====
     public Task<RecurringExpenseTemplateDto> CreateRecurringExpenseAsync(Guid groupId, CreateRecurringExpenseRequest request, CancellationToken ct) =>
         PostAsync<CreateRecurringExpenseRequest, RecurringExpenseTemplateDto>($"groups/{groupId}/recurring-expenses", request, ct);

@@ -4,8 +4,13 @@
     ViewData["Title"] = "Nhóm của tôi";
 }
 
-<h1>@Localizer["Nhóm của tôi"]</h1>
-<p class="text-muted mb-4">@Localizer["Chọn 1 nhóm để xem chi tiết, hoặc tạo nhóm mới ở bên phải."]</p>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+    <div>
+        <h1>@Localizer["Nhóm của tôi"]</h1>
+        <p class="text-muted mb-4">@Localizer["Chọn 1 nhóm để xem chi tiết, hoặc tạo nhóm mới ở bên phải."]</p>
+    </div>
+    <a asp-page="/Groups/Templates" class="btn btn-outline-secondary">@Localizer["🗂️ Mẫu nhóm của tôi"]</a>
+</div>
 
 @if (Model.ErrorMessage is not null)
 {

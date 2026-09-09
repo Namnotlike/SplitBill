@@ -24,6 +24,7 @@ public sealed class SplitBillDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<RecurringExpenseTemplate> RecurringExpenseTemplates => Set<RecurringExpenseTemplate>();
+    public DbSet<GroupTemplate> GroupTemplates => Set<GroupTemplate>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

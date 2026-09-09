@@ -1,0 +1,127 @@
+@page
+@model SplitBill.Web.Pages.Groups.TemplatesModel
+@{
+    ViewData["Title"] = "Mẫu nhóm của tôi";
+}
+
+<h1>@Localizer["Mẫu nhóm của tôi"]</h1>
+<p class="text-muted mb-4">
+    @Localizer["Lưu sẵn 1 \"khung\" nhóm (loại, tiền tệ, danh sách khách vãng lai hay đi cùng) để tạo nhóm mới trong 1 lượt, không phải thêm lại từng thành viên mỗi lần."]
+</p>
+
+@if (Model.ErrorMessage is not null)
+{
+    <div class="alert alert-danger">@Model.ErrorMessage</div>
+}
+@if (Model.SuccessMessage is not null)
+{
+    <div class="alert alert-success">@Model.SuccessMessage</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        @if (Model.MyTemplates.Count == 0)
+        {
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <div class="fs-1 mb-2">🗂️</div>
+                    <p class="text-muted mb-0">@Localizer["Chưa có mẫu nào. Lưu mẫu đầu tiên ở bên phải 👉"]</p>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="row g-3">
+                @foreach (var template in Model.MyTemplates)
+                {
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title mb-1">@template.Name</h5>
+                                @if (!string.IsNullOrWhiteSpace(template.Description))
+                                {
+                                    <p class="text-muted small mb-2">@template.Description</p>
+                                }
+                                <div class="mb-2">
+                                    <span class="badge" style="background: var(--sb-brand-light); color: var(--sb-brand-dark);">
+                                        @(template.Type == "OneTime" ? Localizer["Một lần"] : Localizer["Dùng lại nhiều lần"])
+                                    </span>
+                                    <span class="badge bg-secondary">@template.Currency</span>
+                                    @if (!template.SimplifyDebts)
+                                    {
+                                        <span class="badge bg-secondary">@Localizer["Không gộp nợ"]</span>
+                                    }
+                                </div>
+                                @if (template.MemberNames.Count > 0)
+                                {
+                                    <p class="small text-muted mb-2">
+                                        @Localizer["Khách vãng lai"]: @string.Join(", ", template.MemberNames)
+                                    </p>
+                                }
+
+                                <form method="post" asp-page-handler="CreateGroup" class="d-flex gap-2 mb-2">
+                                    <input type="hidden" name="templateId" value="@template.Id" />
+                                    <input type="text" name="groupName" class="form-control form-control-sm"
+                                           placeholder="@template.Name" />
+                                    <button type="submit" class="btn btn-primary btn-sm text-nowrap">@Localizer["+ Tạo nhóm"]</button>
+                                </form>
+                                <form method="post" asp-page-handler="Delete">
+                                    <input type="hidden" name="templateId" value="@template.Id" />
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">@Localizer["Xóa mẫu"]</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">@Localizer["+ Lưu mẫu mới"]</h5>
+                <form method="post" asp-page-handler="Create">
+                    <div class="mb-3">
+                        <label asp-for="NewTemplate.Name" class="form-label">@Localizer["Tên mẫu"]</label>
+                        <input asp-for="NewTemplate.Name" class="form-control" placeholder="VD: Nhóm phượt cuối tuần" />
+                        <span asp-validation-for="NewTemplate.Name" class="text-danger"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="NewTemplate.Description" class="form-label">@Localizer["Mô tả (tùy chọn)"]</label>
+                        <input asp-for="NewTemplate.Description" class="form-control" />
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="NewTemplate.Type" class="form-label">@Localizer["Loại nhóm"]</label>
+                        <select asp-for="NewTemplate.Type" class="form-select">
+                            <option value="OneTime">@Localizer["Một lần (cuộc chơi)"]</option>
+                            <option value="Recurring">@Localizer["Dùng lại nhiều lần"]</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="NewTemplate.Currency" class="form-label">@Localizer["Tiền tệ"]</label>
+                        <select asp-for="NewTemplate.Currency" class="form-select">
+                            <option value="VND">VND (đ)</option>
+                            <option value="USD">USD ($)</option>
+                            <option value="EUR">EUR (€)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input asp-for="NewTemplate.SimplifyDebts" class="form-check-input" />
+                        <label asp-for="NewTemplate.SimplifyDebts" class="form-check-label">@Localizer["Gộp nợ tối ưu"]</label>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="NewTemplate.MemberNamesText" class="form-label">@Localizer["Khách vãng lai hay đi cùng (mỗi dòng 1 tên, tùy chọn)"]</label>
+                        <textarea asp-for="NewTemplate.MemberNamesText" class="form-control" rows="4" placeholder="Bình&#10;Cường"></textarea>
+                        <span class="text-muted small">@Localizer["Bạn (người tạo nhóm) luôn tự động là Owner, không cần liệt kê ở đây."]</span>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">@Localizer["Lưu mẫu"]</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

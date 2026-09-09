@@ -40,4 +40,6 @@ public static class ErrorCodes
     public const string SettlementNotDeleted = "SETTLEMENT_NOT_DELETED";
     // Đăng nhập bằng Google (CLAUDE.md mục 25.3, bổ sung 2026-09-09).
     public const string InvalidInternalSecret = "INVALID_INTERNAL_SECRET";
+    // Mẫu nhóm tái sử dụng (CLAUDE.md mục 25.6, bổ sung 2026-09-09).
+    public const string GroupTemplateNotFound = "GROUP_TEMPLATE_NOT_FOUND";
 }
