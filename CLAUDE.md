@@ -2368,3 +2368,77 @@ Pending đó. Cả 2 luồng đều xác nhận Timeline hiện đúng dòng "đ
 sửa bug ở trên). `dotnet build`: 0 warning, 0 error. `dotnet test`: **249/249 pass** (69 UnitTests + 25
 Web.Tests + 151 IntegrationTests + 4 E2ETests — 9 test mới: 3 `ExpenseServiceTests`, 5
 `SettlementRecordServiceTests`, 2 `GroupServiceTests`; không có test cũ nào bị ảnh hưởng).
+
+### 25.2 Miễn nợ (hạng mục 2/9)
+
+Một khoản nợ nhỏ (vd 5.000đ lẻ do làm tròn) nhiều khi không đáng để bắt người khác chuyển khoản thật —
+"Miễn nợ" cho phép chủ nợ tự tay xóa khoản nợ đó mà không cần một lượt chuyển tiền nào xảy ra.
+
+**Thiết kế:** KHÔNG tạo entity/bảng mới. Tận dụng `Settlement` hiện có, thêm 1 cột
+`bool IsWaived` (mặc định `false`, migration `AddSettlementIsWaived`). Khi miễn nợ, `SettlementRecordService.
+WaiveAsync` tạo thẳng 1 `Settlement` ở trạng thái **Confirmed** (không qua `Pending`) với `IsWaived =
+true`, `RecordedByMemberId`/`ConfirmedByMemberId` đều là chính người miễn nợ, `ConfirmedAt = now`.
+
+- **Vì sao không cần sửa `BalanceCalculator`/thuật toán settlement (mục 6):** `BalanceCalculator` chỉ
+  nhìn `Status == Confirmed` để tính vào `net` (mục 6.1), hoàn toàn không biết tới cờ `IsWaived` — một
+  khoản nợ đã miễn tự động làm `net` về đúng như đã "trả xong", không cần đổi 1 dòng nào trong
+  `BalanceCalculator`/`GreedySettlementSolver`/`OptimalSettlementSolver`. `IsWaived` CHỈ dùng để hiển
+  thị/audit phân biệt đúng bản chất sự kiện (badge "Đã miễn nợ" thay vì "Confirmed", Summary Timeline
+  khác câu) — theo đúng CLAUDE.md mục 12 "chạy lại toàn bộ test ở mục 7 khi sửa thuật toán settlement",
+  không cần chạy lại vì thuật toán không hề bị đụng tới (đã verify: không sửa file nào trong
+  `SplitBill.Application/Settlement/`).
+- **Quyền hạn:** chỉ chủ nợ (`request.ToMemberId`, người ĐANG được nợ) mới miễn được — khớp nguyên tắc
+  "chỉ người NHẬN mới xác nhận" của `ConfirmAsync` (mục 8), KHÔNG cho Owner miễn nợ thay người khác
+  (khác hẳn quyền Create/Delete Expense/Settlement vốn mở cho mọi Member — miễn nợ đụng trực tiếp tới
+  quyền lợi tài chính cá nhân của đúng 1 người, không phải việc chung của nhóm).
+- **API:** `POST /api/v1/groups/{groupId}/settlements/waive` — body giống hệt `CreateSettlementRequest`
+  (`FromMemberId`, `ToMemberId`, `Amount`, `Note?`).
+- **Audit log:** dùng chung Action `"Created"` với ghi nhận thanh toán thường (không thêm Action mới) —
+  về bản chất vẫn là "tạo mới 1 Settlement", `BuildSummary` (Timeline, mục 15.5) phân biệt qua
+  `SettlementDto.IsWaived`: `"đã miễn nợ {amount} cho {tên người nợ}"` thay vì `"đã ghi nhận chuyển...
+  từ ... đến ..."`.
+- **Cố tình KHÔNG thêm sự kiện thông báo mới** — cùng nguyên tắc đã áp dụng cho Bình luận khoản chi
+  (mục 19.2): mục 13 chốt đúng 4 sự kiện thông báo, "không hơn, không tự ý thêm".
+- **`DeleteAsync` không cần sửa gì** để chặn xóa settlement đã miễn nợ — `DeleteAsync` vốn đã chỉ cho
+  xóa khi `Status == Pending` (mục 8), mà `WaiveAsync` luôn tạo thẳng `Confirmed`, nên tự động không
+  xóa được, đúng ý muốn (1 khoản nợ đã miễn là quyết định chốt, không nên xóa nhầm).
+
+**Web:** `Groups/SettlementPlan.cshtml` có 2 điểm vào — nút "🤝 Miễn nợ này" ngay trên mỗi đề xuất gộp
+nợ (chỉ hiện khi `Model.MyMemberId == tx.ToMemberId`, tức đang xem đúng vai trò chủ nợ của giao dịch
+đó) và khối form thủ công "🤝 Miễn nợ" (tương tự "Ghi nhận thanh toán khác") cho trường hợp không nằm
+trong danh sách đề xuất. Bảng "Lịch sử ghi nhận" hiện badge riêng màu xanh dương nhạt "Đã miễn nợ" thay
+vì "Confirmed" cho các dòng `IsWaived`.
+
+> ⚠️ **Bug thật phát hiện trước khi verify sống (rà soát code, không phải lỗi runtime đã xảy ra):**
+> `SettlementPlanModel` vốn chỉ có 1 `[BindProperty] RecordInput NewSettlement` cho form "Ghi nhận
+> thanh toán khác", với `Amount` gắn `[Range(1, long.MaxValue)]`. Thêm `[BindProperty] RecordInput
+> WaiveDebt` (form Miễn nợ) CÙNG kiểu `RecordInput` sẽ khiến ASP.NET Core Razor Pages validate **CẢ
+> HAI** property `[BindProperty]` mỗi lần POST — bất kể handler nào thực sự chạy. Submit form "Ghi
+> nhận" (chỉ điền `NewSettlement.*`) khiến `WaiveDebt.Amount` giữ nguyên giá trị mặc định `0`, tự động
+> fail `[Range(1,...)]` và làm `ModelState.IsValid == false` cho TOÀN BỘ request — nếu
+> `OnPostRecordAsync` vẫn dựa vào `!ModelState.IsValid` như code gốc, mọi lần ghi nhận thanh toán bình
+> thường sẽ bị chặn nhầm bởi 1 form khác mà người dùng còn chưa đụng tới, dù tự bản thân form đó không
+> có lỗi gì. Đã sửa TRƯỚC khi build/test: bỏ `[Range]` khỏi `RecordInput.Amount`, thay bằng validate
+> thủ công `Amount <= 0` ngay trong từng handler (`OnPostRecordAsync`/`OnPostWaiveAsync`), không phụ
+> thuộc `ModelState.IsValid` nữa. Bài học chung: 2 `[BindProperty]` khác nhau dùng CHUNG 1 class DTO
+> trên cùng 1 PageModel là rủi ro tiềm ẩn — validation attribute trên field của form A luôn được áp
+> dụng ngay cả khi chỉ form B được submit.
+
+Đã verify sống trên trình duyệt (không chỉ qua test): nhóm có đề xuất "Guest Friend chuyển cho Restore
+Tester 50.000đ" → đăng nhập đúng Restore Tester (chủ nợ) → nút "🤝 Miễn nợ này" hiện đúng trên card đề
+xuất → bấm → chuyển thẳng về đúng "Mọi người đã cân bằng, không cần chuyển gì thêm." (0 giao dịch, số
+dư về 0 mà KHÔNG có giao dịch chuyển tiền nào xảy ra) → bảng "Lịch sử ghi nhận" hiện đúng badge xanh
+dương "Đã miễn nợ" (phân biệt rõ với badge vàng "Pending" của 1 settlement khác cùng bảng) → Timeline
+hiện đúng "Restore Tester đã miễn nợ 50.000đ cho Guest Friend". `dotnet build`: 0 warning, 0 error.
+`dotnet test`: **254/254 pass** (69 UnitTests + 25 Web.Tests + 156 IntegrationTests + 4 E2ETests — 5
+test mới: `WaiveAsync_ByCreditor_CreatesConfirmedWaivedSettlement`,
+`WaiveAsync_ByDebtorNotCreditor_ThrowsInsufficientRole`, `WaiveAsync_AppearsInGetByGroup_WithIsWaivedTrue`
+(`SettlementRecordServiceTests`), `GetBalancesAsync_AfterWaive_DebtIsForgivenWithoutRealTransfer`
+(`BalanceServiceTests`), `GetAuditLogsAsync_SettlementWaived_SummaryDescribesWaive`
+(`GroupServiceTests`)).
+
+> **Ghi chú vận hành (không phải bug):** lần chạy `dotnet test tests/SplitBill.E2ETests` đầu tiên sau
+> khi thêm migration mới thất bại toàn bộ 8/8 với lỗi `TestServer.get_Application()` "server has not
+> been started" — đúng loại flaky đã ghi nhận trước đó ở mục 24 (một lần local port/process contention,
+> không tái lập được). Chạy lại ngay sau đó (không sửa gì) → 4/4 pass sạch, xác nhận lại đúng tính chất
+> transient của lớp lỗi này trên máy dev hiện tại — không liên quan gì tới thay đổi Miễn nợ.

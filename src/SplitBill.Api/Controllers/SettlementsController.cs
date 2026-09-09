@@ -14,15 +14,18 @@ public sealed class SettlementsController : ControllerBase
     private readonly IBalanceService _balanceService;
     private readonly ISettlementRecordService _settlementService;
     private readonly IValidator<CreateSettlementRequest> _createValidator;
+    private readonly IValidator<WaiveSettlementRequest> _waiveValidator;
 
     public SettlementsController(
         IBalanceService balanceService,
         ISettlementRecordService settlementService,
-        IValidator<CreateSettlementRequest> createValidator)
+        IValidator<CreateSettlementRequest> createValidator,
+        IValidator<WaiveSettlementRequest> waiveValidator)
     {
         _balanceService = balanceService;
         _settlementService = settlementService;
         _createValidator = createValidator;
+        _waiveValidator = waiveValidator;
     }
 
     [HttpGet("/api/v1/groups/{groupId:guid}/balances")]
@@ -51,6 +54,15 @@ public sealed class SettlementsController : ControllerBase
     {
         _createValidator.ValidateOrThrowDomainException(request);
         var settlement = await _settlementService.CreateAsync(User.GetUserId(), groupId, request, cancellationToken);
+        return Ok(settlement);
+    }
+
+    // CLAUDE.md mục 25.2 — miễn nợ (tạo trực tiếp 1 settlement Confirmed, không qua Pending).
+    [HttpPost("/api/v1/groups/{groupId:guid}/settlements/waive")]
+    public async Task<ActionResult<SettlementDto>> WaiveAsync(Guid groupId, WaiveSettlementRequest request, CancellationToken cancellationToken)
+    {
+        _waiveValidator.ValidateOrThrowDomainException(request);
+        var settlement = await _settlementService.WaiveAsync(User.GetUserId(), groupId, request, cancellationToken);
         return Ok(settlement);
     }
 

@@ -26,6 +26,11 @@ public class SettlementPlanModel : PageModel
     [BindProperty]
     public RecordInput NewSettlement { get; set; } = new();
 
+    // Miễn nợ (CLAUDE.md mục 25.2) — form riêng, cùng shape với RecordInput nhưng tách property để 2
+    // form trên trang không giẫm lên nhau khi model-binding (mỗi form chỉ gửi đúng field của chính nó).
+    [BindProperty]
+    public RecordInput WaiveDebt { get; set; } = new();
+
     public string? ErrorMessage { get; set; }
 
     public sealed class RecordInput
@@ -36,7 +41,14 @@ public class SettlementPlanModel : PageModel
         [Required]
         public Guid ToMemberId { get; set; }
 
-        [Range(1, long.MaxValue)]
+        // ⚠️ CỐ TÌNH không gắn [Range(1, long.MaxValue)] ở đây: Razor Pages validate MỌI property
+        // [BindProperty] trên PageModel mỗi lần POST, bất kể handler nào chạy — nếu Amount có [Range]
+        // ở CẢ NewSettlement lẫn WaiveDebt, submit form "Ghi nhận" (chỉ điền NewSettlement.*) sẽ khiến
+        // WaiveDebt.Amount giữ giá trị mặc định 0, tự động fail Range và làm ModelState.IsValid = false
+        // cho TOÀN BỘ request — chặn nhầm cả luồng ghi nhận thanh toán bình thường dù người dùng không
+        // hề đụng tới form Miễn nợ. Phát hiện lúc thêm WaiveDebt vào cùng PageModel, trước khi kịp
+        // verify sống (không phải bug đã từng xảy ra thật, nhưng đủ rõ ràng để sửa ngay từ đầu thay vì
+        // dựa vào ModelState.IsValid). Validate Amount > 0 thủ công trong từng handler thay thế.
         public long Amount { get; set; }
 
         public string? Note { get; set; }
@@ -64,9 +76,9 @@ public class SettlementPlanModel : PageModel
 
     public async Task<IActionResult> OnPostRecordAsync(Guid id, CancellationToken cancellationToken)
     {
-        if (!ModelState.IsValid || NewSettlement.FromMemberId == NewSettlement.ToMemberId)
+        if (NewSettlement.Amount <= 0 || NewSettlement.FromMemberId == NewSettlement.ToMemberId)
         {
-            TempData["ErrorMessage"] = "Người chuyển và người nhận không được trùng nhau.";
+            TempData["ErrorMessage"] = "Người chuyển và người nhận không được trùng nhau, số tiền phải > 0.";
             return RedirectToPage("/Groups/SettlementPlan", new { id });
         }
 
@@ -77,6 +89,34 @@ public class SettlementPlanModel : PageModel
                 new CreateSettlementRequest(NewSettlement.FromMemberId, NewSettlement.ToMemberId, NewSettlement.Amount, NewSettlement.Note),
                 cancellationToken);
             TempData["SuccessMessage"] = "Đã ghi nhận, chờ người nhận xác nhận.";
+        }
+        catch (ApiException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
+        return RedirectToPage("/Groups/SettlementPlan", new { id });
+    }
+
+    // CLAUDE.md mục 25.2 — miễn nợ. Không dùng chung handler "Record" ở trên dù shape input giống hệt
+    // nhau: 2 endpoint API khác nhau (waive tạo thẳng Confirmed, record tạo Pending) và thông báo
+    // thành công cũng khác — tách handler riêng cho rõ ràng, tránh 1 tham số ẩn kiểu "isWaive: bool"
+    // rẽ nhánh trong cùng 1 handler.
+    public async Task<IActionResult> OnPostWaiveAsync(Guid id, CancellationToken cancellationToken)
+    {
+        if (WaiveDebt.Amount <= 0 || WaiveDebt.FromMemberId == WaiveDebt.ToMemberId)
+        {
+            TempData["ErrorMessage"] = "Người nợ và người miễn nợ không được trùng nhau, số tiền phải > 0.";
+            return RedirectToPage("/Groups/SettlementPlan", new { id });
+        }
+
+        try
+        {
+            await _apiClient.WaiveSettlementAsync(
+                id,
+                new WaiveSettlementRequest(WaiveDebt.FromMemberId, WaiveDebt.ToMemberId, WaiveDebt.Amount, WaiveDebt.Note),
+                cancellationToken);
+            TempData["SuccessMessage"] = "Đã miễn nợ.";
         }
         catch (ApiException ex)
         {

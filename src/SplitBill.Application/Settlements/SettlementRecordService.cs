@@ -75,6 +75,54 @@ public sealed class SettlementRecordService : ISettlementRecordService
         return ToDto(settlement);
     }
 
+    // CLAUDE.md mục 25.2 — Miễn nợ. Khác CreateAsync ở chỗ tạo settlement THẲNG ở trạng thái Confirmed
+    // (không qua Pending) — không có "bước chuyển tiền thật" nào để chờ đối phương xác nhận, chính chủ
+    // nợ là người tự xác nhận xóa nợ ngay lúc tạo. Cố tình KHÔNG re-dùng CreateAsync + ConfirmAsync nối
+    // tiếp: 2 bước riêng sẽ tạo 2 dòng AuditLog ("Created" rồi "Updated") trong khi về bản chất đây là
+    // 1 hành động nghiệp vụ duy nhất, và ConfirmAsync yêu cầu Status đang Pending — phức tạp hóa không
+    // cần thiết so với chỉ set thẳng Confirmed.
+    public async Task<SettlementDto> WaiveAsync(Guid callerUserId, Guid groupId, WaiveSettlementRequest request, CancellationToken cancellationToken)
+    {
+        var group = await LoadGroupAsync(groupId, cancellationToken);
+        var caller = ResolveCallerMember(group, callerUserId);
+
+        RequireMemberInGroup(group, request.FromMemberId);
+        RequireMemberInGroup(group, request.ToMemberId);
+
+        // Chỉ chủ nợ (người đang được nợ, ToMemberId) mới có quyền tự tay xóa khoản nợ của người khác
+        // — khớp nguyên tắc "chỉ người NHẬN mới xác nhận" ở ConfirmAsync (mục 8), không cho phép Owner
+        // thay mặt xóa nợ hộ người khác (khác quyền Create/Delete Expense/Settlement vốn mở cho mọi
+        // Member — miễn nợ đụng trực tiếp tới quyền lợi tài chính cá nhân của đúng 1 người).
+        if (caller.Id != request.ToMemberId)
+        {
+            throw new DomainException(ErrorCodes.InsufficientRole, "Chỉ người đang được nợ mới được miễn khoản nợ này.");
+        }
+
+        var settlement = new SettlementEntity
+        {
+            Id = Guid.NewGuid(),
+            GroupId = group.Id,
+            FromMemberId = request.FromMemberId,
+            ToMemberId = request.ToMemberId,
+            Amount = request.Amount,
+            Status = SettlementStatus.Confirmed,
+            IsWaived = true,
+            RecordedByMemberId = caller.Id,
+            ConfirmedByMemberId = caller.Id,
+            ConfirmedAt = DateTimeOffset.UtcNow,
+            Note = request.Note,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+
+        await _settlementRepository.AddAsync(settlement, cancellationToken);
+        await WriteAuditLogAsync(group.Id, settlement.Id, "Created", caller.Id, null, ToDto(settlement), cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Cố tình KHÔNG thêm sự kiện thông báo mới (mục 13 đã chốt đúng 4 sự kiện, "không hơn, không
+        // tự ý thêm" — tiền lệ đã áp dụng cho Bình luận khoản chi, mục 19.2).
+        return ToDto(settlement);
+    }
+
     public async Task<SettlementDto> ConfirmAsync(Guid callerUserId, Guid settlementId, CancellationToken cancellationToken)
     {
         var settlement = await LoadSettlementAsync(settlementId, cancellationToken);
@@ -278,5 +326,6 @@ public sealed class SettlementRecordService : ISettlementRecordService
         settlement.RecordedByMemberId,
         settlement.ConfirmedByMemberId,
         settlement.ConfirmedAt,
-        settlement.CreatedAt);
+        settlement.CreatedAt,
+        settlement.IsWaived);
 }

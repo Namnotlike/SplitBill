@@ -4,6 +4,11 @@ namespace SplitBill.Application.Settlements;
 public interface ISettlementRecordService
 {
     Task<SettlementDto> CreateAsync(Guid callerUserId, Guid groupId, CreateSettlementRequest request, CancellationToken cancellationToken);
+
+    /// <summary>Miễn nợ (CLAUDE.md mục 25.2) — tạo trực tiếp 1 settlement Confirmed, KHÔNG qua bước
+    /// Pending/chuyển tiền thật. Chỉ chủ nợ (<c>request.ToMemberId</c>, người đang được nợ) mới gọi
+    /// được — ném <c>INSUFFICIENT_ROLE</c> nếu caller không phải chính người đó.</summary>
+    Task<SettlementDto> WaiveAsync(Guid callerUserId, Guid groupId, WaiveSettlementRequest request, CancellationToken cancellationToken);
     Task<SettlementDto> ConfirmAsync(Guid callerUserId, Guid settlementId, CancellationToken cancellationToken);
     Task<SettlementDto> RejectAsync(Guid callerUserId, Guid settlementId, CancellationToken cancellationToken);
     Task DeleteAsync(Guid callerUserId, Guid settlementId, CancellationToken cancellationToken);

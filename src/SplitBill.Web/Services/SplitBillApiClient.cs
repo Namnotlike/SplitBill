@@ -238,6 +238,11 @@ public sealed class SplitBillApiClient
     public Task<SettlementDto> CreateSettlementAsync(Guid groupId, CreateSettlementRequest request, CancellationToken ct) =>
         PostAsync<CreateSettlementRequest, SettlementDto>($"groups/{groupId}/settlements", request, ct);
 
+    /// <summary>Miễn nợ (CLAUDE.md mục 25.2) — tạo trực tiếp settlement Confirmed, chỉ chủ nợ
+    /// (request.ToMemberId) gọi được.</summary>
+    public Task<SettlementDto> WaiveSettlementAsync(Guid groupId, WaiveSettlementRequest request, CancellationToken ct) =>
+        PostAsync<WaiveSettlementRequest, SettlementDto>($"groups/{groupId}/settlements/waive", request, ct);
+
     public Task<SettlementDto> ConfirmSettlementAsync(Guid settlementId, CancellationToken ct) =>
         PostAsync<object?, SettlementDto>($"settlements/{settlementId}/confirm", null, ct);
 

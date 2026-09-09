@@ -58,6 +58,17 @@ else
                                 <button type="submit" class="btn btn-sm btn-primary">@Localizer["Tôi đã chuyển khoản này"]</button>
                             </form>
                         }
+                        @if (Model.MyMemberId == tx.ToMemberId)
+                        {
+                            @* Miễn nợ (CLAUDE.md mục 25.2) — chỉ chủ nợ (người đang được nợ, tx.ToMemberId
+                               trong đề xuất này) mới thấy nút này, khớp đúng quyền hạn API yêu cầu. *@
+                            <form method="post" asp-page-handler="Waive" asp-route-id="@Model.Group.Id" class="mt-2">
+                                <input type="hidden" name="WaiveDebt.FromMemberId" value="@tx.FromMemberId" />
+                                <input type="hidden" name="WaiveDebt.ToMemberId" value="@tx.ToMemberId" />
+                                <input type="hidden" name="WaiveDebt.Amount" value="@tx.Amount" />
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">🤝 @Localizer["Miễn nợ này"]</button>
+                            </form>
+                        }
                     </div>
                 </div>
             </div>
@@ -102,6 +113,44 @@ else
     </div>
 </div>
 
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">🤝 @Localizer["Miễn nợ"]</h5>
+        <p class="text-muted small">@Localizer["Chỉ chủ nợ (người đang được nợ) mới miễn được khoản nợ của chính mình — không cần chuyển tiền thật."]</p>
+        <form method="post" asp-page-handler="Waive" asp-route-id="@Model.Group.Id" class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label">@Localizer["Người nợ"]</label>
+                <select name="WaiveDebt.FromMemberId" class="form-select">
+                    @foreach (var m in Model.Group.Members)
+                    {
+                        <option value="@m.Id">@m.DisplayName</option>
+                    }
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label">@Localizer["Người miễn nợ (bạn)"]</label>
+                <select name="WaiveDebt.ToMemberId" class="form-select">
+                    @foreach (var m in Model.Group.Members)
+                    {
+                        <option value="@m.Id" selected="@(m.Id == Model.MyMemberId)">@m.DisplayName</option>
+                    }
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label">@Localizer["Số tiền"] (@Model.Group.Currency)</label>
+                <input name="WaiveDebt.Amount" type="number" min="1" class="form-control" />
+            </div>
+            <div class="col-auto">
+                <label class="form-label">@Localizer["Ghi chú"]</label>
+                <input name="WaiveDebt.Note" class="form-control" />
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-outline-secondary">@Localizer["Miễn nợ"]</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-body @(Model.Settlements.Count > 0 ? "p-0" : "")">
         <h5 class="card-title @(Model.Settlements.Count > 0 ? "px-4 pt-4" : "")">@Localizer["Lịch sử ghi nhận"]</h5>
@@ -122,15 +171,26 @@ else
                                 <td>@Model.MemberName(s.ToMemberId)</td>
                                 <td>@SupportedCurrencies.Format(s.Amount, Model.Group.Currency)</td>
                                 <td>
-                                    @{
+                                    @* Miễn nợ (CLAUDE.md mục 25.2) hiện badge riêng dù Status thật sự vẫn là
+                                       "Confirmed" — về số dư không khác gì Confirmed thường, nhưng người xem
+                                       cần biết đây KHÔNG phải 1 lượt chuyển tiền thật đã xảy ra. Dùng @@if/@@else
+                                       thay vì ternary trộn LocalizedHtmlString với string thường (CLAUDE.md mục
+                                       22.2 — bài học đã ghi lại, tránh lặp lại bug LocalizedHtmlString lộ ra
+                                       màn hình). *@
+                                    @if (s.IsWaived)
+                                    {
+                                        <span class="badge bg-info text-dark">@Localizer["Đã miễn nợ"]</span>
+                                    }
+                                    else
+                                    {
                                         var badgeClass = s.Status switch
                                         {
                                             "Confirmed" => "bg-success",
                                             "Rejected" => "bg-danger",
                                             _ => "bg-warning text-dark",
                                         };
+                                        <span class="badge @badgeClass">@s.Status</span>
                                     }
-                                    <span class="badge @badgeClass">@s.Status</span>
                                 </td>
                                 <td class="pe-4 text-end">
                                     @if (s.Status == "Pending" && Model.MyMemberId == s.ToMemberId)

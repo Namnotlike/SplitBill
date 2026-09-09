@@ -41,6 +41,46 @@ public sealed class SettlementRecordServiceTests
         (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.SettlementSameMember);
     }
 
+    // CLAUDE.md mục 25.2 — Miễn nợ.
+    [Fact]
+    public async Task WaiveAsync_ByCreditor_CreatesConfirmedWaivedSettlement()
+    {
+        var (harness, ownerId, _, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+
+        var settlement = await harness.SettlementRecordService.WaiveAsync(
+            ownerId, group.Id, new WaiveSettlementRequest(guestMemberId, ownerMemberId, 50_000), CancellationToken.None);
+
+        settlement.Status.Should().Be("Confirmed");
+        settlement.IsWaived.Should().BeTrue();
+        settlement.ConfirmedByMemberId.Should().Be(ownerMemberId);
+        settlement.RecordedByMemberId.Should().Be(ownerMemberId);
+    }
+
+    [Fact]
+    public async Task WaiveAsync_ByDebtorNotCreditor_ThrowsInsufficientRole()
+    {
+        var (harness, ownerId, guestUserId, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+
+        // guestUserId la nguoi NO (FromMemberId), khong phai chu no (ToMemberId=ownerMemberId) -> khong
+        // duoc mien no thay chu no.
+        var act = () => harness.SettlementRecordService.WaiveAsync(
+            guestUserId, group.Id, new WaiveSettlementRequest(guestMemberId, ownerMemberId, 50_000), CancellationToken.None);
+
+        (await act.Should().ThrowAsync<DomainException>()).Which.ErrorCode.Should().Be(ErrorCodes.InsufficientRole);
+    }
+
+    [Fact]
+    public async Task WaiveAsync_AppearsInGetByGroup_WithIsWaivedTrue()
+    {
+        var (harness, ownerId, _, group, ownerMemberId, guestMemberId) = await SetupGroupAsync();
+        await harness.SettlementRecordService.WaiveAsync(
+            ownerId, group.Id, new WaiveSettlementRequest(guestMemberId, ownerMemberId, 50_000), CancellationToken.None);
+
+        var settlements = await harness.SettlementRecordService.GetByGroupAsync(ownerId, group.Id, CancellationToken.None);
+
+        settlements.Should().ContainSingle(s => s.IsWaived && s.Status == "Confirmed");
+    }
+
     [Fact]
     public async Task ConfirmAsync_ByNonReceiver_ThrowsInsufficientRole()
     {

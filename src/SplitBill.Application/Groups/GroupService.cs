@@ -519,10 +519,18 @@ public sealed class GroupService : IGroupService
                     var restoredExpense = Parse<ExpenseDto>(log.AfterJson);
                     return restoredExpense is null ? "đã khôi phục 1 khoản chi" : $"đã khôi phục khoản chi \"{restoredExpense.Title}\" ({SupportedCurrencies.Format(restoredExpense.TotalAmount, currency)})";
 
+                // Miễn nợ (CLAUDE.md mục 25.2): dùng chung Action "Created" với ghi nhận thanh toán
+                // thường (WaiveAsync ghi audit log "Created" — xem lý do ở đó), phân biệt qua
+                // SettlementDto.IsWaived thay vì thêm 1 Action mới, vì về bản chất đây vẫn là "tạo mới
+                // 1 Settlement", chỉ khác trạng thái ban đầu.
                 case ("Settlement", "Created"):
                     var settlementCreated = Parse<SettlementDto>(log.AfterJson);
-                    return settlementCreated is null
-                        ? "đã ghi nhận 1 khoản thanh toán"
+                    if (settlementCreated is null)
+                    {
+                        return "đã ghi nhận 1 khoản thanh toán";
+                    }
+                    return settlementCreated.IsWaived
+                        ? $"đã miễn nợ {SupportedCurrencies.Format(settlementCreated.Amount, currency)} cho {MemberName(settlementCreated.FromMemberId)}"
                         : $"đã ghi nhận chuyển {SupportedCurrencies.Format(settlementCreated.Amount, currency)} từ {MemberName(settlementCreated.FromMemberId)} đến {MemberName(settlementCreated.ToMemberId)}";
 
                 case ("Settlement", "Updated"):

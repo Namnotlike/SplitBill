@@ -349,6 +349,24 @@ public sealed class GroupServiceTests
         page.Items.Should().Contain(l => l.EntityType == "Settlement" && l.Action == "Restored" && l.Summary == "đã khôi phục khoản thanh toán 50.000đ (từ Binh đến Nam)");
     }
 
+    // CLAUDE.md mục 25.2 — Miễn nợ dùng chung Action "Created" nhưng phải ra câu Summary KHÁC hẳn
+    // ghi nhận thanh toán thường (phân biệt qua SettlementDto.IsWaived).
+    [Fact]
+    public async Task GetAuditLogsAsync_SettlementWaived_SummaryDescribesWaive()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var nam = group.Members[0];
+        var binh = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(null, "Binh"), CancellationToken.None);
+        await harness.SettlementRecordService.WaiveAsync(
+            ownerId, group.Id, new WaiveSettlementRequest(binh.Id, nam.Id, 50_000), CancellationToken.None);
+
+        var page = await harness.GroupService.GetAuditLogsAsync(ownerId, group.Id, 1, 20, CancellationToken.None);
+
+        page.Items.Should().Contain(l => l.EntityType == "Settlement" && l.Summary == "đã miễn nợ 50.000đ cho Binh");
+    }
+
     [Fact]
     public async Task GetAuditLogsAsync_SettlementConfirmed_SummaryDescribesConfirmation()
     {

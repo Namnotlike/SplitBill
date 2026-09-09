@@ -40,6 +40,22 @@ public sealed class BalanceServiceTests
         balances.Sum(b => b.Net).Should().Be(0);
     }
 
+    // CLAUDE.md mục 25.2 — Miễn nợ: về số dư phải cư xử y hệt 1 settlement Confirmed thông thường
+    // (BalanceCalculator không hề biết tới cờ IsWaived, chỉ nhìn Status), không cần sửa gì thuật toán.
+    [Fact]
+    public async Task GetBalancesAsync_AfterWaive_DebtIsForgivenWithoutRealTransfer()
+    {
+        var (harness, ownerId, group, ownerMemberId, guestMemberId) = await SetupGroupWithExpenseAsync();
+
+        await harness.SettlementRecordService.WaiveAsync(
+            ownerId, group.Id, new WaiveSettlementRequest(guestMemberId, ownerMemberId, 150_000), CancellationToken.None);
+
+        var balances = await harness.BalanceService.GetBalancesAsync(ownerId, group.Id, CancellationToken.None);
+        balances.Single(b => b.MemberId == ownerMemberId).Net.Should().Be(0);
+        balances.Single(b => b.MemberId == guestMemberId).Net.Should().Be(0);
+        balances.Sum(b => b.Net).Should().Be(0);
+    }
+
     [Fact]
     public async Task GetSettlementPlanAsync_Simplified_ReturnsSingleTransaction()
     {
