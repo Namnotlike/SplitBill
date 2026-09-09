@@ -251,6 +251,10 @@ public sealed class SplitBillApiClient
     public Task<byte[]> ExportBalancesCsvAsync(Guid groupId, CancellationToken ct) =>
         GetBytesAsync($"groups/{groupId}/export/balances.csv", ct);
 
+    /// <summary>Xuất/backup toàn bộ dữ liệu tài chính cốt lõi của nhóm dạng JSON (CLAUDE.md mục 25.4).</summary>
+    public Task<byte[]> ExportGroupBackupJsonAsync(Guid groupId, CancellationToken ct) =>
+        GetBytesAsync($"groups/{groupId}/export/backup.json", ct);
+
     /// <summary>Timeline hoạt động nhóm (CLAUDE.md mục 15.5).</summary>
     public Task<PagedResult<AuditLogDto>> GetAuditLogsAsync(Guid groupId, int page, int pageSize, CancellationToken ct) =>
         GetAsync<PagedResult<AuditLogDto>>($"groups/{groupId}/audit-logs?page={page}&pageSize={pageSize}", ct);

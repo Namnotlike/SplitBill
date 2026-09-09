@@ -104,6 +104,12 @@ public class DetailsModel : PageModel
         return File(bytes, "text/csv", $"so-du-{id}.csv");
     }
 
+    public async Task<IActionResult> OnGetExportBackupAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var bytes = await _apiClient.ExportGroupBackupJsonAsync(id, cancellationToken);
+        return File(bytes, "application/json", $"backup-{id}.json");
+    }
+
     // CLAUDE.md mục 18 — Nhân bản nhóm: 1-click, luôn dùng tên tự sinh "{Tên gốc} (bản sao)" (không có
     // form nhập tên riêng — người dùng đổi tên sau ở trang Sửa nhóm nếu muốn, giữ hành động này đơn
     // giản đúng tinh thần "1 nút bấm" như RotateShareToken).

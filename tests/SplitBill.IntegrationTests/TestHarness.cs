@@ -91,7 +91,7 @@ public sealed class TestHarness : IDisposable
             expenseRepository, groupRepository, auditLogRepository, unitOfWork, splitCalculator, receiptImageRepository, NotificationService);
         BalanceService = new BalanceService(groupRepository, expenseRepository, settlementRepository, balanceCalculator, vietQrGenerator, settlementPlanner);
         SettlementRecordService = new SettlementRecordService(groupRepository, settlementRepository, auditLogRepository, unitOfWork, NotificationService);
-        ExportService = new ExportService(ExpenseService, GroupService, BalanceService);
+        ExportService = new ExportService(ExpenseService, GroupService, BalanceService, SettlementRecordService);
         RecurringExpenseService = new RecurringExpenseService(recurringExpenseRepository, groupRepository, splitCalculator, unitOfWork);
         RecurringExpenseRunner = new RecurringExpenseRunner(
             recurringExpenseRepository, groupRepository, expenseRepository, auditLogRepository,

@@ -9,12 +9,18 @@ public sealed class ExportService : IExportService
     private readonly IExpenseService _expenseService;
     private readonly IGroupService _groupService;
     private readonly IBalanceService _balanceService;
+    private readonly ISettlementRecordService _settlementRecordService;
 
-    public ExportService(IExpenseService expenseService, IGroupService groupService, IBalanceService balanceService)
+    public ExportService(
+        IExpenseService expenseService,
+        IGroupService groupService,
+        IBalanceService balanceService,
+        ISettlementRecordService settlementRecordService)
     {
         _expenseService = expenseService;
         _groupService = groupService;
         _balanceService = balanceService;
+        _settlementRecordService = settlementRecordService;
     }
 
     public async Task<string> ExportExpensesCsvAsync(Guid callerUserId, Guid groupId, CancellationToken cancellationToken)
@@ -56,6 +62,17 @@ public sealed class ExportService : IExportService
         }
 
         return csv.ToString();
+    }
+
+    public async Task<GroupBackupDto> ExportGroupBackupAsync(Guid callerUserId, Guid groupId, CancellationToken cancellationToken)
+    {
+        // 3 lệnh gọi đều tự kiểm tra quyền (caller phải là thành viên nhóm) bên trong service tương
+        // ứng — không cần kiểm tra lặp lại ở đây, cùng nguyên tắc đã áp dụng cho 2 hàm CSV phía trên.
+        var group = await _groupService.GetByIdAsync(callerUserId, groupId, cancellationToken);
+        var expenses = await _expenseService.GetAllForExportAsync(callerUserId, groupId, cancellationToken);
+        var settlements = await _settlementRecordService.GetByGroupAsync(callerUserId, groupId, cancellationToken);
+
+        return new GroupBackupDto(DateTimeOffset.UtcNow, group, expenses, settlements);
     }
 
     private static string FormatMemberAmounts(IReadOnlyList<ExpenseMemberAmountDto> amounts, IReadOnlyDictionary<Guid, string> memberNames) =>

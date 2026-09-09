@@ -2307,7 +2307,8 @@ trước khi thêm dependency, đúng CLAUDE.md mục 2 — "Làm hết" chỉ p
 
 Tiến độ: 1. Khôi phục khoản chi/thanh toán đã xóa — đã làm (mục 25.1). 2. Miễn nợ — đã làm (mục 25.2).
 3. Đăng nhập bằng Google — đã làm (mục 25.3, người dùng đã đồng ý thêm
-`Microsoft.AspNetCore.Authentication.Google`).
+`Microsoft.AspNetCore.Authentication.Google`). 4. Xuất/backup dữ liệu nhóm dạng JSON — đã làm (mục
+25.4, không cần NuGet mới).
 
 ### 25.1 Khôi phục khoản chi/thanh toán đã xóa (hạng mục 1/9)
 
@@ -2587,3 +2588,44 @@ IntegrationTests + 4 E2ETests — 8 test mới: `InternalSecretComparerTests` (5
 `GoogleLoginAsync_SameGoogleIdTwice_ReturnsSameUser_DoesNotDuplicate`,
 `GoogleLoginAsync_EmailAlreadyRegisteredWithPassword_LinksGoogleId_KeepsPasswordLogin` (3,
 `AuthServiceTests`)).
+
+### 25.4 Xuất/backup toàn bộ dữ liệu 1 nhóm dạng JSON (hạng mục 4/9)
+
+`GET /api/v1/groups/{groupId}/export/backup.json` — không cần NuGet mới, tái dùng đúng
+`System.Text.Json` đã có sẵn trong ASP.NET Core (khác 2 hạng mục kế tiếp trong danh sách, Web Push và
+2FA/TOTP, vẫn sẽ cần hỏi lại trước khi thêm package nếu đúng là cần).
+
+**Phạm vi cố ý giới hạn ở dữ liệu tài chính cốt lõi** — `GroupBackupDto(ExportedAt, Group, Expenses,
+Settlements)` — đủ để biết "nhóm này gồm ai, đã chi những gì, đã thanh toán những gì". CỐ TÌNH KHÔNG
+gồm: `ReceiptImage` (ảnh nhị phân, base64 hóa sẽ làm file phình to bất hợp lý so với giá trị mang lại),
+`AuditLog` (nhật ký kỹ thuật, không phải dữ liệu cần khôi phục), `ExpenseComment` (nội dung trao đổi xã
+hội, không phải số liệu tài chính), `RecurringExpenseTemplate`/`SplitPreset` (cấu hình tiện ích, không
+phải lịch sử đã xảy ra) — cùng tinh thần các quyết định phạm vi đã ghi ở mục 18 (Nhân bản nhóm), không
+phải thiếu sót. Tái dùng nguyên `IExpenseService.GetAllForExportAsync` (đã có sẵn cho CSV) và
+`ISettlementRecordService.GetByGroupAsync` (đã có sẵn cho trang Web `Settlements`) — không viết lại
+logic đọc dữ liệu nào, `ExportService.ExportGroupBackupAsync` chỉ gọi 3 service hiện có rồi gộp lại.
+Quyền hạn: kế thừa nguyên từ `GroupService.GetByIdAsync`/2 service kia — caller phải là thành viên
+nhóm, không cần kiểm tra thêm ở `ExportService`.
+
+**Định dạng file**: `WriteIndented = true` (khác các response JSON API bình thường, ưu tiên gọn nhẹ) —
+vì mục đích chính của file này là backup/khôi phục thủ công, con người cần đọc/kiểm tra được trực
+tiếp. Đồng thời dùng `JavaScriptEncoder.UnsafeRelaxedJsonEscaping` (khác mặc định của
+`System.Text.Json`, vốn escape mọi ký tự ngoài ASCII kể cả tiếng Việt có dấu thành `\uXXXX`) để tên
+nhóm/khoản chi tiếng Việt hiển thị nguyên văn, đọc được trực tiếp trong file — an toàn ở đây vì đây là
+file tải xuống để lưu trữ, không phải HTML render lại (không có rủi ro XSS như khi dùng encoder này
+cho nội dung nhúng vào trang web).
+
+Web: nút "⬇ Backup JSON" trên `Groups/Details`, cạnh 2 nút CSV đã có — `OnGetExportBackupAsync` proxy
+qua `SplitBillApiClient` (cùng mẫu 2 handler CSV export sẵn có, tự gắn Bearer token qua
+`BearerTokenHandler`, trình duyệt không bao giờ gọi thẳng Api).
+
+Đã verify sống đầy đủ, không chỉ `dotnet test`: tạo 1 nhóm qua API thật (1 thành viên có tài khoản + 1
+khách vãng lai, 1 khoản chi chia đôi, 1 settlement Pending) → `curl` thẳng `backup.json` (Api thật) →
+đúng cấu trúc, đúng dữ liệu, tiếng Việt không bị escape, `Content-Disposition: attachment` đúng tên
+file; đăng nhập bằng trình duyệt thật, vào đúng nhóm đó, bấm "⬇ Backup JSON" → xác nhận qua log Api
++ Web request thật sự đi qua (không phải chỉ UI hiện nút) — response `200`, `2368` byte, khớp chính
+xác với kết quả `curl` trực tiếp trước đó.
+
+`dotnet build`: 0 warning, 0 error. `dotnet test`: **264/264 pass** (74 + 25 + 161 + 4 — 2 test mới:
+`ExportGroupBackupAsync_IncludesGroupMembersExpensesAndSettlements`,
+`ExportGroupBackupAsync_CallerNotMember_ThrowsMemberNotInGroup` (`ExportServiceTests`)).

@@ -1,6 +1,8 @@
 using FluentAssertions;
 using SplitBill.Application.Expenses;
 using SplitBill.Application.Groups;
+using SplitBill.Application.Settlements;
+using SplitBill.Domain.Exceptions;
 using Xunit;
 
 namespace SplitBill.IntegrationTests;
@@ -50,5 +52,44 @@ public sealed class ExportServiceTests
         csv.Should().StartWith("Thành viên,\"Số dư");
         csv.Should().Contain("Nam,50000");
         csv.Should().Contain("Binh,-50000");
+    }
+
+    // ===== Xuất/backup JSON toàn bộ dữ liệu nhóm (CLAUDE.md mục 25.4, bổ sung 2026-09-09) =====
+
+    [Fact]
+    public async Task ExportGroupBackupAsync_IncludesGroupMembersExpensesAndSettlements()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+        var guest = await harness.GroupService.AddMemberAsync(ownerId, group.Id, new AddMemberRequest(null, "Binh"), CancellationToken.None);
+        await harness.ExpenseService.CreateAsync(ownerId, group.Id, new CreateExpenseRequest(
+            "An toi", 100_000, 0, DateTimeOffset.UtcNow,
+            [new ExpensePayerInput(group.Members[0].Id, 100_000)],
+            "Equal",
+            new SplitConfigInput(MemberIds: [group.Members[0].Id, guest.Id])), CancellationToken.None);
+        await harness.SettlementRecordService.CreateAsync(ownerId, group.Id,
+            new CreateSettlementRequest(guest.Id, group.Members[0].Id, 50_000), CancellationToken.None);
+
+        var backup = await harness.ExportService.ExportGroupBackupAsync(ownerId, group.Id, CancellationToken.None);
+
+        backup.Group.Id.Should().Be(group.Id);
+        backup.Group.Members.Should().HaveCount(2);
+        backup.Expenses.Should().ContainSingle(e => e.Title == "An toi");
+        backup.Settlements.Should().ContainSingle(s => s.FromMemberId == guest.Id && s.Amount == 50_000);
+        backup.ExportedAt.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task ExportGroupBackupAsync_CallerNotMember_ThrowsMemberNotInGroup()
+    {
+        using var harness = TestHarness.Create();
+        var ownerId = await harness.RegisterUserAsync("a@example.com", "Nam");
+        var outsiderId = await harness.RegisterUserAsync("b@example.com", "Binh");
+        var group = await harness.GroupService.CreateAsync(ownerId, new CreateGroupRequest("Du lich", null, "OneTime", "VND"), CancellationToken.None);
+
+        var act = () => harness.ExportService.ExportGroupBackupAsync(outsiderId, group.Id, CancellationToken.None);
+
+        await act.Should().ThrowAsync<DomainException>();
     }
 }
