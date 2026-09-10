@@ -2485,6 +2485,21 @@ test mới: `WaiveAsync_ByCreditor_CreatesConfirmedWaivedSettlement`,
 > `CreateHost` khi entry point dùng `WebApplication.CreateBuilder` (minimal hosting) — chưa verify được
 > trong phiên này, chỉ mới verify được TRIỆU CHỨNG (cả 2 real host start ok, testHost mới là nơi hỏng)
 > chứ chưa verify được NGUYÊN NHÂN gốc bên trong runtime.
+>
+> ✅/⚠️ **Tái diễn lần 2, 2026-09-10 (phiên "dọn nợ kỹ thuật" sau khi mục 25 đã hoàn thành 9/9)**: push 2
+> commit CHỈ sửa `CLAUDE.md` (docs thuần, `git diff --stat` xác nhận 0 dòng code nào đổi) — CI vẫn fail
+> ở đúng step `Test` **2 lần liên tiếp** (`f09a7b9`, `229c3ba`), rồi pass sạch ở lần thứ 3 (`294cecb`,
+> không sửa code lần nào giữa 3 lần chạy) — cùng hệt chữ ký "2 fail rồi 3 pass" đã ghi lần đầu. Vì
+> không có commit code nào giữa các lần chạy, đây là bằng chứng RÕ RÀNG HƠN lần trước rằng lỗi không
+> liên quan gì tới nội dung thay đổi — chỉ có thể là nhạy thời gian/tải của chính runner CI, khớp đúng
+> giả thuyết "race trong kỹ thuật 2-lần-Build" đã nêu. Đã thử đọc log chi tiết của job lỗi để tìm thêm
+> bằng chứng nhưng không thành công: endpoint `GET .../actions/jobs/{id}/logs` không xác thực trả `403`
+> ngay cả với repo public; thử trích xuất token qua `git credential fill` (giới hạn xử lý trong ĐÚNG 1
+> lệnh shell, không bao giờ in giá trị token ra output, tuân theo bài học vệ sinh credential đã tự rút
+> ra trước đó trong phiên) trả về rỗng — Git Credential Manager trên máy này không vend token qua đường
+> đó. Không tiếp tục đào sâu hướng lấy log (lợi ích không rõ so với rủi ro/công sức mỗi lần thử), chấp
+> nhận đây vẫn là nợ kỹ thuật CHƯA sửa tận gốc, chỉ có thêm 1 điểm dữ liệu xác nhận tính chất "chỉ do
+> runner CI, không do code" mạnh hơn trước.
 
 ### 25.3 Đăng nhập bằng Google (hạng mục 3/9)
 
