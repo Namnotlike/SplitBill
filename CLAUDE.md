@@ -2879,10 +2879,15 @@ qua Web xác nhận có đủ 2 listener `push`/`notificationclick` mới.
 
 > ✅ **Cập nhật 2026-09-10 — click-through một phần bằng trình duyệt Chromium thật** (kết nối Chrome
 > extension có sẵn ở phiên này): đăng nhập thật → `/Notifications` → bấm "Bật thông báo đẩy" → xác
-> nhận qua console (không có lỗi JS nào) và qua `Notification.permission` (đổi đúng từ chưa-gọi sang
-> `"default"` — trạng thái "đang chờ người dùng quyết định", đúng như kỳ vọng ngay sau khi
-> `requestPermission()` được gọi) rằng nút bấm đúng là đã gọi `Notification.requestPermission()` mà
-> không ném lỗi. **Không đi hết được toàn bộ luồng**: hộp thoại xin quyền thông báo của Chrome là UI
+> nhận **dứt khoát, không mơ hồ** rằng nút bấm đúng là đã gọi `Notification.requestPermission()`, bằng
+> cách monkey-patch hàm này (gán 1 cờ `true` trong wrapper rồi mới gọi hàm gốc) NGAY TRƯỚC khi bấm, rồi
+> đọc lại cờ đó sau khi bấm — cờ chuyển đúng từ `false` sang `true`.
+> ⚠️ Lần verify đầu tiên (trước khi sửa) chỉ dựa vào `Notification.permission == "default"` SAU click —
+> advisor chỉ ra đây là phép thử không kết luận được gì: `"default"` cũng chính là giá trị mặc định
+> CHƯA TỪNG gọi `requestPermission()` bao giờ, nên không phân biệt được "nút bấm hoạt động đúng" khỏi
+> "cú click bị trượt, không trúng gì cả" — đúng loại lỗi click-trượt đã tự gặp 2 lần khác trong cùng
+> phiên này (nút Đăng ký, nút Đăng nhập). Đã sửa lại bằng phép thử dứt khoát ở trên trước khi coi là đã
+> verify. **Không đi hết được toàn bộ luồng**: hộp thoại xin quyền thông báo của Chrome là UI
 > gốc của trình duyệt (không phải DOM của trang), nằm ngoài vùng mà công cụ chụp ảnh màn hình dựa trên
 > CDP `Page.captureScreenshot` bao phủ, và các trang cấu hình nội bộ dùng để cấp quyền trước
 > (`chrome://settings/content/notifications`) bị chặn tường minh bởi chính extension ("Can't interact
