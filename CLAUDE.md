@@ -2862,13 +2862,22 @@ không chỉ gọi thẳng Api) render đúng `data-vapid-public-key` với publ
 (`sb-push-toggle-btn`/`sb-push-subscribe-form`/`sb-push-unsubscribe-form`); `service-worker.js` phục vụ
 qua Web xác nhận có đủ 2 listener `push`/`notificationclick` mới.
 
-**Chưa verify được** (giới hạn thành thật, giống mục 25.6): không có kết nối Chrome extension trong
-phiên này nên không click-through được nút "Bật thông báo đẩy" bằng trình duyệt thật để xác nhận
-`Notification.requestPermission()`/`PushManager.subscribe()` chạy đúng và popup xin quyền hiện ra —
-phần JS phía trình duyệt (client-side subscribe flow) mới chỉ được xác nhận đúng bằng đọc code + verify
-HTML/service-worker render đúng, chưa phải click thật. Cần verify sống bổ sung khi có trình duyệt thật
-(của người dùng, hoặc lần sau có Chrome extension) trước khi coi tính năng này đã kiểm chứng đầy đủ
-100%.
+> ✅ **Cập nhật 2026-09-10 — click-through một phần bằng trình duyệt Chromium thật** (kết nối Chrome
+> extension có sẵn ở phiên này): đăng nhập thật → `/Notifications` → bấm "Bật thông báo đẩy" → xác
+> nhận qua console (không có lỗi JS nào) và qua `Notification.permission` (đổi đúng từ chưa-gọi sang
+> `"default"` — trạng thái "đang chờ người dùng quyết định", đúng như kỳ vọng ngay sau khi
+> `requestPermission()` được gọi) rằng nút bấm đúng là đã gọi `Notification.requestPermission()` mà
+> không ném lỗi. **Không đi hết được toàn bộ luồng**: hộp thoại xin quyền thông báo của Chrome là UI
+> gốc của trình duyệt (không phải DOM của trang), nằm ngoài vùng mà công cụ chụp ảnh màn hình dựa trên
+> CDP `Page.captureScreenshot` bao phủ, và các trang cấu hình nội bộ dùng để cấp quyền trước
+> (`chrome://settings/content/notifications`) bị chặn tường minh bởi chính extension ("Can't interact
+> with browser-internal... URLs") — đây là giới hạn có chủ đích của công cụ tự động hóa trình duyệt,
+> không phải lỗi của app. Vì vậy bước `PushManager.subscribe()` thực sự chạy xong (sau khi người dùng
+> BẤM "Cho phép" trên hộp thoại gốc) vẫn CHƯA verify được bằng trình duyệt thật — chỉ verify được nửa
+> đầu (nút bấm đúng, gọi đúng API trình duyệt, không lỗi) chứ chưa phải toàn bộ luồng tới lúc nhận
+> push thật. Cần một người dùng thật tự bấm "Cho phép" trên hộp thoại đó (hoặc chạy Chrome với cờ
+> `--unsafely-treat-insecure-origin-as-secure`/policy pre-grant riêng ngoài phạm vi công cụ hiện có) để
+> đóng nốt khoảng verify còn lại.
 
 `dotnet build`: 0 warning, 0 error. `dotnet test`: **282/282 pass** (74 unit + 25 web + 179 integration
 + 4 E2E — 5 test integration mới: `SubscribeToPushAsync_ThenNotifyAsync_SendsPushWithAbsoluteUrl`,
@@ -3025,10 +3034,28 @@ kịch bản curl bên dưới, không lưu lại trong repo):
    `/Groups/Index`, navbar hiện đúng tên tài khoản — xác nhận toàn bộ vòng đời qua đúng luồng trình
    duyệt thật sẽ đi (không chỉ gọi API).
 
-**Chưa verify được** (giới hạn thành thật, cùng lý do mục 25.6/25.7): không có kết nối Chrome extension
-trong phiên này nên chưa xác nhận trực tiếp bằng mắt việc quét QR bằng 1 app xác thực THẬT (Google
-Authenticator...) — đã verify gián tiếp đầy đủ bằng cách tính đúng mã TOTP từ CHÍNH secret trong QR đó
-bằng thuật toán RFC 6238 đã verify khớp test vector chính thức, và xác nhận Api chấp nhận đúng mã đó.
+> ✅ **Cập nhật 2026-09-10 — đã verify sống bằng trình duyệt Chromium thật (kết nối Chrome extension có
+> sẵn ở phiên này, khác lần đầu triển khai)**: chạy `SplitBill.Api` + `SplitBill.Web` thật (LocalDB,
+> `ASPNETCORE_ENVIRONMENT=Development`), đăng ký 1 tài khoản mới qua form thật → vào `/Account/
+> TwoFactor` → bấm "Bật xác thực 2 lớp" → **QR code render đúng trên trình duyệt thật** (trước đó chỉ
+> verify qua curl/text, chưa từng nhìn thấy QR thật) → tính mã TOTP thật từ secret hiển thị (PowerShell
+> `HMACSHA1`, cùng thuật toán RFC 6238 đã verify khớp test vector chính thức) → xác nhận & bật 2FA
+> thành công, 10 mã dự phòng hiện đúng → đăng xuất (xác nhận qua log Api có `POST /auth/logout` —
+> phát hiện lần đầu bấm "Đăng xuất" qua `read_page` ref KHÔNG thực sự submit form, phải dùng
+> `computer` click theo tọa độ mới ăn; nhắc lại đúng bài học ở mục 15.6/18 về việc verify sống phải
+> xác nhận qua log server, không chỉ tin UI) → đăng nhập lại bằng mật khẩu → redirect đúng
+> `/Account/TwoFactorChallenge` → **xác nhận tường minh navbar KHÔNG hiện trạng thái đã đăng nhập ở
+> bước này** (kiểm tra kỹ vì nghi ngờ ban đầu — do cookie cũ chưa logout — cứ tưởng là lỗi bypass 2FA,
+> hóa ra chỉ là phương pháp test sai, không phải bug thật) → nhập mã TOTP thật → hoàn tất đăng nhập,
+> redirect đúng `/Groups/Index`, navbar hiện đúng tên tài khoản → xác nhận qua log Api có đúng
+> `POST /auth/login/2fa` trả `200`. Khoảng "Chưa verify được" ở bản gốc (chỉ tính mã TOTP gián tiếp,
+> chưa từng thấy QR/luồng UI thật) nay đã đóng.
+>
+> **Vẫn chưa verify được** (giới hạn thành thật còn lại, không phóng đại): quét QR bằng 1 app xác thực
+> di động THẬT (Google Authenticator...) — không có thiết bị di động trong môi trường này. Đã verify
+> gián tiếp đầy đủ bằng cách tính đúng mã TOTP từ CHÍNH secret trong QR đó bằng thuật toán RFC 6238 đã
+> verify khớp test vector chính thức, và xác nhận Api chấp nhận đúng mã đó — nhưng bản thân việc app
+> điện thoại đọc đúng nội dung ảnh QR (không phải lỗi encode ảnh) chưa được xác nhận bằng mắt người.
 
 > ⚠️ **Rủi ro vận hành phát hiện qua rà soát chủ động (advisor, trước khi commit — không phải bug đã
 > xảy ra thật), đã vá 1 phần:** `TwoFactor:EncryptionKey` (khóa AES-GCM mã hóa `TwoFactorSecretEncrypted`
